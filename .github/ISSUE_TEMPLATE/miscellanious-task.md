@@ -1,8 +1,8 @@
 ---
 name: Miscellanious Task
 about: A Task that doesn't really fit into writing or coding.
-title: "[OTHER] task-name"
-labels: ''
+title: "[OTHER] "
+labels: 'Other'
 assignees: ''
 
 ---
