@@ -1,9 +1,9 @@
 ---
-name: Overleaf Section
-about: For Writing a Section in Overleaf
+name: Writing
+about: For Writing in Overleaf
 title: "[SECTION] "
-labels: Overleaf
-assignees:
+labels: overleaf
+assignees: ''
 
 ---
 
@@ -13,7 +13,7 @@ assignees:
 - [ ] Sub-task 1
 - [ ] Sub-task 2
 
-# Requirements for Section
+# Requirements for Writing
 - [ ] Requirement 1
 - [ ] Requirement 2
 - [ ] Requirement 3
