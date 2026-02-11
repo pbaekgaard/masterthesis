@@ -1,8 +1,8 @@
 ---
 name: Coding
 about: Coding task that implements something new
-title: ''
-labels: ''
+title: '[CODE] '
+labels: 'CODE'
 assignees: ''
 
 ---
