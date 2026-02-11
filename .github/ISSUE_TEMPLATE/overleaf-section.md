@@ -1,9 +1,9 @@
 ---
 name: Overleaf Section
 about: For Writing a Section in Overleaf
-title: "[SECTION] Section Name"
+title: "[SECTION] "
 labels: Overleaf
-assignees: Aasmundur, pbaekgaard
+assignees:
 
 ---
 
