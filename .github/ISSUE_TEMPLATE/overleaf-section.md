@@ -1,7 +1,7 @@
 ---
 name: Overleaf Section
-about: For writing a section in overleaf
-title: "[SECTION/CHAPTER] Section/Chapter Name"
+about: For Writing a Section in Overleaf
+title: "[SECTION] Section Name"
 labels: Overleaf
 assignees: Aasmundur, pbaekgaard
 
@@ -9,8 +9,9 @@ assignees: Aasmundur, pbaekgaard
 
 # Description
 
+# Subtasks
 
-# Requirements
+# Requirements for Section
 - [ ] Requirement 1
 - [ ] Requirement 2
 - [ ] Requirement 3
