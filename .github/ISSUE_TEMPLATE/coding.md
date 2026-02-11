@@ -2,7 +2,7 @@
 name: Coding
 about: Coding task that implements something new
 title: '[CODE] '
-labels: 'CODE'
+labels: 'code'
 assignees: ''
 
 ---
