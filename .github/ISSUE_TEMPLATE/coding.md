@@ -1,8 +1,8 @@
 ---
 name: Coding
 about: Coding task that implements something new
-title: '[CODE] '
-labels: 'code'
+title: "[CODE] "
+labels: code, overleaf
 assignees: ''
 
 ---

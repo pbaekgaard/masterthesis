@@ -2,7 +2,7 @@
 name: Other
 about: A Task that doesn't really fit into writing or coding.
 title: "[OTHER] "
-labels: 'other'
+labels: other
 assignees: ''
 
 ---
