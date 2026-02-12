@@ -1,0 +1,32 @@
+# Test file for small_lang compiler
+
+func is_greater_than_44(params : Integer) -> Integer {
+  let x : Integer = params;
+  if x > 44 is True then {
+    1
+  }
+  else if not {
+    0
+  }
+}
+
+
+func otherFunction() -> Boolean {
+  let number : Integer = 20;
+  let is_greater : Integer = is_greater_than_44(number);
+  if is_greater == 0 is True then {
+    print("Didnt work the first time!");
+  }
+  while is_greater == 0 do {
+    number = number + 1;
+    is_greater = is_greater_than_44(number);
+  }
+  True
+}
+
+func main() -> Boolean {
+  let result : Boolean = otherFunction();
+  print(result);
+  print("Finished");
+  result
+}
