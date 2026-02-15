@@ -42,6 +42,18 @@ impl Lexer {
                 '*' => {
                     self.simple_token(TokenType::Multiply);
                 }
+                '{' => {
+                    self.simple_token(TokenType::LeftBrace);
+                }
+                '}' => {
+                    self.simple_token(TokenType::RightBrace);
+                }
+                '(' => {
+                    self.simple_token(TokenType::LeftParen);
+                }
+                ')' => {
+                    self.simple_token(TokenType::RightBrace);
+                }
                 _ => panic!("Suuuper wrongdog in here, unexpected char '{}' at {}:{}", ch, self.line, self.column),
             }
         }
@@ -67,11 +79,13 @@ impl Lexer {
     }
 
     fn read_number(&mut self) -> Token {
-        // TODO: 
+        // TODO: implement this shi
+        Token::new(TokenType::Integer, self.line, self.column)
     }
 
     fn read_identifier(&mut self) -> Token {
-        // TODO:
+        // TODO: implement this shi
+        Token::new(TokenType::Integer, self.line, self.column)
     }
     
 }
@@ -84,7 +98,7 @@ impl PartialEq for Lexer {
     }
 }
 mod tests{
-    use crate::lexer::lexer::Lexer;
+    use crate::lexer::{lexer::Lexer, token::{Token, TokenType}};
     #[test]
     fn new_creates_lexer_correctly(){
         let actual = Lexer::new("a = 2".to_string());
@@ -97,5 +111,18 @@ mod tests{
         };
 
         assert_eq!(actual, expected);
+    }
+
+    fn tokenize_works_as_intended(){
+        let lex: &mut Lexer = Lexer::new("a = 2".to_string()); //wrongdog fix later
+        let actualTokenVec: Vec<Token> = Lexer::tokenize(lex);
+
+        let expected: Vec<Token> = vec![
+            Token::new(TokenType::Identifier("a".to_string()), 1, 1), //idk if true, check later
+            Token::new(TokenType::Assign, 1, 3), 
+            Token::new(TokenType::Integer, 1, 5),
+        ];
+
+        assert_eq!(actualTokenVec, expected);// idk man i tried, does not work
     }
 }
