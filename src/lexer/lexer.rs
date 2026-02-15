@@ -1,3 +1,5 @@
+use crate::lexer::token::{Token, TokenType};
+
 
 
 #[derive(Debug)]
@@ -16,6 +18,60 @@ impl Lexer {
             line: 1,
             column: 1,
         }
+    }
+    pub fn tokenize(&mut self) -> Vec<Token> {
+        let mut tokens: Vec<Token> = Vec::new();
+        while let Some(ch) = self.current_char() {
+            match ch {
+                ' ' | '\t' => {
+                    self.advance();
+                }
+
+                '\n' => {
+                    self.advance_line();
+                }
+                '=' => {
+                    self.simple_token(TokenType::Assign);
+                }
+                '+' => {
+                    self.simple_token(TokenType::Plus);
+                }
+                '-' => {
+                    self.simple_token(TokenType::Minus);
+                }
+                '*' => {
+                    self.simple_token(TokenType::Multiply);
+                }
+                _ => panic!("Suuuper wrongdog in here, unexpected char '{}' at {}:{}", ch, self.line, self.column),
+            }
+        }
+        tokens
+    }
+    fn current_char(&self) -> Option<char> {
+        self.input.get(self.position).copied()
+    }
+
+    fn advance(&mut self) {
+        self.position += 1;
+        self.column += 1;
+    }
+
+    fn advance_line(&mut self) {
+        self.position += 1;
+        self.line += 1;
+        self.column = 1;
+    }
+
+    fn simple_token(&self, token_type: TokenType) -> Token {
+        Token::new(token_type, self.line, self.column)
+    }
+
+    fn read_number(&mut self) -> Token {
+        // TODO: 
+    }
+
+    fn read_identifier(&mut self) -> Token {
+        // TODO:
     }
     
 }

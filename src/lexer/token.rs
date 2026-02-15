@@ -32,6 +32,8 @@ pub enum TokenType {
     GreaterThan, // >
     Equals,      // ==
     Plus,        // +
+    Minus,       // -
+    Multiply,    // *
 
     // Punctuation
     LeftParen,  // (
