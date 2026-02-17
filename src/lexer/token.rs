@@ -13,7 +13,7 @@ pub enum TokenType {
     Is,
 
     // Types
-    Integer(i64),
+    Integer,
     Boolean,
 
     // Literals
