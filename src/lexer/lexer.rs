@@ -1,3 +1,5 @@
+use std::{any::Any, string};
+
 use crate::lexer::token::{Token, TokenType};
 
 
@@ -29,6 +31,9 @@ impl Lexer {
 
                 '\n' => {
                     self.advance_line();
+                }
+                'A'..='Z' | 'a'..='z' => {
+                    self.read_identifier(ch);
                 }
                 '=' => {
                     self.simple_token(TokenType::Assign);
@@ -78,14 +83,28 @@ impl Lexer {
         Token::new(token_type, self.line, self.column)
     }
 
-    fn read_number(&mut self) -> Token {
+    fn read_number(&mut self, first_ch: char) -> Token {
         // TODO: implement this shi
-        Token::new(TokenType::Integer, self.line, self.column)
+        Token::new(TokenType::Integer(num), self.line, self.column)
     }
 
-    fn read_identifier(&mut self) -> Token {
-        // TODO: implement this shi
-        Token::new(TokenType::Integer, self.line, self.column)
+    fn read_identifier(&mut self, first_ch: char) -> Token {
+        let mut name:String  = "".to_string();
+        let startColumnNum: usize = self.column;
+        name.push(first_ch);
+        self.advance();
+        while let Some(ch) = self.current_char() {
+            match ch {
+                'A'..='Z' | 'a'..='z' => {
+                    name.push(ch);
+                    self.advance();
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        Token::new(TokenType::Identifier(name), self.line, startColumnNum)
     }
     
 }
@@ -112,17 +131,17 @@ mod tests{
 
         assert_eq!(actual, expected);
     }
-
+    #[test]
     fn tokenize_works_as_intended(){
-        let lex: &mut Lexer = Lexer::new("a = 2".to_string()); //wrongdog fix later
-        let actualTokenVec: Vec<Token> = Lexer::tokenize(lex);
+        let mut lex: Lexer = Lexer::new("a = 2".to_string()); //wrongdog fix later
+        let actual_token_vec: Vec<Token> = lex.tokenize();
 
         let expected: Vec<Token> = vec![
             Token::new(TokenType::Identifier("a".to_string()), 1, 1), //idk if true, check later
             Token::new(TokenType::Assign, 1, 3), 
-            Token::new(TokenType::Integer, 1, 5),
+            Token::new(TokenType::Integer(2), 1, 5),
         ];
 
-        assert_eq!(actualTokenVec, expected);// idk man i tried, does not work
+        assert_eq!(actual_token_vec, expected);// idk man i tried, does not work
     }
 }
