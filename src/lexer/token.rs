@@ -30,6 +30,7 @@ pub enum TokenType {
     Arrow,       // ->
     Assign,      // =
     GreaterThan, // >
+    LessThan, // <
     Equals,      // ==
     Plus,        // +
     Minus,       // -
@@ -47,7 +48,7 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub line: usize,
@@ -61,5 +62,12 @@ impl Token {
             line,
             column,
         }
+    }
+}
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.token_type == other.token_type &&
+        self.line == other.line &&
+        self.column == other.column
     }
 }

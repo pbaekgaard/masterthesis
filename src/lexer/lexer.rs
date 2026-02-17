@@ -32,32 +32,53 @@ impl Lexer {
                 '\n' => {
                     self.advance_line();
                 }
-                'A'..='Z' | 'a'..='z' => {
-                    self.read_identifier(ch);
+                'A'..='Z' | 'a'..='z' | '_' => {
+                    tokens.push(self.read_identifier(ch));
+                }
+                '0' ..= '9' => {
+                    tokens.push(self.read_number(ch));
                 }
                 '=' => {
-                    self.simple_token(TokenType::Assign);
+                    tokens.push(self.simple_token(TokenType::Assign));
+                }
+                ':' => {
+                    tokens.push(self.simple_token(TokenType::Colon));
                 }
                 '+' => {
-                    self.simple_token(TokenType::Plus);
+                    tokens.push(self.simple_token(TokenType::Plus));
                 }
                 '-' => {
-                    self.simple_token(TokenType::Minus);
+                    tokens.push(self.simple_token(TokenType::Minus));
                 }
                 '*' => {
-                    self.simple_token(TokenType::Multiply);
+                    tokens.push(self.simple_token(TokenType::Multiply));
                 }
                 '{' => {
-                    self.simple_token(TokenType::LeftBrace);
+                    tokens.push(self.simple_token(TokenType::LeftBrace));
                 }
                 '}' => {
-                    self.simple_token(TokenType::RightBrace);
+                    tokens.push(self.simple_token(TokenType::RightBrace));
                 }
                 '(' => {
-                    self.simple_token(TokenType::LeftParen);
+                    tokens.push(self.simple_token(TokenType::LeftParen));
                 }
                 ')' => {
-                    self.simple_token(TokenType::RightBrace);
+                    tokens.push(self.simple_token(TokenType::RightParen));
+                }
+                '>' =>{
+                    tokens.push(self.simple_token(TokenType::GreaterThan));
+                }
+                '<' =>{
+                    tokens.push(self.simple_token(TokenType::LessThan));
+                }
+                ';' =>{
+                    tokens.push(self.simple_token(TokenType::Semicolon));                    
+                }
+                '"' => {
+                    tokens.push(self.read_string_literal());
+                }
+                '#' => {
+                    self.read_comment();
                 }
                 _ => panic!("Suuuper wrongdog in here, unexpected char '{}' at {}:{}", ch, self.line, self.column),
             }
@@ -79,12 +100,25 @@ impl Lexer {
         self.column = 1;
     }
 
-    fn simple_token(&self, token_type: TokenType) -> Token {
-        Token::new(token_type, self.line, self.column)
+    fn simple_token(&mut self, token_type: TokenType) -> Token {
+        let start_col_num = self.column;
+        self.advance();
+        Token::new(token_type, self.line, start_col_num)
+        
     }
-
+    fn read_comment(&mut self) {
+        while let Some(ch) = self.current_char(){
+            match ch{
+                '\n' => {
+                    break;
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+    }
     fn read_number(&mut self, first_ch: char) -> Token {
-        // TODO: implement this shi
         let mut num_string: String = "".to_string();
         let start_col_num :usize= self.column;
         num_string.push(first_ch);
@@ -101,7 +135,28 @@ impl Lexer {
             }
         }
         let num = num_string.parse::<i64>().unwrap();
-        Token::new(TokenType::Integer(num), self.line, self.column)
+        Token::new(TokenType::Integer(num), self.line, start_col_num)
+    }
+
+    fn read_string_literal(&mut self) -> Token{
+        let mut the_litteral: String = "".to_string();
+        let start_col_num: usize = self.column;
+        the_litteral.push('"');
+        self.advance();
+        while let Some(ch) = self.current_char(){
+            match ch {
+                '"' => {
+                    the_litteral.push(ch);
+                    self.advance();
+                    break;
+                }
+                _ => {
+                    the_litteral.push(ch);
+                    self.advance();
+                }
+            }
+        }
+        Token::new(TokenType::StringLiteral(the_litteral), self.line, start_col_num)
     }
 
     fn read_identifier(&mut self, first_ch: char) -> Token {
@@ -111,7 +166,7 @@ impl Lexer {
         self.advance();
         while let Some(ch) = self.current_char() {
             match ch {
-                'A'..='Z' | 'a'..='z' => {
+                'A'..='Z' | 'a'..='z' | '_' => {
                     name.push(ch);
                     self.advance();
                 }
@@ -149,15 +204,41 @@ mod tests{
     }
     #[test]
     fn tokenize_works_as_intended(){
-        let mut lex: Lexer = Lexer::new("a = 2".to_string()); //wrongdog fix later
+        let mut lex: Lexer = Lexer::new("abc_def = 2".to_string()); 
         let actual_token_vec: Vec<Token> = lex.tokenize();
 
         let expected: Vec<Token> = vec![
-            Token::new(TokenType::Identifier("a".to_string()), 1, 1), //idk if true, check later
-            Token::new(TokenType::Assign, 1, 3), 
-            Token::new(TokenType::Integer(2), 1, 5),
+            Token::new(TokenType::Identifier("abc_def".to_string()), 1, 1), 
+            Token::new(TokenType::Assign, 1, 9), 
+            Token::new(TokenType::Integer(2), 1, 11),
         ];
 
-        assert_eq!(actual_token_vec, expected);// idk man i tried, does not work
+        assert_eq!(actual_token_vec, expected);
+    }
+    #[test]
+    fn reading_comments_tokenize_lexer_line_col_are_correct(){
+        let mut lex: Lexer = Lexer::new("#abc_def = 2\n".to_string()); 
+        lex.tokenize();
+        assert_eq!((lex.line, lex.column), (2,1));
+    }
+    #[test]
+    fn reading_comments_tokenize_returns_empty_vector(){
+        let mut lex: Lexer = Lexer::new("#abc_def = 2\n".to_string()); 
+        let actual_token_vec: Vec<Token> = lex.tokenize();
+
+        let expected: Vec<Token> = vec![];
+
+        assert_eq!(actual_token_vec, expected);
+    }
+    #[test]
+    fn read_string_literal_makes_correct_token(){
+        let mut lex: Lexer = Lexer::new("\"test\"".to_string()); 
+        let actual_token_vec: Vec<Token> = lex.tokenize();
+
+        let expected: Vec<Token> = vec![
+            Token::new(TokenType::StringLiteral("\"test\"".to_string()), 1, 1)
+        ];
+
+        assert_eq!(actual_token_vec, expected);
     }
 }
