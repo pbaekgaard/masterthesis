@@ -5,7 +5,7 @@ func is_greater_than_44(params : Integer) -> Integer {
   if x > 44 is True then {
     1
   }
-  else if not {
+  else {
     0
   }
 }
