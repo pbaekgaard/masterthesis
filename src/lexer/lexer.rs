@@ -85,12 +85,28 @@ impl Lexer {
 
     fn read_number(&mut self, first_ch: char) -> Token {
         // TODO: implement this shi
+        let mut num_string: String = "".to_string();
+        let start_col_num :usize= self.column;
+        num_string.push(first_ch);
+        self.advance();
+        while let Some(ch) = self.current_char() {
+            match ch {
+                '0'..='9' =>{
+                    num_string.push(ch);
+                    self.advance();
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        let num = num_string.parse::<i64>().unwrap();
         Token::new(TokenType::Integer(num), self.line, self.column)
     }
 
     fn read_identifier(&mut self, first_ch: char) -> Token {
         let mut name:String  = "".to_string();
-        let startColumnNum: usize = self.column;
+        let start_col_num: usize = self.column;
         name.push(first_ch);
         self.advance();
         while let Some(ch) = self.current_char() {
@@ -104,7 +120,7 @@ impl Lexer {
                 }
             }
         }
-        Token::new(TokenType::Identifier(name), self.line, startColumnNum)
+        Token::new(TokenType::Identifier(name), self.line, start_col_num)
     }
     
 }
