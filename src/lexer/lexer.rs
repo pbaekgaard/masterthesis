@@ -1,5 +1,3 @@
-use std::{any::Any, string};
-
 use crate::lexer::token::{Token, TokenType};
 
 
@@ -214,7 +212,6 @@ impl Lexer {
             "Boolean"=> Token::new(TokenType::Boolean, line, col),
             "True"   => Token::new(TokenType::True, line, col),
             "False"  => Token::new(TokenType::False, line, col),
-            "Eof"    => Token::new(TokenType::Eof, line, col),
             _        => Token::new(TokenType::Identifier(name.to_string()), line, col),
         }
     }

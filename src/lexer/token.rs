@@ -43,9 +43,6 @@ pub enum TokenType {
     RightBrace, // }
     Comma,      // ,
     Semicolon,  // ;
-
-    // Special
-    Eof,
 }
 
 #[derive(Debug, Clone)]
