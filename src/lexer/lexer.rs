@@ -40,43 +40,43 @@ impl Lexer {
                     tokens.push(self.assign_or_equals());
                 }
                 ':' => {
-                    tokens.push(self.simple_token(TokenType::Colon));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::Colon));
                 }
                 '+' => {
-                    tokens.push(self.simple_token(TokenType::Plus));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::Plus));
                 }
                 '-' => {
                     tokens.push(self.minus_or_arrow());
                 }
                 '*' => {
-                    tokens.push(self.simple_token(TokenType::Multiply));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::Multiply));
                 }
                 '{' => {
-                    tokens.push(self.simple_token(TokenType::LeftBrace));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::LeftBrace));
                 }
                 '}' => {
-                    tokens.push(self.simple_token(TokenType::RightBrace));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::RightBrace));
                 }
                 '(' => {
-                    tokens.push(self.simple_token(TokenType::LeftParen));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::LeftParen));
                 }
                 ')' => {
-                    tokens.push(self.simple_token(TokenType::RightParen));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::RightParen));
                 }
                 '>' =>{
-                    tokens.push(self.simple_token(TokenType::GreaterThan));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::GreaterThan));
                 }
                 '<' =>{
-                    tokens.push(self.simple_token(TokenType::LessThan));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::LessThan));
                 }
                 ';' =>{
-                    tokens.push(self.simple_token(TokenType::Semicolon));                    
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::Semicolon));                    
                 }
                 '"' => {
                     tokens.push(self.read_string_literal());
                 }
                 ',' => {
-                    tokens.push(self.simple_token(TokenType::Comma));
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::Comma));
                 }
                 '#' => {
                     self.read_comment();
@@ -84,6 +84,7 @@ impl Lexer {
                 _ => panic!("Suuuper wrongdog in here, unexpected char '{}' at {}:{}", ch, self.line, self.column),
             }
         }
+        tokens.push(self.simple_token("EOF".to_string(),TokenType::Eof));
         tokens
     }
     fn current_char(&self) -> Option<char> {
@@ -101,28 +102,28 @@ impl Lexer {
         self.column = 1;
     }
 
-    fn simple_token(&mut self, token_type: TokenType) -> Token {
+    fn simple_token(&mut self,value: String, token_type: TokenType) -> Token {
         let start_col_num = self.column;
         self.advance();
-        Token::new(token_type, self.line, start_col_num)
+        Token::new(value, token_type, self.line, start_col_num)
         
     }
     fn assign_or_equals(&mut self) -> Token{
         let original_col = self.column;
         self.advance();
         if self.current_char().unwrap() == '=' {
-            Token::new(TokenType::Equals, self.line, original_col)
+            Token::new("=".to_string(),TokenType::Equals, self.line, original_col)
         } else {
-            Token::new(TokenType::Assign, self.line, original_col)
+            Token::new("==".to_string(),TokenType::Assign, self.line, original_col)
         }
     }
     fn minus_or_arrow(&mut self) -> Token {
         let original_col = self.column;
         self.advance();
         if self.current_char().unwrap() == '>' {
-            Token::new(TokenType::Arrow, self.line, original_col)
+            Token::new("->".to_string(),TokenType::Arrow, self.line, original_col)
         } else {
-            Token::new(TokenType::Minus, self.line, original_col)
+            Token::new("-".to_string(),TokenType::Minus, self.line, original_col)
         }
     }
     fn read_comment(&mut self) {
@@ -154,7 +155,7 @@ impl Lexer {
             }
         }
         let num = num_string.parse::<i64>().unwrap();
-        Token::new(TokenType::IntegerLiteral(num), self.line, start_col_num)
+        Token::new(num_string, TokenType::IntegerLiteral(num), self.line, start_col_num)
     }
 
     fn read_string_literal(&mut self) -> Token{
@@ -175,7 +176,7 @@ impl Lexer {
                 }
             }
         }
-        Token::new(TokenType::StringLiteral(the_litteral), self.line, start_col_num)
+        Token::new(the_litteral, TokenType::StringLiteral(the_litteral), self.line, start_col_num)
     }
 
     fn read_identifier(&mut self, first_ch: char) -> Token {

@@ -4,8 +4,10 @@ mod semantic;
 
 use std::env;
 use std::fs;
-
+use lexer::token::Token;
 use lexer::lexer::Lexer; // adjust if needed
+use parser::parser::AST;
+use parser::parser::Parser;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -20,10 +22,12 @@ fn main() {
     let source = fs::read_to_string(filename)
         .expect("Failed to read file");
 
-    let mut lexer = Lexer::new(source);
-    let _tokens = lexer.tokenize();
+    let mut lexer: Lexer = Lexer::new(source);
+    let _tokens: Vec<Token> = lexer.tokenize();
+    let mut parser: Parser = Parser::new(_tokens);
+    let _ast: AST = parser.parse_program();
 
-    println!("Lexing completed successfully.");
+    println!("Lexing and parsing completed successfully.");
 }
 
 #[cfg(test)]

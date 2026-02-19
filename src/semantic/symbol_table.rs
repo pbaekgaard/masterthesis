@@ -59,7 +59,7 @@ impl SymbolTable {
     pub fn lookup(&self, name: &str) -> Option<&Symbol> {
         for scope in self.scopes.iter().rev() {
             if let Some(symbol) = scope.get(name) {
-                Some(symbol);
+                return Some(symbol);
             }
         }
         None

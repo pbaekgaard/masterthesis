@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     // Keywords
@@ -43,22 +45,86 @@ pub enum TokenType {
     RightBrace, // }
     Comma,      // ,
     Semicolon,  // ;
+    //special
+    Eof, // End of file
 }
 
 #[derive(Debug, Clone)]
 pub struct Token {
+    pub value: String,
     pub token_type: TokenType,
     pub line: usize,
     pub column: usize,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, line: usize, column: usize) -> Self {
+    pub fn new(value: String,token_type: TokenType, line: usize, column: usize) -> Self {
         Token {
+            value:value, 
             token_type,
             line,
             column,
         }
+    }
+}
+impl fmt::Display for TokenType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            // Keywords
+            TokenType::Func => write!(f, "func"),
+            TokenType::Let => write!(f, "let"),
+            TokenType::If => write!(f, "if"),
+            TokenType::Then => write!(f, "then"),
+            TokenType::Else => write!(f, "else"),
+            TokenType::Not => write!(f, "not"),
+            TokenType::While => write!(f, "while"),
+            TokenType::Print => write!(f, "print"),
+            TokenType::Do => write!(f, "do"),
+            TokenType::Is => write!(f, "is"),
+
+            // Types
+            TokenType::Integer => write!(f, "Integer"),
+            TokenType::Boolean => write!(f, "Boolean"),
+
+            // Literals
+            TokenType::True => write!(f, "true"),
+            TokenType::False => write!(f, "false"),
+            TokenType::IntegerLiteral(val) => write!(f, "{val}"),
+            TokenType::StringLiteral(val) => write!(f, "\"{val}\""),
+
+            // Identifiers
+            TokenType::Identifier(name) => write!(f, "{name}"),
+
+            // Operators
+            TokenType::Colon => write!(f, ":"),
+            TokenType::Arrow => write!(f, "->"),
+            TokenType::Assign => write!(f, "="),
+            TokenType::GreaterThan => write!(f, ">"),
+            TokenType::LessThan => write!(f, "<"),
+            TokenType::Equals => write!(f, "=="),
+            TokenType::Plus => write!(f, "+"),
+            TokenType::Minus => write!(f, "-"),
+            TokenType::Multiply => write!(f, "*"),
+
+            // Punctuation
+            TokenType::LeftParen => write!(f, "("),
+            TokenType::RightParen => write!(f, ")"),
+            TokenType::LeftBrace => write!(f, "{{"),
+            TokenType::RightBrace => write!(f, "}}"),
+            TokenType::Comma => write!(f, ","),
+            TokenType::Semicolon => write!(f, ";"),
+            TokenType::Eof => write!(f, "Eof"),
+        }
+    }
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} at {}:{}",
+            self.token_type, self.line, self.column
+        )
     }
 }
 impl PartialEq for Token {
