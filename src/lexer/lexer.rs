@@ -155,7 +155,7 @@ impl Lexer {
             }
         }
         let num = num_string.parse::<i64>().unwrap();
-        Token::new(num_string, TokenType::IntegerLiteral(num), self.line, start_col_num)
+        Token::new(num_string, TokenType::IntegerLiteral, self.line, start_col_num)
     }
 
     fn read_string_literal(&mut self) -> Token{
@@ -176,7 +176,7 @@ impl Lexer {
                 }
             }
         }
-        Token::new(the_litteral, TokenType::StringLiteral(the_litteral), self.line, start_col_num)
+        Token::new(the_litteral.clone(), TokenType::StringLiteral, self.line, start_col_num)
     }
 
     fn read_identifier(&mut self, first_ch: char) -> Token {
@@ -199,21 +199,21 @@ impl Lexer {
     }
     fn give_keyword_or_literal_token(&mut self, name: &str, line: usize, col: usize) -> Token{
         match name {
-            "let"    => Token::new(TokenType::Let, line, col),
-            "func"   => Token::new(TokenType::Func, line, col),
-            "if"     => Token::new(TokenType::If, line, col),
-            "then"   => Token::new(TokenType::Then, line, col),
-            "else"   => Token::new(TokenType::Else, line, col),
-            "not"    => Token::new(TokenType::Not, line, col),
-            "while"  => Token::new(TokenType::While, line, col),
-            "print"  => Token::new(TokenType::Print, line, col),
-            "do"     => Token::new(TokenType::Do, line, col),
-            "is"     => Token::new(TokenType::Is, line, col),
-            "Integer"=> Token::new(TokenType::Integer, line, col),
-            "Boolean"=> Token::new(TokenType::Boolean, line, col),
-            "True"   => Token::new(TokenType::True, line, col),
-            "False"  => Token::new(TokenType::False, line, col),
-            _        => Token::new(TokenType::Identifier(name.to_string()), line, col),
+            "let"    => Token::new("let".to_string(), TokenType::Let, line, col),
+            "func"   => Token::new("func".to_string(), TokenType::Func, line, col),
+            "if"     => Token::new("if".to_string(), TokenType::If, line, col),
+            "then"   => Token::new("then".to_string(), TokenType::Then, line, col),
+            "else"   => Token::new("else".to_string(), TokenType::Else, line, col),
+            "not"    => Token::new("not".to_string(), TokenType::Not, line, col),
+            "while"  => Token::new("while".to_string(), TokenType::While, line, col),
+            "print"  => Token::new("print".to_string(), TokenType::Print, line, col),
+            "do"     => Token::new("do".to_string(), TokenType::Do, line, col),
+            "is"     => Token::new("is".to_string(), TokenType::Is, line, col),
+            "Integer"=> Token::new("Integer".to_string(), TokenType::Integer, line, col),
+            "Boolean"=> Token::new("Boolean".to_string(), TokenType::Boolean, line, col),
+            "True"   => Token::new("True".to_string(), TokenType::True, line, col),
+            "False"  => Token::new("False".to_string(), TokenType::False, line, col),
+            _        => Token::new(name.to_string(), TokenType::Identifier, line, col),
         }
     }
 }
@@ -246,9 +246,9 @@ mod tests{
         let actual_token_vec: Vec<Token> = lex.tokenize();
 
         let expected: Vec<Token> = vec![
-            Token::new(TokenType::Identifier("abc_def".to_string()), 1, 1), 
-            Token::new(TokenType::Assign, 1, 9), 
-            Token::new(TokenType::IntegerLiteral(2), 1, 11),
+            Token::new("abc_def".to_string(), TokenType::Identifier, 1, 1), 
+            Token::new("=".to_string(), TokenType::Assign, 1, 9), 
+            Token::new(2.to_string(), TokenType::IntegerLiteral, 1, 11),
         ];
 
         assert_eq!(actual_token_vec, expected);
@@ -274,7 +274,7 @@ mod tests{
         let actual_token_vec: Vec<Token> = lex.tokenize();
 
         let expected: Vec<Token> = vec![
-            Token::new(TokenType::StringLiteral("\"test\"".to_string()), 1, 1)
+            Token::new("\"test\"".to_string(), TokenType::StringLiteral, 1, 1)
         ];
 
         assert_eq!(actual_token_vec, expected);

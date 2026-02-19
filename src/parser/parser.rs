@@ -15,7 +15,12 @@ pub enum Stmt {
 }
 pub struct Param {
     name: String,
-    param_type: Expr, // or some Type enum
+    param_type: Type, // or some Type enum
+}
+
+pub enum Type {
+    Integer,
+    Boolean
 }
 pub enum Expr {
     Integer(i64),
@@ -61,9 +66,9 @@ impl Parser {
                 TokenType::Func =>{
                     ast.push(self.parse_func());
                 }
-                TokenType::Let(a) => {
-                    ast.push(self.parse_let());
-                }
+                // TokenType::Let(a) => {
+                //     ast.push(self.parse_let());
+                // }
                 _ => panic!("Wrong token {} at {}:{}", self.peek(), self.peek().line, self.peek().column)
             }
         }
@@ -72,7 +77,37 @@ impl Parser {
     //Todo: Implement the following funcs/helper funcs->
     fn parse_func(&mut self) -> Stmt{
         self.expect(TokenType::Func);
-        let name = self.expect()
+        let name = self.expect(TokenType::Identifier).unwrap().value;
+        self.expect(TokenType::LeftParen);
+        let params = Vec::new();
+        while !self.match_token(TokenType::RightParen) {
+            let name = self.expect(TokenType::Identifier).unwrap().value;
+            self.expect(TokenType::Colon);
+            
+            let mut typevalue;
+            match self.peek().token_type {
+                TokenType::Integer => {
+                    self.expect(TokenType::Integer).unwrap().value;
+                    typevalue = Type::Integer;
+                }
+                TokenType::Boolean => {
+                    self.expect(TokenType::Boolean).unwrap().value;
+                    typevalue = Type::Boolean;
+                }
+                _ => panic!("Unknown type for parameter")
+            }
+            params.push(Param {name: name, param_type: typevalue});
+            if !self.match_token(TokenType::RightParen) {
+                self.expect(TokenType::Comma);
+            }
+        }
+
+        self.expect(TokenType::RightParen);
+        
+        self.expect(TokenType::Arrow);
+
+
+        Stmt::Function { name, params: (), return_type: (), body: () }
     }
 
         // fn parse_expr

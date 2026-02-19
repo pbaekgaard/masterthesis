@@ -21,11 +21,11 @@ pub enum TokenType {
     // Literals
     True,
     False,
-    IntegerLiteral(i64),
-    StringLiteral(String),
+    IntegerLiteral,
+    StringLiteral,
 
     // Identifiers
-    Identifier(String),
+    Identifier,
 
     // Operators
     Colon,       // :
@@ -89,11 +89,11 @@ impl fmt::Display for TokenType {
             // Literals
             TokenType::True => write!(f, "true"),
             TokenType::False => write!(f, "false"),
-            TokenType::IntegerLiteral(val) => write!(f, "{val}"),
-            TokenType::StringLiteral(val) => write!(f, "\"{val}\""),
+            TokenType::IntegerLiteral => write!(f, "IntegerLiteral"),
+            TokenType::StringLiteral => write!(f, "StringLiteral"),
 
             // Identifiers
-            TokenType::Identifier(name) => write!(f, "{name}"),
+            TokenType::Identifier => write!(f, "Identifier"),
 
             // Operators
             TokenType::Colon => write!(f, ":"),
