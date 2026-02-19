@@ -4,14 +4,17 @@ pub enum Stmt {
     ExprStmt(Expr),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
-    Block(Vec<Stmt>),
     Print(Expr),
-    Function {
-        name: String,
-        params: Vec<Param>,
-        return_type: Option<Expr>,
-        body: Box<Stmt>,
-    },
+}
+
+pub struct Function {
+        pub name: String,
+        pub params: Vec<Param>,
+        pub return_type: Type,
+        pub body: Block,
+}
+pub struct Block{
+    pub statements: Vec<Stmt>
 }
 pub struct Param {
     name: String,
@@ -46,7 +49,7 @@ pub enum UnOp {
     Not,
     Neg,
 }
-pub type AST = Vec<Stmt>;
+pub type AST = Vec<Function>;
 pub struct Parser{
     tokens: Vec<Token>,
     position: usize
@@ -62,36 +65,35 @@ impl Parser {
     pub fn parse_program(&mut self) -> AST {
         let mut ast: AST = Vec::new();
         while !self.match_token(TokenType::Eof) {
-            match self.peek().token_type.clone() {
+            match self.current().token_type.clone() {
                 TokenType::Func =>{
                     ast.push(self.parse_func());
                 }
-                // TokenType::Let(a) => {
-                //     ast.push(self.parse_let());
-                // }
-                _ => panic!("Wrong token {} at {}:{}", self.peek(), self.peek().line, self.peek().column)
+                _ => panic!("Wrong token {} at {}:{}", self.current(), self.current().line, self.current().column)
             }
         }
         ast
     } 
     //Todo: Implement the following funcs/helper funcs->
-    fn parse_func(&mut self) -> Stmt{
+    fn parse_func(&mut self) -> Function{
         self.expect(TokenType::Func);
+        
         let name = self.expect(TokenType::Identifier).unwrap().value;
         self.expect(TokenType::LeftParen);
-        let params = Vec::new();
+
+        let mut params = Vec::new();
         while !self.match_token(TokenType::RightParen) {
             let name = self.expect(TokenType::Identifier).unwrap().value;
             self.expect(TokenType::Colon);
             
             let mut typevalue;
-            match self.peek().token_type {
+            match self.current().token_type {
                 TokenType::Integer => {
-                    self.expect(TokenType::Integer).unwrap().value;
+                    self.expect(TokenType::Integer);
                     typevalue = Type::Integer;
                 }
                 TokenType::Boolean => {
-                    self.expect(TokenType::Boolean).unwrap().value;
+                    self.expect(TokenType::Boolean);
                     typevalue = Type::Boolean;
                 }
                 _ => panic!("Unknown type for parameter")
@@ -106,9 +108,45 @@ impl Parser {
         
         self.expect(TokenType::Arrow);
 
-
-        Stmt::Function { name, params: (), return_type: (), body: () }
+        let mut return_type;
+            match self.current().token_type {
+                TokenType::Integer => {
+                    self.expect(TokenType::Integer);
+                    return_type = Type::Integer;
+                }
+                TokenType::Boolean => {
+                    self.expect(TokenType::Boolean);
+                    return_type = Type::Boolean;
+                }
+                _ => panic!("Unknown return type for function")
+            }
+        
+        self.expect(TokenType::LeftBrace);
+        let body: Block = self.parse_block();
+        Function { name, params, return_type, body}
     }
+
+    fn parse_block(&mut self) -> Block {
+        let mut statements:Vec<Stmt> = Vec::new();
+        let cur_tok = self.current();
+        while !self.match_token(TokenType::Eof) && 
+              !self.match_token(TokenType::RightBrace){
+            if self.match_token(TokenType::Let){
+                statements.push(self.parse_let());
+            }else if self.match_token(TokenType::If){
+                statements.push(self.parse_if());
+            }else if self.match_token(TokenType::While){
+                statements.push(self.parse_while());
+            }else if self.match_token(TokenType::Identifier) && self.match_token(TokenType::Assign){
+                statements.push(self.parse_assignment());
+            }else{
+                let expression = self.parse_expression();
+                statements.push(Stmt::ExprStmt(expression));
+            }
+        }
+        Block { statements }
+    }
+
 
         // fn parse_expr
 
@@ -119,7 +157,15 @@ impl Parser {
         //Even more parse functions my fella
 
     //Here im making some helper functions i reckon mate
-    fn peek(&self) -> &Token {
+    fn peek(&self, token_type: TokenType) -> bool {
+        if self.position+1 < self.tokens.len(){
+            self.tokens.get(self.position + 1).unwrap().token_type == token_type
+        }else {
+            false
+        }
+    }
+
+    fn current(&self) -> &Token {
         self.tokens.get(self.position).unwrap()
     }
 
@@ -127,15 +173,15 @@ impl Parser {
         self.position += 1;
     } 
     fn consume(&mut self)-> Token{
-        let token = self.peek().clone();
+        let token = self.current().clone();
         self.advance();
         token
     }
     fn match_token(&self, expected: TokenType) -> bool{
-        self.peek().token_type == expected
+        self.current().token_type == expected
     }
     fn expect(&mut self, expected: TokenType) -> Result<Token, String> {
-        let tok = self.peek();
+        let tok = self.current();
         if tok.token_type == expected {
             Ok(self.consume())
         }else{
