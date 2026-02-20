@@ -19,8 +19,7 @@ pub enum TokenType {
     Boolean,
 
     // Literals
-    True,
-    False,
+    BooleanLiteral,
     IntegerLiteral,
     StringLiteral,
 
@@ -47,7 +46,8 @@ pub enum TokenType {
     Comma,      // ,
     Semicolon,  // ;
     //special
-    Eof, // End of file
+    Return,
+    EOF, // End of file
 }
 
 #[derive(Debug, Clone)]
@@ -88,8 +88,7 @@ impl fmt::Display for TokenType {
             TokenType::Boolean => write!(f, "Boolean"),
 
             // Literals
-            TokenType::True => write!(f, "true"),
-            TokenType::False => write!(f, "false"),
+            TokenType::BooleanLiteral => write!(f, "BooleanLiteral"),
             TokenType::IntegerLiteral => write!(f, "IntegerLiteral"),
             TokenType::StringLiteral => write!(f, "StringLiteral"),
 
@@ -116,7 +115,8 @@ impl fmt::Display for TokenType {
             TokenType::RightBrace => write!(f, "}}"),
             TokenType::Comma => write!(f, ","),
             TokenType::Semicolon => write!(f, ";"),
-            TokenType::Eof => write!(f, "Eof"),
+            TokenType::EOF => write!(f, "EOF"),
+            TokenType::Return => write!(f, "Return"),
         }
     }
 }

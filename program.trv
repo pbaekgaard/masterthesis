@@ -10,7 +10,6 @@ func is_greater_than_44(params : Integer) -> Integer {
   }
 }
 
-
 func otherFunction() -> Boolean {
   let number : Integer = 20;
   let is_greater : Integer = is_greater_than_44(number);

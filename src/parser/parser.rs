@@ -1,7 +1,9 @@
-use crate::lexer::token::{ self, Token, TokenType };
+use crate::lexer::token::{Token, TokenType};
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Let(String, Type, Expr),
-    ExprStmt(Expr),
+    AssignStatement(String, Expr),
+    ExprStatement(Expr),
     If {
         condition: Expr,
         block: Block,
@@ -12,26 +14,32 @@ pub enum Stmt {
         block: Block,
     },
     Print(Expr),
+    Return(Expr)
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
     pub params: Vec<Param>,
     pub return_type: Type,
     pub body: Block,
 }
+#[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     pub statements: Vec<Stmt>,
 }
+#[derive(Debug, Clone, PartialEq)]
 pub struct Param {
-    name: String,
-    param_type: Type, // or some Type enum
+    pub name: String,
+    pub param_type: Type,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Integer,
     Boolean,
 }
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     IntegerLiteral(i64),
     BooleanLiteral(bool),
@@ -42,15 +50,18 @@ pub enum Expr {
     Call(Vec<Expr>), //I do not understand what this one is, but the expert recommended it
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
     Add,
     Sub,
     Mul,
     Equals,
+    NotEquals,
     GreaterThan,
     LessThan,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnOp {
     Not,
 }
@@ -64,97 +75,104 @@ impl Parser {
     pub fn new(token_vector: Vec<Token>) -> Self {
         Self {
             tokens: token_vector,
-            position: 1,
+            position: 0,
         }
     }
     pub fn parse_program(&mut self) -> AST {
         let mut ast: AST = Vec::new();
-        while !self.match_token(TokenType::Eof) {
-            match self.current().token_type.clone() {
+        while !self.match_token(TokenType::EOF) {
+            match self.current().token_type {
                 TokenType::Func => {
                     ast.push(self.parse_func());
                 }
-                _ =>
-                    panic!(
-                        "Wrong token {} at {}:{}",
-                        self.current(),
-                        self.current().line,
-                        self.current().column
-                    ),
+                _ => panic!(
+                    "Wrong token {} at {}:{}",
+                    self.current(),
+                    self.current().line,
+                    self.current().column,
+                ),
             }
         }
         ast
     }
     //Todo: Implement the following funcs/helper funcs->
     fn parse_func(&mut self) -> Function {
-        self.expect(TokenType::Func);
+        let _ = self.expect(TokenType::Func);
 
         let name = self.expect(TokenType::Identifier).unwrap().value;
-        self.expect(TokenType::LeftParen);
+        let _ = self.expect(TokenType::LeftParen);
 
         let mut params = Vec::new();
         while !self.match_token(TokenType::RightParen) {
             let name = self.expect(TokenType::Identifier).unwrap().value;
-            self.expect(TokenType::Colon);
+            let _ = self.expect(TokenType::Colon);
 
-            let mut typevalue;
-            match self.current().token_type {
+            let typevalue = match self.current().token_type {
                 TokenType::Integer => {
-                    self.expect(TokenType::Integer);
-                    typevalue = Type::Integer;
+                    let _ = self.expect(TokenType::Integer);
+                    Type::Integer
                 }
                 TokenType::Boolean => {
-                    self.expect(TokenType::Boolean);
-                    typevalue = Type::Boolean;
+                    let _ = self.expect(TokenType::Boolean);
+                    Type::Boolean
                 }
                 _ => panic!("Unknown type for parameter"),
-            }
-            params.push(Param { name: name, param_type: typevalue });
+            };
+            params.push(Param {
+                name,
+                param_type: typevalue,
+            });
             if !self.match_token(TokenType::RightParen) {
-                self.expect(TokenType::Comma);
+                let _ = self.expect(TokenType::Comma);
             }
         }
 
-        self.expect(TokenType::RightParen);
+        let _ = self.expect(TokenType::RightParen);
 
-        self.expect(TokenType::Arrow);
+        let _ = self.expect(TokenType::Arrow);
 
-        let mut return_type;
-        match self.current().token_type {
+        let return_type = match self.current().token_type {
             TokenType::Integer => {
-                self.expect(TokenType::Integer);
-                return_type = Type::Integer;
+                let _ = self.expect(TokenType::Integer);
+                Type::Integer
             }
             TokenType::Boolean => {
-                self.expect(TokenType::Boolean);
-                return_type = Type::Boolean;
+                let _ = self.expect(TokenType::Boolean);
+                Type::Boolean
             }
-            _ => panic!("Unknown return type for function"),
-        }
+            _ => panic!(
+                "Unknown return type for function: {}",
+                self.current().token_type
+            ),
+        };
 
-        self.expect(TokenType::LeftBrace);
+        let _ = self.expect(TokenType::LeftBrace);
         let body: Block = self.parse_block();
-        Function { name, params, return_type, body }
+        let _ = self.expect(TokenType::RightBrace);
+        Function {
+            name,
+            params,
+            return_type,
+            body,
+        }
     }
 
     fn parse_block(&mut self) -> Block {
         let mut statements: Vec<Stmt> = Vec::new();
         let cur_tok = self.current();
-        while !self.match_token(TokenType::Eof) && !self.match_token(TokenType::RightBrace) {
+        while !self.match_token(TokenType::EOF) && !self.match_token(TokenType::RightBrace) {
             if self.match_token(TokenType::Let) {
                 statements.push(self.parse_let()); //dingdong test commit after revert;
             } else if self.match_token(TokenType::If) {
-                statements.push(self.parse_if());
+                // statements.push(self.parse_if());
             } else if self.match_token(TokenType::While) {
-                statements.push(self.parse_while());
-            } else if
-                self.match_token(TokenType::Identifier) &&
-                self.match_token(TokenType::Assign)
+                // statements.push(self.parse_while());
+            } else if self.match_token(TokenType::Identifier) && self.match_token(TokenType::Assign)
             {
-                statements.push(self.parse_assignment());
+                // statements.push(self.parse_assignment());
             } else {
                 let expression = self.parse_expression();
-                statements.push(Stmt::ExprStmt(expression));
+                statements.push(Stmt::ExprStatement(expression));
             }
         }
         Block { statements }
@@ -163,52 +181,117 @@ impl Parser {
     fn parse_let(&mut self) -> Stmt {
         self.consume();
         let var_name = self.expect(TokenType::Identifier).unwrap().value;
-        self.expect(TokenType::Colon);
+        let _ = self.expect(TokenType::Colon);
         let type_of_var = match self.current().token_type {
             TokenType::Integer => Type::Integer,
             TokenType::Boolean => Type::Boolean,
-            _ =>
-                panic!(
-                    "Expected type, got something else at {}:{}",
-                    self.current().line,
-                    self.current().column
-                ),
+            _ => panic!(
+                "Expected type, got something else at {}:{}",
+                self.current().line,
+                self.current().column
+            ),
         };
         self.consume();
-        self.expect(TokenType::Assign);
+        let _ = self.expect(TokenType::Assign);
         let expr = self.parse_expression();
+        let _ = self.expect(TokenType::Semicolon);
         Stmt::Let(var_name, type_of_var, expr)
     }
+
+    fn token_to_binop(&self, tt: &TokenType) -> BinOp {
+        match tt {
+            TokenType::Plus => BinOp::Add,
+            TokenType::Minus => BinOp::Sub,
+            TokenType::Multiply => BinOp::Mul,
+            TokenType::Equals => BinOp::Equals,
+            TokenType::GreaterThan => BinOp::GreaterThan,
+            TokenType::LessThan => BinOp::LessThan,
+            _ => panic!("Not a binary operator"),
+        }
+    }
+
     fn parse_expression(&mut self) -> Expr {
         let tok = self.consume();
         match tok.token_type {
-            TokenType::Integer => {
-                if
-                    self.match_any(
-                        &[
-                            TokenType::Minus,
-                            TokenType::Plus,
-                            TokenType::Multiply,
-                            TokenType::Division,
-                            TokenType::GreaterThan,
-                            TokenType::LessThan,
-                            TokenType::Equals,
-                        ]
+            TokenType::IntegerLiteral | TokenType::Identifier => {
+                if self.match_any(&[
+                    TokenType::Minus,
+                    TokenType::Plus,
+                    TokenType::Multiply,
+                    TokenType::Division,
+                    TokenType::GreaterThan,
+                    TokenType::LessThan,
+                    TokenType::Equals,
+                ]) {
+                    let op_token = self.consume();
+                    let op = self.token_to_binop(&op_token.token_type);
+                    let right = self.parse_expression();
+                    Expr::BinaryOp(
+                        match tok.token_type {
+                            TokenType::IntegerLiteral => {
+                                Box::new(Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap()))
+                            }
+                            TokenType::Identifier => Box::new(Expr::Identifier(tok.value)),
+                            _ => panic!("SOMETHING IS WRONGDOG"),
+                        },
+                        op,
+                        Box::new(right),
                     )
-                {
-                    Expr::BinaryOp(Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap()), , ())
-                }else{
+                } else {
                     Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap())
                 }
             }
-            TokenType::Boolean => Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap()),
-            TokenType::StringLiteral => Expr::StringLiteral(tok.value.clone()),
-            TokenType::Identifier => Expr::Identifier(tok.value.clone()),
+            TokenType::BooleanLiteral => {
+                if self.match_token(TokenType::Equals) {
+                    let op_token = self.consume();
+                    let op = self.token_to_binop(&op_token.token_type);
+                    let right = self.parse_expression();
+                    Expr::BinaryOp(
+                        Box::new(Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap())),
+                        op,
+                        Box::new(right),
+                    )
+                } else if self.match_token(TokenType::Not) {
+                    let _ = self.expect(TokenType::Equals);
+                    let op = BinOp::NotEquals;
+                    let right = self.parse_expression();
+                    Expr::BinaryOp(
+                        Box::new(Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap())),
+                        op,
+                        Box::new(right),
+                    )
+                } else {
+                    Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap())
+                }
+            }
+            TokenType::StringLiteral => {
+                if self.match_token(TokenType::Equals) {
+                    let op_token = self.consume();
+                    let op = self.token_to_binop(&op_token.token_type);
+                    let right = self.expect(TokenType::StringLiteral).unwrap();
+                    Expr::BinaryOp(
+                        Box::new(Expr::StringLiteral(tok.value.parse::<String>().unwrap())),
+                        op,
+                        Box::new(Expr::StringLiteral(right.value.parse::<String>().unwrap())),
+                    )
+                } else if self.match_token(TokenType::Not) {
+                    let _ = self.expect(TokenType::Equals);
+                    let op = BinOp::NotEquals;
+                    let right = self.expect(TokenType::StringLiteral).unwrap();
+                    Expr::BinaryOp(
+                        Box::new(Expr::StringLiteral(tok.value.parse::<String>().unwrap())),
+                        op,
+                        Box::new(Expr::StringLiteral(right.value.parse::<String>().unwrap())),
+                    )
+                } else {
+                    Expr::StringLiteral(tok.value.clone())
+                }
+            }
             TokenType::Not => {
                 let exprs = self.parse_expression();
                 Expr::UnaryOp(UnOp::Not, Box::new(exprs))
             }
-            _ => panic!(""),
+            _ => panic!("Unexpected token {:?} in expression", tok.token_type),
         }
     }
     // fn parse_expr
@@ -243,23 +326,67 @@ impl Parser {
     fn match_token(&self, expected: TokenType) -> bool {
         self.current().token_type == expected
     }
-    fn match_any(&self, token_types: &[TokenType]) -> bool {
-        token_types.contains(&self.current().token_type)
+    fn match_any(&self, types: &[TokenType]) -> bool {
+        types.contains(&self.current().token_type)
     }
     fn expect(&mut self, expected: TokenType) -> Result<Token, String> {
         let tok = self.current();
         if tok.token_type == expected {
             Ok(self.consume())
         } else {
-            Err(
-                format!(
-                    "Expected {:?} at {}:{}, found {:?}",
-                    expected,
-                    tok.line,
-                    tok.column,
-                    tok.token_type
-                )
-            )
+            Err(format!(
+                "Expected {:?} at {}:{}, found {:?}",
+                expected, tok.line, tok.column, tok.token_type
+            ))
         }
+    }
+}
+
+mod tests {
+
+    use crate::parser::parser::Parser;
+    use crate::{
+        lexer::{
+            lexer::Lexer,
+            token::{Token, TokenType},
+        },
+        parser::parser::{AST, BinOp, Block, Expr, Function, Type},
+    };
+
+    #[test]
+    fn test_parser_parses_correct_ast() {
+        use crate::parser::parser::Stmt;
+        use std::fs;
+        let source = fs::read_to_string("simple.trv").expect("Failed to read file");
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+        let mut parser = Parser::new(tokens);
+        let actual = parser.parse_program();
+
+        let expected: AST = vec![Function {
+            name: "main".to_string(),
+            params: vec![],
+            return_type: Type::Integer,
+            body: Block {
+                statements: vec![
+                    Stmt::Let("num".to_string(), Type::Integer, Expr::IntegerLiteral(0)),
+                    Stmt::While{
+                        expr: Expr::BinaryOp(
+                            Box::new(Expr::Identifier("num".to_string())),
+                            BinOp::LessThan,
+                            Box::new(Expr::IntegerLiteral(10))
+                        ),
+                        block: Block{
+                            statements: vec![
+                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
+                            ]
+                        }
+                    },
+                    Stmt::Return(Expr::Identifier("num".to_string()))
+                ],
+            },
+        }];
+
+        assert_eq!(actual, expected);
     }
 }

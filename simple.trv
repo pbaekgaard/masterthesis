@@ -1,0 +1,9 @@
+func main() -> Integer {
+  let num : Integer = 0;
+
+  while num < 10 do {
+    num = 11;
+  }
+
+  return num;
+}

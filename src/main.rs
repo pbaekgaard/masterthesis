@@ -12,12 +12,12 @@ use parser::parser::Parser;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 3 {
+    if args.len() < 2 {
         eprintln!("Usage: triviC <filename>");
         std::process::exit(1);
     }
 
-    let filename = &args[2];
+    let filename = &args[1];
 
     let source = fs::read_to_string(filename)
         .expect("Failed to read file");
@@ -28,13 +28,4 @@ fn main() {
     let _ast: AST = parser.parse_program();
 
     println!("Lexing and parsing completed successfully.");
-}
-
-#[cfg(test)]
-mod tests{
-    use pretty_assertions::{assert_eq};
-    #[test]
-    fn zero_eq_zero(){
-        assert_eq!(0,0);
-    }
 }

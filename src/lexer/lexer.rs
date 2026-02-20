@@ -87,7 +87,7 @@ impl Lexer {
                 _ => panic!("Suuuper wrongdog in here, unexpected char '{}' at {}:{}", ch, self.line, self.column),
             }
         }
-        tokens.push(self.simple_token("EOF".to_string(),TokenType::Eof));
+        tokens.push(self.simple_token("EOF".to_string(),TokenType::EOF));
         tokens
     }
     fn current_char(&self) -> Option<char> {
@@ -124,6 +124,7 @@ impl Lexer {
         let original_col = self.column;
         self.advance();
         if self.current_char().unwrap() == '>' {
+            self.advance();
             Token::new("->".to_string(),TokenType::Arrow, self.line, original_col)
         } else {
             Token::new("-".to_string(),TokenType::Minus, self.line, original_col)
@@ -214,8 +215,9 @@ impl Lexer {
             "is"     => Token::new("is".to_string(), TokenType::Is, line, col),
             "Integer"=> Token::new("Integer".to_string(), TokenType::Integer, line, col),
             "Boolean"=> Token::new("Boolean".to_string(), TokenType::Boolean, line, col),
-            "True"   => Token::new("True".to_string(), TokenType::True, line, col),
-            "False"  => Token::new("False".to_string(), TokenType::False, line, col),
+            "return"=> Token::new("Return".to_string(), TokenType::Return, line, col),
+            "True"   => Token::new("True".to_string(), TokenType::BooleanLiteral, line, col),
+            "False"  => Token::new("False".to_string(), TokenType::BooleanLiteral, line, col),
             _        => Token::new(name.to_string(), TokenType::Identifier, line, col),
         }
     }
@@ -252,6 +254,7 @@ mod tests{
             Token::new("abc_def".to_string(), TokenType::Identifier, 1, 1), 
             Token::new("=".to_string(), TokenType::Assign, 1, 9), 
             Token::new(2.to_string(), TokenType::IntegerLiteral, 1, 11),
+            Token::new("EOF".to_string(), TokenType::EOF, 1, 12),
         ];
 
         assert_eq!(actual_token_vec, expected);
@@ -260,14 +263,16 @@ mod tests{
     fn reading_comments_tokenize_lexer_line_col_are_correct(){
         let mut lex: Lexer = Lexer::new("#abc_def = 2\n".to_string()); 
         lex.tokenize();
-        assert_eq!((lex.line, lex.column), (2,1));
+        assert_eq!((lex.line, lex.column), (2,2));
     }
     #[test]
-    fn reading_comments_tokenize_returns_empty_vector(){
+    fn reading_comments_tokenize_returns_eof_vector(){
         let mut lex: Lexer = Lexer::new("#abc_def = 2\n".to_string()); 
         let actual_token_vec: Vec<Token> = lex.tokenize();
 
-        let expected: Vec<Token> = vec![];
+        let expected: Vec<Token> = vec![
+            Token::new("EOF".to_string(), TokenType::EOF, 2, 1)
+        ];
 
         assert_eq!(actual_token_vec, expected);
     }
@@ -277,7 +282,8 @@ mod tests{
         let actual_token_vec: Vec<Token> = lex.tokenize();
 
         let expected: Vec<Token> = vec![
-            Token::new("\"test\"".to_string(), TokenType::StringLiteral, 1, 1)
+            Token::new("\"test\"".to_string(), TokenType::StringLiteral, 1, 1),
+            Token::new("EOF".to_string(), TokenType::EOF, 1, 7)
         ];
 
         assert_eq!(actual_token_vec, expected);
