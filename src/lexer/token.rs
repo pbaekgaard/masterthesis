@@ -37,6 +37,7 @@ pub enum TokenType {
     Plus,        // +
     Minus,       // -
     Multiply,    // *
+    Division,
 
     // Punctuation
     LeftParen,  // (
@@ -105,6 +106,8 @@ impl fmt::Display for TokenType {
             TokenType::Plus => write!(f, "+"),
             TokenType::Minus => write!(f, "-"),
             TokenType::Multiply => write!(f, "*"),
+            TokenType::Division => write!(f, "/"),
+
 
             // Punctuation
             TokenType::LeftParen => write!(f, "("),

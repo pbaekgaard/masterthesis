@@ -51,6 +51,9 @@ impl Lexer {
                 '*' => {
                     tokens.push(self.simple_token(ch.to_string(),TokenType::Multiply));
                 }
+                '/' => {
+                    tokens.push(self.simple_token(ch.to_string(),TokenType::Division));
+                }
                 '{' => {
                     tokens.push(self.simple_token(ch.to_string(),TokenType::LeftBrace));
                 }
