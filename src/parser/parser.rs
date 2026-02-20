@@ -132,7 +132,7 @@ impl Parser {
         while !self.match_token(TokenType::Eof) && 
               !self.match_token(TokenType::RightBrace){
             if self.match_token(TokenType::Let){
-                statements.push(self.parse_let());
+                statements.push(self.parse_let())//dingdong test commit after revert;
             }else if self.match_token(TokenType::If){
                 statements.push(self.parse_if());
             }else if self.match_token(TokenType::While){
