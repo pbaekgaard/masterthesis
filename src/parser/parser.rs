@@ -283,8 +283,12 @@ impl Parser {
                         op,
                         Box::new(right),
                     )
-                } else {
-                    Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap())
+                }else {
+                    match tok.token_type{
+                        TokenType::IntegerLiteral => Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap()), 
+                        TokenType::Identifier => Expr::Identifier(tok.value),
+                        _ => panic!("tokentype wrong, should be integer literal or identifyer")
+                    }
                 }
             }
             TokenType::BooleanLiteral => {
@@ -420,6 +424,23 @@ mod tests {
                                 Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
                             ]
                         }
+                    },
+                    Stmt::If {
+                        condition: Expr::BinaryOp(
+                            Box::new(Expr::Identifier("num".to_string())), 
+                            BinOp::GreaterThan, 
+                            Box::new(Expr::IntegerLiteral(10))
+                        ), 
+                        block: Block{
+                            statements: vec![
+                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
+                            ]
+                        }, 
+                        option:  Some(Block{
+                            statements: vec![
+                                Stmt:: AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
+                            ]
+                        })
                     },
                     Stmt::Return(Expr::Identifier("num".to_string()))
                 ],
