@@ -159,23 +159,69 @@ impl Parser {
 
     fn parse_block(&mut self) -> Block {
         let mut statements: Vec<Stmt> = Vec::new();
-        let cur_tok = self.current();
+
         while !self.match_token(TokenType::EOF) && !self.match_token(TokenType::RightBrace) {
             if self.match_token(TokenType::Let) {
                 statements.push(self.parse_let()); //dingdong test commit after revert;
             } else if self.match_token(TokenType::If) {
-                // statements.push(self.parse_if());
+                statements.push(self.parse_if());
             } else if self.match_token(TokenType::While) {
-                // statements.push(self.parse_while());
-            } else if self.match_token(TokenType::Identifier) && self.match_token(TokenType::Assign)
+                statements.push(self.parse_while());
+            } else if self.match_token(TokenType::Identifier) && self.peek(TokenType::Assign)
             {
-                // statements.push(self.parse_assignment());
-            } else {
+                statements.push(self.parse_assignment());
+            } else if self.match_token(TokenType::Return) {
+                statements.push(self.parse_return());
+            } 
+            else {
                 let expression = self.parse_expression();
                 statements.push(Stmt::ExprStatement(expression));
             }
         }
         Block { statements }
+    }
+    fn parse_return(&mut self) -> Stmt{
+        self.consume();
+        let expr = self.parse_expression();
+        let _ = self.expect(TokenType::Semicolon);
+        Stmt::Return(expr)
+    }
+
+    fn parse_assignment(&mut self) -> Stmt{
+        let var_name = self.expect(TokenType::Identifier).unwrap().value;
+        let _ = self.expect(TokenType::Assign);
+        let expr = self.parse_expression();
+        let _ = self.expect(TokenType::Semicolon);
+        Stmt::AssignStatement(var_name, expr)
+    }
+
+    fn parse_while(&mut self) -> Stmt{
+        self.consume();
+        let expr = self.parse_expression();
+        let _ = self.expect(TokenType::Do);
+        let _ = self.expect(TokenType::LeftBrace);
+        let block = self.parse_block();
+        let _ = self.expect(TokenType::RightBrace);
+        Stmt::While { expr, block }
+    }
+
+    fn parse_if(&mut self) -> Stmt{
+        self.consume();
+        let condition = self.parse_expression();
+        let _ = self.expect(TokenType::Then);
+        let _ = self.expect(TokenType::LeftBrace);
+        let block = self.parse_block();
+        let _ = self.expect(TokenType::RightBrace);
+        let option = match self.current().token_type {
+            TokenType::Else => {
+                self.consume();
+                let _ = self.expect(TokenType::LeftBrace);
+                Some(self.parse_block())
+            }
+            _ => None
+        };
+        let _ = self.expect(TokenType::RightBrace);
+        Stmt::If { condition , block, option }
     }
 
     fn parse_let(&mut self) -> Stmt {
@@ -294,13 +340,6 @@ impl Parser {
             _ => panic!("Unexpected token {:?} in expression", tok.token_type),
         }
     }
-    // fn parse_expr
-
-    // fn parse_bin_op
-
-    // fn parse_un_op
-
-    //Even more parse functions my fella
 
     //Here im making some helper functions i reckon mate
     fn peek(&self, token_type: TokenType) -> bool {

@@ -2,7 +2,7 @@
 
 func is_greater_than_44(params : Integer) -> Integer {
   let x : Integer = params;
-  if x > 44 is True then {
+  if x > 44 then {
     1
   }
   else {
@@ -13,7 +13,7 @@ func is_greater_than_44(params : Integer) -> Integer {
 func otherFunction() -> Boolean {
   let number : Integer = 20;
   let is_greater : Integer = is_greater_than_44(number);
-  if is_greater == 0 is True then {
+  if is_greater == 0 then {
     print("Didnt work the first time!");
   }
   while is_greater == 0 do {
