@@ -31,6 +31,6 @@ fn main() {
     let ast: AST = parser.parse_program();
     println!("Lexing and parsing completed successfully.");
     let output_file = File::create("main.asm").expect("failed to create main.asm");
-    let codegen = CodeGenerator::new(output_file);
+    let mut codegen = CodeGenerator::new(output_file);
     codegen.generate(ast);
 }
