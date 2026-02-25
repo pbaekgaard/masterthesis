@@ -9,6 +9,7 @@ use parser::parser::AST;
 use parser::parser::Parser;
 use std::env;
 use std::fs;
+use std::fs::File;
 
 use crate::codegen::codegen::CodeGenerator;
 
@@ -29,6 +30,7 @@ fn main() {
     let mut parser: Parser = Parser::new(tokens);
     let ast: AST = parser.parse_program();
     println!("Lexing and parsing completed successfully.");
-    let codegen = CodeGenerator::new();
+    let output_file = File::create("main.asm").expect("failed to create main.asm");
+    let codegen = CodeGenerator::new(output_file);
     codegen.generate(ast);
 }
