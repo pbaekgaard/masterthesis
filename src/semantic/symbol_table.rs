@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Type { 
+pub enum Type {
     Integer,
     Boolean,
     String,
-    Void,          //mayhaps not needed dunno, only if we allow functiions that dont return anything
+    Void, //mayhaps not needed dunno, only if we allow functiions that dont return anything
     Function {
         params: Vec<Type>,
         return_type: Box<Type>,
@@ -20,8 +20,8 @@ pub struct Symbol {
 }
 
 impl Symbol {
-    pub fn new(_name: String, s_type: Type, scope_lvl: usize ) -> Self{
-        Self{
+    pub fn new(_name: String, s_type: Type, scope_lvl: usize) -> Self {
+        Self {
             name: _name,
             symbol_type: s_type,
             scope_level: scope_lvl,
@@ -34,9 +34,7 @@ pub struct SymbolTable {
 }
 impl SymbolTable {
     pub fn new() -> Self {
-        Self{
-            scopes: Vec::new(),
-        }
+        Self { scopes: Vec::new() }
     }
     pub fn enter_scope(&mut self) {
         self.scopes.push(HashMap::new());
@@ -50,7 +48,10 @@ impl SymbolTable {
         let current = self.scopes.last_mut().unwrap();
 
         if current.contains_key(&symbol.name) {
-            return Err(format!("Symbol '{}' already declared in this scope", symbol.name));
+            return Err(format!(
+                "Symbol '{}' already declared in this scope",
+                symbol.name
+            ));
         }
 
         current.insert(symbol.name.clone(), symbol);
@@ -67,7 +68,4 @@ impl SymbolTable {
     pub fn lookup_current(&self, name: &str) -> Option<&Symbol> {
         self.scopes.last()?.get(name)
     }
-
-
-
 }
