@@ -1,4 +1,4 @@
-use crate::parser::{parser::Function, AST};
+use crate::parser::{AST, parser::{Block, Function, Stmt}};
 use std::{fs::File, io::Write};
 
 #[derive(Debug)]
@@ -18,16 +18,19 @@ impl CodeGenerator {
     }
 
     fn gen_init(&mut self) {
-        self.write_line(".syntax unified");
-        self.write_line(".thumb");
-        self.write_line(".section .text");
-        self.write_line(".global _start");
-        self.write_line(".type _start, %function");
+        self.write_line(".syntax unified",0);
+        self.write_line(".thumb",0);
+        self.write_line(".section .text",0);
+        self.write_line(".global _start",0);
+        self.write_line(".type _start, %function",0);
     }
 
-    fn write_line(&mut self, string: &str) {
-        // writeln! automatically appends \n and writes to the file
-        let _ = writeln!(self.file, "{}", string);
+    fn write_line(&mut self, string: &str, indents: usize) {
+        // Create indentation (e.g., 4 spaces per indent level)
+        let indent_str = "\t".repeat(indents);
+
+        // writeln! automatically appends \n
+        let _ = writeln!(self.file, "{}{}", indent_str, string);
     }
 
     fn emit(&mut self, func: Function) {
@@ -39,7 +42,18 @@ impl CodeGenerator {
     }
 
     fn emit_main(&mut self, func: Function) {
-
+        self.write_line("_start:",0);
+        self.emit_block(func.body, true);
+    }
+    fn emit_block(&mut self, block: Block, is_main: bool){
+        for stmt in block.statements{
+            match stmt {
+                Stmt::Return(expr) => {
+                    expr
+                }
+                _ => panic!("Block fucking wrong")
+            }
+        }
     }
 }
 
