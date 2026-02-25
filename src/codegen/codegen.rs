@@ -1,73 +1,117 @@
-use crate::parser::{AST, parser::Function};
-use std::{fs::File, io::{Seek, SeekFrom, Write}};
+use crate::parser::{parser::Function, AST};
+use std::{fs::File, io::Write};
 
 #[derive(Debug)]
 pub struct CodeGenerator {
-    file: File
+    pub file: File,
 }
 
 impl CodeGenerator {
-    pub fn new(file : File) -> Self {
-        Self {file}
+    pub fn new(file: File) -> Self {
+        Self { file }
     }
-    pub fn generate(&mut self, ast : AST) {
-        self.gen_main(ast[0].clone());
-
+    pub fn generate(&mut self, ast: AST) {
+        self.gen_init();
+        for func in ast {
+            self.emit(func);
+        }
     }
-    fn gen_main(&mut self, func: Function){
-        self.emit("instruction".to_string());
+
+    fn gen_init(&mut self) {
+        self.write_line(".syntax unified");
+        self.write_line(".thumb");
+        self.write_line(".section .text");
+        self.write_line(".global _start");
+        self.write_line(".type _start, %function");
     }
-    fn emit(&mut self, instruction : String) {
-        let mut buf = br##"
-            .syntax unified
-            .thumb
 
-            .section .text
-            .global _start
+    fn write_line(&mut self, string: &str) {
+        // writeln! automatically appends \n and writes to the file
+        let _ = writeln!(self.file, "{}", string);
+    }
 
-        "##;
-        let mut buf_2 = br##"
-        .type _start, %function
+    fn emit(&mut self, func: Function) {
+        match func.name.as_str() {
+            "main" => self.emit_main(func),
+            _ => panic!("failed"),
+        }
+        self.file.sync_all().unwrap();
+    }
 
-            _start:
-                mov r0, #69
-                mov r7, #1
-                svc #0
+    fn emit_main(&mut self, func: Function) {
 
-            .size _start, .-_start"##;
-        self.file.write_all(buf);
-        self.file.write_all(buf_2);
-        self.file.flush().unwrap();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{CodeGenerator, codegen};
     use crate::lexer::{lexer::Lexer, token::Token};
     use crate::parser::parser::{Parser, AST};
-    use std::{fs::File, io::{Seek, SeekFrom, Write}};
-    use std::io::Read;
+    use crate::CodeGenerator;
+    use std::fs::{File, OpenOptions};
+    use std::io::{Read, Seek, SeekFrom};
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    fn initialize() {
+        INIT.call_once(|| {
+            let mut path = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+            path.push("temp/tests");
+            std::fs::create_dir_all(path).unwrap();
+        });
+    }
+
+    #[test]
+    fn can_generate_init() {
+        initialize();
+        let output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_init.asm")
+            .expect("Failed to create file: /temp/tests/test_can_generate_init.asm");
+
+        let ast = AST::new();
+        let mut codegen = CodeGenerator::new(output_file);
+        codegen.generate(ast);
+        codegen.file.seek(SeekFrom::Start(0)).unwrap();
+        let mut buf = String::new();
+        codegen.file.read_to_string(&mut buf).unwrap();
+        let expected = indoc::indoc! {r##"
+            .syntax unified
+            .thumb
+            .section .text
+            .global _start
+            .type _start, %function
+            "##}.to_string();
+        assert_eq!(expected, buf);
+
+    }
 
     #[test]
     fn can_generate_return() {
-        let source = r##"
-            func main() -> Boolean {
-                return 69;
-            }
-        "##.to_string();
+        initialize();
+        let source = std::fs::read_to_string("test_codes/test_main_return.trv")
+            .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
         let mut parser: Parser = Parser::new(tokens);
         let ast: AST = parser.parse_program();
-        let output_file = File::create("test_can_generate_return.asm").expect("Couldn't create file: test_can_generate_return.asm");
+        let output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_return.asm")
+            .expect("Failed to create file: /temp/tests/test_can_generate_return.asm");
         let mut codegen = CodeGenerator::new(output_file);
         codegen.generate(ast);
-        let mut buf = "".to_string();
-        codegen.file.flush().unwrap();          // ensure all writes are written
-        codegen.file.seek(SeekFrom::Start(0)).unwrap(); // rewind to start
-        let _ = codegen.file.read_to_string(&mut buf);
-        let expected = r##"
+        codegen.file.seek(SeekFrom::Start(0)).unwrap();
+        let mut buf = String::new();
+        codegen.file.read_to_string(&mut buf).unwrap();
+        let expected = indoc::indoc! {r##"
             .syntax unified
             .thumb
 
@@ -80,28 +124,8 @@ mod tests {
                 mov r7, #1
                 svc #0
 
-            .size _start, .-_start
-        "##.to_string();//make
-        assert_eq!(expected, buf)
-    }
-
-    #[test]
-    fn can_generate_let() {
-        let source = r##"
-            func main() -> Boolean {
-                let x : Integer = 11;
-            }
-        "##.to_string();
-        let mut lexer: Lexer = Lexer::new(source);
-        let tokens: Vec<Token> = lexer.tokenize();
-        let mut parser: Parser = Parser::new(tokens);
-        let ast: AST = parser.parse_program();
-        let output_file = File::create("test_can_generate_let.asm").expect("Couldn't create file: test_can_generate_let.asm");
-        let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
-        let mut buf = "".to_string();
-        let _ = codegen.file.read_to_string(&mut buf);
-        let expected = r##""##.to_string();//make
+            .size _start, .-_start"##}
+        .to_string();
         assert_eq!(expected, buf)
     }
 }
