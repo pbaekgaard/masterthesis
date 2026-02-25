@@ -1,0 +1,19 @@
+#!/bin/bash
+
+ASM_FILE="${1:-main.asm}"
+
+if [ ! -f "$ASM_FILE" ]; then
+    echo "Error: File '$ASM_FILE' does not exist" >&2
+    exit 1
+fi
+
+BASE_NAME="${ASM_FILE%.asm}"
+
+arm-none-eabi-as -mthumb -o "${BASE_NAME}.o" "$ASM_FILE"
+
+arm-none-eabi-ld -o "$BASE_NAME" "${BASE_NAME}.o"
+
+qemu-arm ./"$BASE_NAME"
+echo $?
+
+rm "${BASE_NAME}.o" "$BASE_NAME"
