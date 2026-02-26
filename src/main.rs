@@ -7,6 +7,7 @@ use lexer::lexer::Lexer; // adjust if needed
 use lexer::token::Token;
 use parser::parser::AST;
 use parser::parser::Parser;
+use semantic::symbol_table::SymbolTable;
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -27,6 +28,7 @@ fn main() {
 
     let mut lexer: Lexer = Lexer::new(source);
     let tokens: Vec<Token> = lexer.tokenize();
+    let mut symbol_table = SymbolTable::new();
     let mut parser: Parser = Parser::new(tokens);
     let ast: AST = parser.parse_program();
     println!("Lexing and parsing completed successfully.");

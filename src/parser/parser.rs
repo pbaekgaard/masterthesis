@@ -1,4 +1,4 @@
-use crate::lexer::token::{Token, TokenType};
+use crate::{lexer::token::{Token, TokenType}, semantic::symbol_table::SymbolTable};
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Let(String, Type, Expr),
