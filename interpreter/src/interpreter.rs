@@ -37,6 +37,9 @@ impl Interpreter {
     }
 
     pub fn print_memory(&self) {
+        if !self.debug {
+            return;
+        }
         println!("╔══════════════════════════════════════════════════════════════════╗");
         println!("║                        MEMORY STATE                              ║");
         println!("╠══════════════════════════════════════════════════════════════════╣");
@@ -47,7 +50,11 @@ impl Interpreter {
             if i % 4 == 0 {
                 print!("║ ");
             }
-            print!("r{:2}: {:>10} ", i, value);
+            if i < 10 {
+                print!("r{} : {:<10} ", i, value);
+            } else {
+                print!("r{}: {:<10} ", i, value);
+            }
             if i % 4 == 3 {
                 println!(" ║");
             }
@@ -255,7 +262,7 @@ impl Interpreter {
                     println!("StackPointer = {sp}");
                 }
                 Some(other) => {
-                    panic!("Unknown instruction: {}", other);
+                    println!("Instruction not implemented!: {}", other);
                 }
                 None => {
                     panic!("Empty line encountered");
