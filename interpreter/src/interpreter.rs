@@ -111,6 +111,49 @@ impl Interpreter {
             }
         }
 
+        println!("╟──────────────────────────────────────────────────────────────────╢");
+        println!("║ STACK:                                                           ║");
+        println!(
+            "║   Stack size: {:>6} bytes                                       ║",
+            self.memory.get_stack().len()
+        );
+        println!(
+            "║   SP: {:>10} (0x{:08x})                                    ║",
+            self.memory.get_sp(),
+            self.memory.get_sp()
+        );
+
+        let stack_data = self.memory.get_stack();
+        let sp = self.memory.get_sp();
+        let display_start = sp.saturating_sub(64);
+        let display_end = std::cmp::min(sp + 64, stack_data.len());
+        if display_end > 0 {
+            println!("║   Stack contents (from sp-64 to sp+64):                         ║");
+            for row in (display_start..display_end).step_by(16) {
+                let end = std::cmp::min(row + 16, display_end);
+                print!("║   {:04x}: ", row);
+                for i in row..end {
+                    print!("{:02x} ", stack_data[i]);
+                }
+                for _ in end..row + 16 {
+                    print!("   ");
+                }
+                print!(" |");
+                for i in row..end {
+                    let byte = stack_data[i];
+                    if byte >= 32 && byte < 127 {
+                        print!("{}", byte as char);
+                    } else {
+                        print!(".");
+                    }
+                }
+                for _ in end..row + 16 {
+                    print!(" ");
+                }
+                println!("|║");
+            }
+        }
+
         println!("╚══════════════════════════════════════════════════════════════════╝");
     }
 
@@ -236,6 +279,71 @@ impl Interpreter {
         }
     }
 
+    fn exec_str(&mut self, content: String) {
+        if self.debug {
+            println!("Executing str instruction: {}", content);
+        }
+        let parts: Vec<&str> = content.split_whitespace().collect();
+        let dest_reg = parts[1].replace(",", "");
+        let dest_idx: usize = dest_reg[1..]
+            .parse()
+            .expect("Failed to parse register index");
+        let value = self.memory.get_reg(dest_idx);
+
+        let addr_part = parts[2];
+        let addr_part = addr_part.replace("[", "").replace("]", "");
+
+        let mut base_addr: usize = 0;
+        let mut offset: i32 = 0;
+        let mut base_reg_name = String::new();
+
+        for part in addr_part.split(",") {
+            let part = part.trim();
+            if part.starts_with("r") {
+                base_reg_name = part.to_string();
+            } else if part == "sp" {
+                base_reg_name = "sp".to_string();
+            } else if part.starts_with("#") {
+                offset = part
+                    .replace("#", "")
+                    .parse()
+                    .expect("Failed to parse offset");
+            }
+        }
+
+        if base_reg_name == "sp" {
+            base_addr = self.memory.get_sp();
+        } else if base_reg_name.starts_with("r") {
+            let reg_idx: usize = base_reg_name[1..]
+                .parse()
+                .expect("Failed to parse register index");
+            base_addr = self.memory.get_reg(reg_idx) as usize;
+        }
+
+        let offset_from_sp = (base_addr as i32 - self.memory.get_sp() as i32 + offset) as usize;
+        self.memory.write_stack32(offset_from_sp, value);
+
+        if self.debug {
+            println!("Stored value {} at stack offset {}", value, offset_from_sp);
+            let stack_data = self.memory.get_stack();
+            let sp = self.memory.get_sp();
+            println!(
+                "  SP: {:>10}, stack[SP]: {:02x} {:02x} {:02x} {:02x} = {}",
+                sp,
+                stack_data[sp],
+                stack_data[sp + 1],
+                stack_data[sp + 2],
+                stack_data[sp + 3],
+                u32::from_le_bytes([
+                    stack_data[sp],
+                    stack_data[sp + 1],
+                    stack_data[sp + 2],
+                    stack_data[sp + 3]
+                ])
+            );
+        }
+    }
+
     pub fn execute(&mut self) -> u32 {
         let start_block = self.get_start_block();
         for (i, content) in start_block.into_iter().enumerate() {
@@ -255,11 +363,10 @@ impl Interpreter {
                     }
                 }
                 Some("sub") => {
-                    let mut sp = self.memory.get_sp();
-                    println!("StackPointer = {sp}");
                     self.exec_sub(content);
-                    sp = self.memory.get_sp();
-                    println!("StackPointer = {sp}");
+                }
+                Some("str") => {
+                    self.exec_str(content);
                 }
                 Some(other) => {
                     println!("Instruction not implemented!: {}", other);
