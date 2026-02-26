@@ -1,0 +1,9 @@
+[package]
+name = "Thumb2Interpreter"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[dev-dependencies]
+pretty_assertions = "1.4"

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ "$1" = "--debug" ]; then
+    shift
+    cargo run -- "$@"
+else
+    RUSTFLAGS="-A warnings" cargo run --release -- "$@"
+fi
