@@ -37,9 +37,9 @@ impl Interpreter {
     }
 
     pub fn print_memory(&self) {
-        println!("╔════════════════════════════════════════════════════════════════╗");
+        println!("╔══════════════════════════════════════════════════════════════════╗");
         println!("║                        MEMORY STATE                              ║");
-        println!("╠════════════════════════════════════════════════════════════════╣");
+        println!("╠══════════════════════════════════════════════════════════════════╣");
 
         println!("║ REGISTERS:                                                       ║");
         println!("╟──────────────────────────────────────────────────────────────────╢");
@@ -49,7 +49,7 @@ impl Interpreter {
             }
             print!("r{:2}: {:>10} ", i, value);
             if i % 4 == 3 {
-                println!("║");
+                println!(" ║");
             }
         }
         if 32 % 4 != 0 {
@@ -59,7 +59,7 @@ impl Interpreter {
         println!("╟──────────────────────────────────────────────────────────────────╢");
         println!("║ STACK POINTER:                                                   ║");
         println!(
-            "║   SP: {:>10} (0x{:08x})                                ║",
+            "║   SP: {:>10} (0x{:08x})                                    ║",
             self.memory.get_sp(),
             self.memory.get_sp()
         );
@@ -67,11 +67,11 @@ impl Interpreter {
         println!("╟──────────────────────────────────────────────────────────────────╢");
         println!("║ HEAP:                                                            ║");
         println!(
-            "║   Heap allocated: {:>6} bytes                               ║",
+            "║   Heap allocated: {:>6} bytes                                   ║",
             self.memory.get_heap_alloc_index()
         );
         println!(
-            "║   Heap size:     {:>6} bytes                               ║",
+            "║   Heap size:     {:>6} bytes                                   ║",
             self.memory.get_heap_size()
         );
 
@@ -104,7 +104,7 @@ impl Interpreter {
             }
         }
 
-        println!("╚════════════════════════════════════════════════════════════════╝");
+        println!("╚══════════════════════════════════════════════════════════════════╝");
     }
 
     pub fn shout_file(self) {
