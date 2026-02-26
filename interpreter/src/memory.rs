@@ -24,7 +24,6 @@ impl EmulatorMemory {
     }
 
     pub fn push32(&mut self, value: u32) {
-        self.stack_pointer -= 4;
         let bytes = value.to_le_bytes();
         self.stack[self.stack_pointer..self.stack_pointer + 4].copy_from_slice(&bytes);
     }
@@ -36,12 +35,10 @@ impl EmulatorMemory {
             self.stack[self.stack_pointer + 2],
             self.stack[self.stack_pointer + 3],
         ];
-        self.stack_pointer += 4;
         u32::from_le_bytes(bytes)
     }
 
     pub fn push16(&mut self, value: u16) {
-        self.stack_pointer -= 2;
         let bytes = value.to_le_bytes();
         self.stack[self.stack_pointer..self.stack_pointer + 2].copy_from_slice(&bytes);
     }
@@ -51,7 +48,6 @@ impl EmulatorMemory {
             self.stack[self.stack_pointer],
             self.stack[self.stack_pointer + 1],
         ];
-        self.stack_pointer += 2;
         u16::from_le_bytes(bytes)
     }
 
@@ -76,6 +72,11 @@ impl EmulatorMemory {
 
     pub fn write32(&mut self, addr: usize, value: u32) {
         self.heap[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    pub fn write_stack32(&mut self, offset: usize, value: u32) {
+        let addr = self.stack_pointer + offset;
+        self.stack[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
     }
 
     pub fn get_sp(&self) -> usize {
@@ -116,6 +117,10 @@ impl EmulatorMemory {
 
     pub fn get_heap(&self) -> &Vec<u8> {
         &self.heap
+    }
+
+    pub fn get_stack(&self) -> &Vec<u8> {
+        &self.stack
     }
 
     pub fn print_registers(&self) {
