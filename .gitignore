@@ -5,5 +5,8 @@
 #
 # already existing elements were commented out
 
-#/target
+**/target
 /tmp
+/temp
+**/tmp
+**/temp
