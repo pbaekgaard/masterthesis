@@ -79,6 +79,23 @@ impl EmulatorMemory {
         self.stack[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
     }
 
+    pub fn read_stack32(&self, offset: usize) -> u32 {
+        let addr = self.stack_pointer + offset;
+
+        // Ensure we don't read past the end of the stack array
+        if addr + 4 > self.stack.len() {
+            panic!("Stack out of bounds read at offset {}", offset);
+        }
+
+        // Grab 4 bytes and convert them from Little Endian to u32
+        u32::from_le_bytes([
+            self.stack[addr],
+            self.stack[addr + 1],
+            self.stack[addr + 2],
+            self.stack[addr + 3],
+        ])
+    }
+
     pub fn get_sp(&self) -> usize {
         self.stack_pointer
     }
