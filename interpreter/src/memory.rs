@@ -1,10 +1,7 @@
 const STACK_SIZE: usize = 1024 * 1024;
 const HEAP_SIZE: usize = 1024 * 1024;
-const NUM_REGISTERS: usize = 32;
 
 pub struct EmulatorMemory {
-    registers: [u32; NUM_REGISTERS],
-    pc: u32,
     stack: Vec<u8>,
     heap: Vec<u8>,
     heap_alloc_index: usize,
@@ -14,8 +11,6 @@ pub struct EmulatorMemory {
 impl EmulatorMemory {
     pub fn new() -> Self {
         Self {
-            registers: [0; NUM_REGISTERS],
-            pc: 0,
             stack: vec![0; STACK_SIZE],
             heap: vec![0; HEAP_SIZE],
             heap_alloc_index: 0,
@@ -82,12 +77,10 @@ impl EmulatorMemory {
     pub fn read_stack32(&self, offset: usize) -> u32 {
         let addr = self.stack_pointer + offset;
 
-        // Ensure we don't read past the end of the stack array
         if addr + 4 > self.stack.len() {
             panic!("Stack out of bounds read at offset {}", offset);
         }
 
-        // Grab 4 bytes and convert them from Little Endian to u32
         u32::from_le_bytes([
             self.stack[addr],
             self.stack[addr + 1],
@@ -104,26 +97,6 @@ impl EmulatorMemory {
         self.stack_pointer = sp;
     }
 
-    pub fn get_pc(&self) -> u32 {
-        self.pc
-    }
-
-    pub fn set_pc(&mut self, pc: u32) {
-        self.pc = pc;
-    }
-
-    pub fn get_reg(&self, index: usize) -> u32 {
-        self.registers[index]
-    }
-
-    pub fn set_reg(&mut self, index: usize, value: u32) {
-        self.registers[index] = value;
-    }
-
-    pub fn get_registers(&self) -> &[u32; NUM_REGISTERS] {
-        &self.registers
-    }
-
     pub fn get_heap_alloc_index(&self) -> usize {
         self.heap_alloc_index
     }
@@ -138,12 +111,6 @@ impl EmulatorMemory {
 
     pub fn get_stack(&self) -> &Vec<u8> {
         &self.stack
-    }
-
-    pub fn print_registers(&self) {
-        for (i, &value) in self.registers.iter().enumerate() {
-            println!("r{}: {}", i, value);
-        }
     }
 }
 
