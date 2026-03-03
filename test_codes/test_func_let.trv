@@ -1,0 +1,10 @@
+func x() -> Integer {
+  let v : Integer = 100;
+  return v;
+}
+
+func main() -> Integer {
+  let func_res = x();
+  let result = 5;
+  return 29;
+}

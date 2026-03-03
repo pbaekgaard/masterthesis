@@ -1,4 +1,4 @@
-use crate::lexer::token::{Token, TokenType};
+use crate::{lexer::token::{Token, TokenType}, semantic::symbol_table::SymbolTable};
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Let(String, Type, Expr),
@@ -14,7 +14,7 @@ pub enum Stmt {
         block: Block,
     },
     Print(Expr),
-    Return(Expr)
+    Return(Expr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -167,27 +167,25 @@ impl Parser {
                 statements.push(self.parse_if());
             } else if self.match_token(TokenType::While) {
                 statements.push(self.parse_while());
-            } else if self.match_token(TokenType::Identifier) && self.peek(TokenType::Assign)
-            {
+            } else if self.match_token(TokenType::Identifier) && self.peek(TokenType::Assign) {
                 statements.push(self.parse_assignment());
             } else if self.match_token(TokenType::Return) {
                 statements.push(self.parse_return());
-            } 
-            else {
+            } else {
                 let expression = self.parse_expression();
                 statements.push(Stmt::ExprStatement(expression));
             }
         }
         Block { statements }
     }
-    fn parse_return(&mut self) -> Stmt{
+    fn parse_return(&mut self) -> Stmt {
         self.consume();
         let expr = self.parse_expression();
         let _ = self.expect(TokenType::Semicolon);
         Stmt::Return(expr)
     }
 
-    fn parse_assignment(&mut self) -> Stmt{
+    fn parse_assignment(&mut self) -> Stmt {
         let var_name = self.expect(TokenType::Identifier).unwrap().value;
         let _ = self.expect(TokenType::Assign);
         let expr = self.parse_expression();
@@ -195,7 +193,7 @@ impl Parser {
         Stmt::AssignStatement(var_name, expr)
     }
 
-    fn parse_while(&mut self) -> Stmt{
+    fn parse_while(&mut self) -> Stmt {
         self.consume();
         let expr = self.parse_expression();
         let _ = self.expect(TokenType::Do);
@@ -205,7 +203,7 @@ impl Parser {
         Stmt::While { expr, block }
     }
 
-    fn parse_if(&mut self) -> Stmt{
+    fn parse_if(&mut self) -> Stmt {
         self.consume();
         let condition = self.parse_expression();
         let _ = self.expect(TokenType::Then);
@@ -218,10 +216,14 @@ impl Parser {
                 let _ = self.expect(TokenType::LeftBrace);
                 Some(self.parse_block())
             }
-            _ => None
+            _ => None,
         };
         let _ = self.expect(TokenType::RightBrace);
-        Stmt::If { condition , block, option }
+        Stmt::If {
+            condition,
+            block,
+            option,
+        }
     }
 
     fn parse_let(&mut self) -> Stmt {
@@ -283,11 +285,13 @@ impl Parser {
                         op,
                         Box::new(right),
                     )
-                }else {
-                    match tok.token_type{
-                        TokenType::IntegerLiteral => Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap()), 
+                } else {
+                    match tok.token_type {
+                        TokenType::IntegerLiteral => {
+                            Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap())
+                        }
                         TokenType::Identifier => Expr::Identifier(tok.value),
-                        _ => panic!("tokentype wrong, should be integer literal or identifyer")
+                        _ => panic!("tokentype wrong, should be integer literal or identifyer"),
                     }
                 }
             }
@@ -385,22 +389,21 @@ impl Parser {
     }
 }
 
+#[cfg(test)]
 mod tests {
-
     use crate::parser::parser::Parser;
     use crate::{
         lexer::{
             lexer::Lexer,
-            token::{Token, TokenType},
         },
-        parser::parser::{AST, BinOp, Block, Expr, Function, Type},
+        parser::parser::{BinOp, Block, Expr, Function, Type, AST},
     };
+    use crate::parser::parser::Stmt;
 
     #[test]
     fn test_parser_parses_correct_ast() {
-        use crate::parser::parser::Stmt;
         use std::fs;
-        let source = fs::read_to_string("simple.trv").expect("Failed to read file");
+        let source = fs::read_to_string("test_codes/simple.trv").expect("Failed to read file");
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = Parser::new(tokens);
@@ -413,36 +416,39 @@ mod tests {
             body: Block {
                 statements: vec![
                     Stmt::Let("num".to_string(), Type::Integer, Expr::IntegerLiteral(0)),
-                    Stmt::While{
+                    Stmt::While {
                         expr: Expr::BinaryOp(
                             Box::new(Expr::Identifier("num".to_string())),
                             BinOp::LessThan,
-                            Box::new(Expr::IntegerLiteral(10))
+                            Box::new(Expr::IntegerLiteral(10)),
                         ),
-                        block: Block{
-                            statements: vec![
-                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
-                            ]
-                        }
+                        block: Block {
+                            statements: vec![Stmt::AssignStatement(
+                                "num".to_string(),
+                                Expr::IntegerLiteral(11),
+                            )],
+                        },
                     },
                     Stmt::If {
                         condition: Expr::BinaryOp(
-                            Box::new(Expr::Identifier("num".to_string())), 
-                            BinOp::GreaterThan, 
-                            Box::new(Expr::IntegerLiteral(10))
-                        ), 
-                        block: Block{
-                            statements: vec![
-                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
-                            ]
-                        }, 
-                        option:  Some(Block{
-                            statements: vec![
-                                Stmt:: AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
-                            ]
-                        })
+                            Box::new(Expr::Identifier("num".to_string())),
+                            BinOp::GreaterThan,
+                            Box::new(Expr::IntegerLiteral(10)),
+                        ),
+                        block: Block {
+                            statements: vec![Stmt::AssignStatement(
+                                "num".to_string(),
+                                Expr::IntegerLiteral(11),
+                            )],
+                        },
+                        option: Some(Block {
+                            statements: vec![Stmt::AssignStatement(
+                                "num".to_string(),
+                                Expr::IntegerLiteral(11),
+                            )],
+                        }),
                     },
-                    Stmt::Return(Expr::Identifier("num".to_string()))
+                    Stmt::Return(Expr::Identifier("num".to_string())),
                 ],
             },
         }];

@@ -8,6 +8,7 @@ name = "trivic"
 path = "src/main.rs"
 
 [dependencies]
+indoc = "2.0"
 
 
 [dev-dependencies]

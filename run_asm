@@ -1,0 +1,12 @@
+#!/bin/bash
+# make assemble
+arm-none-eabi-as -mthumb -o main.o main.asm
+
+# link
+arm-none-eabi-ld -o main main.o
+
+# run
+qemu-arm ./main
+echo $?
+
+rm main.o main

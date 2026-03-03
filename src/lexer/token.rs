@@ -31,7 +31,7 @@ pub enum TokenType {
     Arrow,       // ->
     Assign,      // =
     GreaterThan, // >
-    LessThan, // <
+    LessThan,    // <
     Equals,      // ==
     Plus,        // +
     Minus,       // -
@@ -59,9 +59,9 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(value: String,token_type: TokenType, line: usize, column: usize) -> Self {
+    pub fn new(value: String, token_type: TokenType, line: usize, column: usize) -> Self {
         Token {
-            value:value, 
+            value: value,
             token_type,
             line,
             column,
@@ -107,7 +107,6 @@ impl fmt::Display for TokenType {
             TokenType::Multiply => write!(f, "*"),
             TokenType::Division => write!(f, "/"),
 
-
             // Punctuation
             TokenType::LeftParen => write!(f, "("),
             TokenType::RightParen => write!(f, ")"),
@@ -123,17 +122,13 @@ impl fmt::Display for TokenType {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} at {}:{}",
-            self.token_type, self.line, self.column
-        )
+        write!(f, "{} at {}:{}", self.token_type, self.line, self.column)
     }
 }
 impl PartialEq for Token {
     fn eq(&self, other: &Self) -> bool {
-        self.token_type == other.token_type &&
-        self.line == other.line &&
-        self.column == other.column
+        self.token_type == other.token_type
+            && self.line == other.line
+            && self.column == other.column
     }
 }
