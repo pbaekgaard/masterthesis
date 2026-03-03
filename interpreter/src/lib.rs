@@ -47,4 +47,35 @@ mod tests {
         let exit_code = interp.execute();
         assert_eq!(exit_code, 12, "test_branching.asm should exit with 12");
     }
+    #[test]
+    fn test_ite_condition_true() {
+        let mut interp = Interpreter::new();
+        interp.read_file(&get_test_file_path("test_ite_true.asm").to_string_lossy().to_string());
+        let exit_code = interp.execute();
+        assert_eq!(exit_code, 1, "ITE True: T should have run, result 1");
+    }
+
+    #[test]
+    fn test_ite_condition_false() {
+        let mut interp = Interpreter::new();
+        interp.read_file(&get_test_file_path("test_ite_false.asm").to_string_lossy().to_string());
+        let exit_code = interp.execute();
+        assert_eq!(exit_code, 2, "ITE False: E should have run, result 2");
+    }
+
+    #[test]
+    fn test_ittete_condition_true() {
+        let mut interp = Interpreter::new();
+        interp.read_file(&get_test_file_path("test_ittete_true.asm").to_string_lossy().to_string());
+        let exit_code = interp.execute();
+        assert_eq!(exit_code, 1011, "ITTETE True: Only T instructions should sum");
+    }
+
+    #[test]
+    fn test_ittete_condition_false() {
+        let mut interp = Interpreter::new();
+        interp.read_file(&get_test_file_path("test_ittete_false.asm").to_string_lossy().to_string());
+        let exit_code = interp.execute();
+        assert_eq!(exit_code, 10100, "ITTETE False: Only E instructions should sum");
+    }
 }
