@@ -1,5 +1,5 @@
 func x() -> Integer {
-  let v = 100;
+  let v : Integer = 100;
   return v;
 }
 

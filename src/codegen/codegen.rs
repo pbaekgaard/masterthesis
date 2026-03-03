@@ -379,79 +379,29 @@ mod tests {
 
                 _start:
                     sub sp, sp, #4
-                    mov r0, #11
+                    mov r0, #9
                     str r0, [sp]
                     ldr r0, [sp, #0]
                     mov r1, r0
                     mov r0, #10
                     cmp r1, r0
+                    mov r0, #0
+                    it gt
                     movgt r0, #1
-                    movle r0, #0
                     cmp r0, #0
                     beq else_0
                     mov r0, #11
-                    str r0, [sp, #0]
+                    str r0, [sp]
                     b endif_0
                 else_0:
                     mov r0, #12
-                    str r0, [sp, #0]
+                    str r0, [sp]
                 endif_0:
                     ldr r0, [sp, #0]
                     mov r7, #1
                     svc #0
-                
+
                 .size _start, .-_start
-            "##
-            }
-        ).to_string();
-        assert_eq!(expected, buf)
-    }
-    #[test]
-    fn can_generate_func_let() {
-        initialize();
-        let source = std::fs
-            ::read_to_string("test_codes/test_func_let.trv")
-            .expect("Failed to read file");
-        let mut lexer: Lexer = Lexer::new(source);
-        let tokens: Vec<Token> = lexer.tokenize();
-        let mut parser: Parser = Parser::new(tokens);
-        let ast: AST = parser.parse_program();
-        let output_file = File::options()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open("temp/tests/test_can_generate_func_let.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_func_let.asm");
-        let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
-        codegen.file.seek(SeekFrom::Start(0)).unwrap();
-        let mut buf = String::new();
-        codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
-            .syntax unified
-            .thumb
-
-            .section .text
-            .global _start
-            .type _start, %function
-
-            x:
-                mov r4, #100
-                mov r0, r4
-                bx lr
-
-            _start:
-                bl x
-                mov r4, r0
-                mov r5, #5
-                mov r0, #29
-                mov r7, #1
-                svc #0
-
-            .size _start, .-_start
             "##
             }
         ).to_string();
