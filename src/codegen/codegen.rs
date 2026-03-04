@@ -37,7 +37,6 @@ impl CodeGenerator {
     }
 
     fn write_line(&mut self, string: &str, indents: usize) {
-        // Create indentation (e.g., 4 spaces per indent level)
         let indent_str = "    ".repeat(indents);
 
         // writeln! automatically appends \n
