@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufRead;
+use std::process::exit;
 
 use crate::memory::EmulatorMemory;
 
@@ -319,12 +320,14 @@ impl Interpreter {
                 }
             }
         }
+
         for (k, v) in branch_map.clone() {
-            println!("label: {k}, pc: {v}");
+            println!("label: {k} at {v}");
         }
 
         self.set_eof_pc(result.len() as u32);
         self.set_branch_map(branch_map);
+        exit(1);
         result
     }
 
@@ -600,9 +603,13 @@ impl Interpreter {
         if parts[0].len() > 1 {
             let cond = &parts[0][1..];
             let is_cond = self.cpsr.evaluate_condition(cond);
+            println!("is_cond: {is_cond}");
             if is_cond {
-                self.set_pc(self.branch_map.get(parts[1]).unwrap().clone());
+                let branch_pc = self.branch_map.get(parts[1]).unwrap().clone();
+                println!("branching to {branch_pc}");
+                self.set_pc(branch_pc);
             } else {
+                self.set_pc(self.get_pc() + 1);
                 return;
             }
         } else {
@@ -646,7 +653,6 @@ impl Interpreter {
         let start_block = self.get_start();
         while self.pc < self.eof_pc {
             let instruction = start_block.get(self.pc as usize).unwrap();
-            let pc = self.pc;
             if !self.cpsr.should_execute() {
                 if self.debug {
                     println!("   -> Condition not met, skipping.");
@@ -666,11 +672,12 @@ impl Interpreter {
                 f if f.starts_with("ldr") => self.exec_ldr(instruction.clone()),
                 f if f.starts_with("cmp") => self.exec_cmp(instruction.clone()),
                 f if f.starts_with("it") => self.exec_itx(instruction.clone()),
-                f if f.starts_with("b") => self.exec_b(instruction.clone()),
+                f if f.starts_with("b") => {
+                    self.exec_b(instruction.clone());
+                    continue;
+                }
                 f if f.starts_with("add") => self.exec_add(instruction.clone()),
                 f if f.contains(":") => {
-                    self.set_pc(self.pc + 1);
-                    continue;
                 }
                 Invalid => panic!("Invalid instruction: {Invalid}"),
             }
