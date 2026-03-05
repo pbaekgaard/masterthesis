@@ -667,7 +667,68 @@ mod tests {
     fn create_interpreter() -> Interpreter {
         Interpreter::new()
     }
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
 
+    fn run_qemu(asm_path: &str) -> i32 {
+        let path = Path::new(asm_path);
+        let stem = path.file_stem().unwrap().to_str().unwrap();
+
+        let obj = format!("/tmp/{}.o", stem);
+        let bin = format!("/tmp/{}", stem);
+
+        // Assemble
+        let status = Command::new("arm-none-eabi-as")
+            .args(["-mthumb", "-o", &obj, asm_path])
+            .status()
+            .expect("Failed to run assembler");
+
+        assert!(status.success(), "Assembler failed for {}", asm_path);
+
+        // Link
+        let status = Command::new("arm-none-eabi-ld")
+            .args(["-o", &bin, &obj])
+            .status()
+            .expect("Failed to run linker");
+
+        assert!(status.success(), "Linker failed for {}", asm_path);
+
+        // Run in qemu
+        let status = Command::new("qemu-arm").arg(&bin).status().expect("Failed to run qemu");
+
+        status.code().unwrap_or(-1)
+    }
+
+    #[test]
+    fn test_qemu_vs_interpreter() {
+        let test_dir = Path::new("test_codes_compiled");
+
+        for entry in fs::read_dir(test_dir).expect("Failed to read test directory") {
+            let entry = entry.unwrap();
+            let path = entry.path();
+
+            if path.extension().and_then(|s| s.to_str()) != Some("asm") {
+                continue;
+            }
+
+            let file_path = path.to_str().unwrap();
+
+            println!("Testing file: {}", file_path);
+
+            // Run qemu
+            let qemu_exit = run_qemu(file_path);
+
+            // Run interpreter
+            let mut interp = Interpreter::new();
+            interp.read_file(&file_path.to_string());
+            let interp_exit = interp.execute();
+
+            println!("Result -> qemu: {}, interpreter: {}", qemu_exit, interp_exit);
+
+            assert_eq!(qemu_exit as u32, interp_exit, "Mismatch for {}", file_path);
+        }
+    }
     #[test]
     fn test_mov_immediate() {
         let mut interp = create_interpreter();
