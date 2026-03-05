@@ -69,6 +69,8 @@ pub struct Interpreter {
     memory: EmulatorMemory,
     registers: [u32; NUM_REGISTERS],
     pc: u32,
+    branch_map: HashMap<String, u32>,
+    eof_pc: u32,
     cpsr: Cpsr,
     file: Vec<String>,
     debug: bool,
@@ -80,6 +82,8 @@ impl Interpreter {
             memory: EmulatorMemory::new(),
             registers: [0; NUM_REGISTERS],
             pc: 0,
+            branch_map: HashMap::new(),
+            eof_pc: 0,
             cpsr: Cpsr::default(),
             file: Vec::new(),
             debug: false,
@@ -88,6 +92,10 @@ impl Interpreter {
 
     pub fn set_debug(&mut self, debug: bool) {
         self.debug = debug;
+    }
+
+    pub fn set_branch_map(&mut self, map: HashMap<String, u32>) {
+        self.branch_map = map;
     }
 
     pub fn get_reg(&self, index: usize) -> u32 {
@@ -104,6 +112,10 @@ impl Interpreter {
 
     pub fn set_pc(&mut self, pc: u32) {
         self.pc = pc;
+    }
+
+    pub fn set_eof_pc(&mut self, pc: u32) {
+        self.eof_pc = pc;
     }
     pub fn read_file(&mut self, file_path: &String) -> bool {
         let file = File::open(file_path).expect("Could not open file: {file_path}");
@@ -273,30 +285,37 @@ impl Interpreter {
         println!("-------------------- SHOUT FILE END --------------------");
     }
 
-    fn get_asm_branches(&self) -> HashMap<String, Vec<String>> {
-        let mut branches: HashMap<String, Vec<String>> = HashMap::new();
-        let mut current_branch: Option<String> = None;
-        let mut current_instructions: Vec<String> = Vec::new();
+    fn get_start(&mut self) -> Vec<String> {
+        let mut result = Vec::new();
+        let mut branch_map : HashMap<String, u32> = HashMap::new();
+        let mut found_start = false;
 
         for line in &self.file {
-            let trimmed = line.trim();
-
-            if trimmed.ends_with(":") && !trimmed.starts_with("    ") {
-                if let Some(branch_name) = current_branch {
-                    branches.insert(branch_name, current_instructions.clone());
-                    current_instructions.clear();
+            match line.starts_with("_start:") {
+                true => {
+                    found_start = true;
+                    let label = line.trim_start().to_string();
+                    result.push(label.clone());
+                    branch_map.insert(label, (result.len() - 1) as u32);
                 }
-                current_branch = Some(trimmed.trim_end_matches(':').to_string());
-            } else if current_branch.is_some() && line.starts_with("    ") {
-                current_instructions.push(trimmed.to_string());
+                false => {
+                    if found_start {
+                        if line.starts_with(".size _start") {
+                            result.pop();
+                        } else {
+                            result.push(line.trim_start().to_string());
+                            if line.contains(":") {
+                                branch_map.insert(line.trim_start().to_string(), (result.len() - 1) as u32);
+                            }
+                        }
+                    }
+                }
             }
         }
-
-        if let Some(branch_name) = current_branch {
-            branches.insert(branch_name, current_instructions);
-        }
-
-        branches
+        
+        self.set_eof_pc(result.len() as u32);
+        self.set_branch_map(branch_map);
+        result
     }
 
     fn exec_mov(&mut self, content: String) {
@@ -542,7 +561,6 @@ impl Interpreter {
                 val_op2,
                 result,
                 self.cpsr.n,
-                self.cpsr.z,
                 self.cpsr.c,
                 self.cpsr.v
             );
@@ -562,11 +580,22 @@ impl Interpreter {
         self.cpsr.it_state.mask = mnemonic.chars().skip(1).collect();
     }
 
+    fn exec_do_branch(&mut self, content: String) {
+
+    }
+
     //NOTE: Maybe we could just use one single exec_b, and have it check if the instruction is beq
     //or ble etc. and use the cpsr register to do stuff instead of a million branch function for
     //each conditional version
     fn exec_b(&mut self, content: String) {
-        
+        // trim instruction to branch or branch + condition
+        // if condition:
+            // if condition true:
+            //   branch  
+            // else 
+            //   return
+        // else
+        self.exec_do_branch(content);
     }
 
     fn exec_add(&mut self, content: String) {
@@ -576,35 +605,44 @@ impl Interpreter {
         let op1 = parts[2].replace(",", "");
         let op2 = parts[3].replace(",", "");
 
-        let dest_idx: usize = dest[1..].parse().unwrap();
-        let src_idx: usize = op1[1..].parse().unwrap();
+        let dest_idx: usize = if dest == "sp" {
+            13
+        } else {
+            dest[1..].parse().unwrap()
+        };
 
-        let src_val = self.get_reg(src_idx);
+        let src_val: u32 = if op1 == "sp" {
+            self.memory.get_sp() as u32
+        } else {
+            let src_idx: usize = op1[1..].parse().unwrap();
+            self.get_reg(src_idx)
+        };
 
         let value = if let Some(imm) = op2.strip_prefix('#') {
             imm.parse::<u32>().unwrap()
         } else {
-            let reg_idx: usize = op2[1..].parse().unwrap();
+            let reg_idx: usize = if op2 == "sp" {
+                13
+            } else {
+                op2[1..].parse().unwrap()
+            };
             self.get_reg(reg_idx)
         };
 
         let result = src_val.wrapping_add(value);
 
-        self.set_reg(dest_idx, result);
+        if dest == "sp" {
+            self.memory.set_sp(result as usize);
+        } else {
+            self.set_reg(dest_idx, result);
+        }
     }
 
     pub fn execute(&mut self) -> u32 {
-        let branches = self.get_asm_branches();
-
-        if !branches.contains_key("_start") {
-            panic!("_start label not found");
-        }
-
-        let start_block = branches.get("_start").unwrap();
-
-        for content in start_block.iter().enumerate() {
-            let instruction = content.split_whitespace().next().unwrap_or("");
-
+        let start_block = self.get_start();
+        while self.pc < self.eof_pc {
+            let instruction = start_block.get(self.pc as usize).unwrap();
+            let pc = self.pc;
             if !self.cpsr.should_execute() {
                 if self.debug {
                     println!("   -> Condition not met, skipping.");
@@ -613,19 +651,23 @@ impl Interpreter {
             }
 
             match instruction {
-                f if f.starts_with("mov") => self.exec_mov(content.clone()),
+                f if f.starts_with("mov") => self.exec_mov(instruction.clone()),
                 f if f.starts_with("svc") => {
-                    if let Some(exit_code) = self.exec_svc(content.clone()) {
+                    if let Some(exit_code) = self.exec_svc(instruction.clone()) {
                         return exit_code;
                     }
                 }
-                f if f.starts_with("sub") => self.exec_sub(content.clone()),
-                f if f.starts_with("str") => self.exec_str(content.clone()),
-                f if f.starts_with("ldr") => self.exec_ldr(content.clone()),
-                f if f.starts_with("cmp") => self.exec_cmp(content.clone()),
-                f if f.starts_with("it") => self.exec_itx(content.clone()),
-                f if f.starts_with("b") => self.exec_b(content.clone()),
-                f if f.starts_with("add") => self.exec_add(content.clone()),
+                f if f.starts_with("sub") => self.exec_sub(instruction.clone()),
+                f if f.starts_with("str") => self.exec_str(instruction.clone()),
+                f if f.starts_with("ldr") => self.exec_ldr(instruction.clone()),
+                f if f.starts_with("cmp") => self.exec_cmp(instruction.clone()),
+                f if f.starts_with("it") => self.exec_itx(instruction.clone()),
+                f if f.starts_with("b") => self.exec_b(instruction.clone()),
+                f if f.starts_with("add") => self.exec_add(instruction.clone()),
+                f if f.contains(":") => {
+                    self.set_pc(self.pc + 1);
+                    continue;
+                }
                 Invalid => panic!("Invalid instruction: {Invalid}"),
             }
             self.set_pc(self.pc + 1);
