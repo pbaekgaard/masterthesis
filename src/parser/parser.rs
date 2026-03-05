@@ -438,7 +438,7 @@ mod tests {
                         block: Block {
                             statements: vec![Stmt::AssignStatement(
                                 "num".to_string(),
-                                Expr::IntegerLiteral(11),
+                                Expr::IntegerLiteral(12),
                             )],
                         },
                         option: Some(Block {

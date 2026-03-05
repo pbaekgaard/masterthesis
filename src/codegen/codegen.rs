@@ -1,6 +1,9 @@
-use crate::parser::{ AST, parser::{ BinOp, Block, Expr, Function, Stmt } };
+use crate::parser::{
+    parser::{BinOp, Block, Expr, Function, Stmt},
+    AST,
+};
 use core::panic;
-use std::{ collections::HashMap, fs::File, io::Write };
+use std::{collections::HashMap, fs::File, io::Write};
 
 #[derive(Debug)]
 pub struct CodeGenerator {
@@ -70,7 +73,7 @@ impl CodeGenerator {
                 Stmt::Return(_) => {
                     self.emit_return(stmt, is_main);
                     has_return = true;
-                },
+                }
                 Stmt::If { .. } => self.emit_if(stmt),
                 Stmt::While { .. } => self.emit_while(stmt),
                 _ => panic!("Error found in expression in return"),
@@ -87,7 +90,11 @@ impl CodeGenerator {
     }
     fn emit_if(&mut self, if_stmt: Stmt) {
         match if_stmt {
-            Stmt::If { condition, block, option } => {
+            Stmt::If {
+                condition,
+                block,
+                option,
+            } => {
                 let label_id = self.label_count;
                 self.label_count += 1;
 
@@ -150,9 +157,9 @@ impl CodeGenerator {
             Stmt::AssignStatement(name, expr) => {
                 self.emit_expr(expr);
                 let offset = self.locals.get(&name).expect("Undefined variable");
-                if self.stack_offset - offset == 0{
+                if self.stack_offset - offset == 0 {
                     self.write_line(&format!("str r0, [sp]"), 1);
-                }else{
+                } else {
                     self.write_line(&format!("str r0, [sp, #{}]", self.stack_offset - offset), 1);
                 }
             }
@@ -173,8 +180,8 @@ impl CodeGenerator {
     }
     fn emit_expr(&mut self, expr: Expr) {
         match expr {
-            Expr::IntegerLiteral(val) => { self.write_line(&format!("mov r0, #{}", val), 1) }
-            Expr::BooleanLiteral(val) => { self.write_line(&format!("mov r0, #{}", val), 1) }
+            Expr::IntegerLiteral(val) => self.write_line(&format!("mov r0, #{}", val), 1),
+            Expr::BooleanLiteral(val) => self.write_line(&format!("mov r0, #{}", val), 1),
             Expr::Identifier(name) => {
                 let offset = self.locals.get(&name).expect("Undefined variable");
                 self.write_line(&format!("ldr r0, [sp, #{}]", self.stack_offset - offset), 1);
@@ -234,11 +241,11 @@ impl CodeGenerator {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::{ lexer::Lexer, token::Token };
-    use crate::parser::parser::{ Parser, AST };
+    use crate::lexer::{lexer::Lexer, token::Token};
+    use crate::parser::parser::{Parser, AST};
     use crate::CodeGenerator;
     use std::fs::File;
-    use std::io::{ Read, Seek, SeekFrom };
+    use std::io::{Read, Seek, SeekFrom};
     use std::sync::Once;
 
     static INIT: Once = Once::new();
@@ -268,9 +275,8 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
+        let expected = (indoc::indoc! {
+            r##"
             .syntax unified
             .thumb
 
@@ -279,16 +285,15 @@ mod tests {
             .type _start, %function
 
             "##
-            }
-        ).to_string();
+        })
+        .to_string();
         assert_eq!(expected, buf);
     }
 
     #[test]
     fn can_generate_return() {
         initialize();
-        let source = std::fs
-            ::read_to_string("test_codes/test_main_return.trv")
+        let source = std::fs::read_to_string("test_codes/test_main_return.trv")
             .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
@@ -306,9 +311,8 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
+        let expected = (indoc::indoc! {
+            r##"
             .syntax unified
             .thumb
 
@@ -323,17 +327,16 @@ mod tests {
 
             .size _start, .-_start
             "##
-            }
-        ).to_string();
+        })
+        .to_string();
         assert_eq!(expected, buf)
     }
 
     #[test]
     fn can_generate_let() {
         initialize();
-        let source = std::fs
-            ::read_to_string("test_codes/test_main_let.trv")
-            .expect("Failed to read file");
+        let source =
+            std::fs::read_to_string("test_codes/test_main_let.trv").expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
         let mut parser: Parser = Parser::new(tokens);
@@ -350,9 +353,8 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
+        let expected = (indoc::indoc! {
+            r##"
                 .syntax unified
                 .thumb
 
@@ -370,16 +372,15 @@ mod tests {
 
                 .size _start, .-_start
             "##
-            }
-        ).to_string();
+        })
+        .to_string();
         assert_eq!(expected, buf)
     }
     #[test]
     fn can_generate_if_else_and_assign() {
         initialize();
-        let source = std::fs
-            ::read_to_string("test_codes/test_func_if_else.trv")
-            .expect("Failed to read file");
+        let source =
+            std::fs::read_to_string("test_codes/test_if_else.trv").expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
         let mut parser: Parser = Parser::new(tokens);
@@ -390,15 +391,14 @@ mod tests {
             .create(true)
             .truncate(true)
             .open("temp/tests/test_can_generate_if_else.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_let.asm");
+            .expect("Failed to create file: /temp/tests/test_can_generate_if_else.asm");
         let mut codegen = CodeGenerator::new(output_file);
         codegen.generate(ast);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
+        let expected = (indoc::indoc! {
+            r##"
                 .syntax unified
                 .thumb
 
@@ -432,16 +432,15 @@ mod tests {
 
                 .size _start, .-_start
             "##
-            }
-        ).to_string();
+        })
+        .to_string();
         assert_eq!(expected, buf)
     }
 
     #[test]
     fn can_generate_while() {
         initialize();
-        let source = std::fs
-            ::read_to_string("test_codes/test_while_simple.trv")
+        let source = std::fs::read_to_string("test_codes/test_while_simple.trv")
             .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
@@ -459,9 +458,8 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
+        let expected = (indoc::indoc! {
+            r##"
                 .syntax unified
                 .thumb
 
@@ -496,16 +494,15 @@ mod tests {
 
                 .size _start, .-_start
             "##
-            }
-        ).to_string();
+        })
+        .to_string();
         assert_eq!(expected, buf)
     }
 
     #[test]
     fn can_generate_two_whiles() {
         initialize();
-        let source = std::fs
-            ::read_to_string("test_codes/test_while_two_loops.trv")
+        let source = std::fs::read_to_string("test_codes/test_while_two_loops.trv")
             .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
@@ -523,9 +520,8 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
+        let expected = (indoc::indoc! {
+            r##"
                 .syntax unified
                 .thumb
 
@@ -583,16 +579,15 @@ mod tests {
 
                 .size _start, .-_start
             "##
-            }
-        ).to_string();
+        })
+        .to_string();
         assert_eq!(expected, buf)
     }
 
     #[test]
     fn can_generate_nested_while() {
         initialize();
-        let source = std::fs
-            ::read_to_string("test_codes/test_while_nested.trv")
+        let source = std::fs::read_to_string("test_codes/test_while_nested.trv")
             .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
@@ -610,9 +605,8 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
+        let expected = (indoc::indoc! {
+            r##"
                 .syntax unified
                 .thumb
 
@@ -668,8 +662,71 @@ mod tests {
 
                 .size _start, .-_start
             "##
-            }
-        ).to_string();
+        })
+        .to_string();
         assert_eq!(expected, buf)
+    }
+
+    #[test]
+    fn compiles_all_correct() {
+        initialize();
+
+        let test_codes_dir = std::path::Path::new("test_codes");
+        let trv_files: Vec<_> = std::fs::read_dir(test_codes_dir)
+            .unwrap()
+            .filter_map(|entry| {
+                let path = entry.unwrap().path();
+                if path.extension().map_or(false, |ext| ext == "trv") {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for trv_path in trv_files {
+            let source = std::fs::read_to_string(&trv_path).expect("Failed to read trv file");
+            let mut lexer: Lexer = Lexer::new(source);
+            let tokens: Vec<Token> = lexer.tokenize();
+            let mut parser: Parser = Parser::new(tokens);
+            let ast: AST = parser.parse_program();
+
+            let file_stem = trv_path.file_stem().unwrap().to_str().unwrap();
+            let output_asm_path = format!("temp/tests/{}.asm", file_stem);
+            let output_file = File::options()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&output_asm_path)
+                .expect(&format!("Failed to create file: {}", output_asm_path));
+
+            let mut codegen = CodeGenerator::new(output_file);
+            codegen.generate(ast);
+
+            let output_path = trv_path.with_extension("trv.output");
+            let expected_exit_code = std::fs::read_to_string(&output_path)
+                .expect("Failed to read output file")
+                .trim()
+                .parse::<i32>()
+                .expect("Failed to parse exit code");
+
+            let result = std::process::Command::new("./run_asm")
+                .arg(&output_asm_path)
+                .output();
+
+            let actual_exit_code = match result {
+                Ok(output) => output.status.code().unwrap_or(-1),
+                Err(_) => -1,
+            };
+
+            std::fs::remove_file(&output_asm_path).ok();
+
+            assert_eq!(
+                expected_exit_code, actual_exit_code,
+                "File {}: expected exit code {}, got {}",
+                file_stem, expected_exit_code, actual_exit_code
+            );
+        }
     }
 }
