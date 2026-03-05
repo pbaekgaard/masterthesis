@@ -566,39 +566,18 @@ impl Interpreter {
     //or ble etc. and use the cpsr register to do stuff instead of a million branch function for
     //each conditional version
     fn exec_b(&mut self, content: String) {
-        let parts: Vec<&str> = content.split_whitespace().collect();
-        let instruction = parts[0]; // b / beq / bgt
-        let label = parts[1];
-
-        // Extract condition
-        let cond = if instruction.len() > 1 {
-            &instruction[1..] // eq, gt, etc
-        } else {
-            "AL"
-        };
-
-        if !self.cpsr.evaluate_condition(cond) {
-            return;
-        }
-
-        // Jump
-        let branches = self.get_asm_branches();
-        if let Some(target) = branches.get(label) {
-            for line in target {
-                println!("Executing from branch {} -> {}", label, line);
-            }
-        }
+        
     }
 
     fn exec_add(&mut self, content: String) {
         let parts: Vec<&str> = content.split_whitespace().collect();
 
         let dest = parts[1].replace(",", "");
-        let src = parts[2].replace(",", "");
+        let op1 = parts[2].replace(",", "");
         let op2 = parts[3].replace(",", "");
 
         let dest_idx: usize = dest[1..].parse().unwrap();
-        let src_idx: usize = src[1..].parse().unwrap();
+        let src_idx: usize = op1[1..].parse().unwrap();
 
         let src_val = self.get_reg(src_idx);
 
@@ -623,7 +602,7 @@ impl Interpreter {
 
         let start_block = branches.get("_start").unwrap();
 
-        for content in start_block.iter() {
+        for content in start_block.iter().enumerate() {
             let instruction = content.split_whitespace().next().unwrap_or("");
 
             if !self.cpsr.should_execute() {
@@ -649,6 +628,7 @@ impl Interpreter {
                 f if f.starts_with("add") => self.exec_add(content.clone()),
                 Invalid => panic!("Invalid instruction: {Invalid}"),
             }
+            self.set_pc(self.pc + 1);
         }
         0
     }
