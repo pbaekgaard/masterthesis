@@ -287,7 +287,7 @@ impl Interpreter {
 
     fn get_start(&mut self) -> Vec<String> {
         let mut result = Vec::new();
-        let mut branch_map : HashMap<String, u32> = HashMap::new();
+        let mut branch_map: HashMap<String, u32> = HashMap::new();
         let mut found_start = false;
 
         for line in &self.file {
@@ -296,23 +296,33 @@ impl Interpreter {
                     found_start = true;
                     let label = line.trim_start().to_string();
                     result.push(label.clone());
-                    branch_map.insert(label, (result.len() - 1) as u32);
+                    branch_map.insert(
+                        label[0..label.len() - 1].to_string(),
+                        (result.len() - 1) as u32
+                    );
                 }
                 false => {
                     if found_start {
                         if line.starts_with(".size _start") {
                             result.pop();
                         } else {
+                            let label = line.trim_start().to_string();
                             result.push(line.trim_start().to_string());
                             if line.contains(":") {
-                                branch_map.insert(line.trim_start().to_string(), (result.len() - 1) as u32);
+                                branch_map.insert(
+                                    label[0..label.len() - 1].to_string(),
+                                    (result.len() - 1) as u32
+                                );
                             }
                         }
                     }
                 }
             }
         }
-        
+        for (k, v) in branch_map.clone() {
+            println!("label: {k}, pc: {v}");
+        }
+
         self.set_eof_pc(result.len() as u32);
         self.set_branch_map(branch_map);
         result
@@ -561,6 +571,7 @@ impl Interpreter {
                 val_op2,
                 result,
                 self.cpsr.n,
+                self.cpsr.z,
                 self.cpsr.c,
                 self.cpsr.v
             );
@@ -580,22 +591,23 @@ impl Interpreter {
         self.cpsr.it_state.mask = mnemonic.chars().skip(1).collect();
     }
 
-    fn exec_do_branch(&mut self, content: String) {
-
-    }
-
     //NOTE: Maybe we could just use one single exec_b, and have it check if the instruction is beq
     //or ble etc. and use the cpsr register to do stuff instead of a million branch function for
     //each conditional version
     fn exec_b(&mut self, content: String) {
         // trim instruction to branch or branch + condition
-        // if condition:
-            // if condition true:
-            //   branch  
-            // else 
-            //   return
-        // else
-        self.exec_do_branch(content);
+        let parts: Vec<&str> = content.split_whitespace().collect();
+        if parts[0].len() > 1 {
+            let cond = &parts[0][1..];
+            let is_cond = self.cpsr.evaluate_condition(cond);
+            if is_cond {
+                self.set_pc(self.branch_map.get(parts[1]).unwrap().clone());
+            } else {
+                return;
+            }
+        } else {
+            self.set_pc(self.branch_map.get(parts[1]).unwrap().clone());
+        }
     }
 
     fn exec_add(&mut self, content: String) {
@@ -605,11 +617,7 @@ impl Interpreter {
         let op1 = parts[2].replace(",", "");
         let op2 = parts[3].replace(",", "");
 
-        let dest_idx: usize = if dest == "sp" {
-            13
-        } else {
-            dest[1..].parse().unwrap()
-        };
+        let dest_idx: usize = if dest == "sp" { 13 } else { dest[1..].parse().unwrap() };
 
         let src_val: u32 = if op1 == "sp" {
             self.memory.get_sp() as u32
@@ -621,11 +629,7 @@ impl Interpreter {
         let value = if let Some(imm) = op2.strip_prefix('#') {
             imm.parse::<u32>().unwrap()
         } else {
-            let reg_idx: usize = if op2 == "sp" {
-                13
-            } else {
-                op2[1..].parse().unwrap()
-            };
+            let reg_idx: usize = if op2 == "sp" { 13 } else { op2[1..].parse().unwrap() };
             self.get_reg(reg_idx)
         };
 
@@ -647,9 +651,9 @@ impl Interpreter {
                 if self.debug {
                     println!("   -> Condition not met, skipping.");
                 }
+                self.set_pc(self.pc + 1);
                 continue; // Skip the match logic entirely
             }
-
             match instruction {
                 f if f.starts_with("mov") => self.exec_mov(instruction.clone()),
                 f if f.starts_with("svc") => {
@@ -740,11 +744,11 @@ mod tests {
 
             // Run qemu
             let qemu_exit = run_qemu(file_path);
-
             // Run interpreter
             let mut interp = Interpreter::new();
             interp.read_file(&file_path.to_string());
             let interp_exit = interp.execute();
+            println!("file executed");
 
             println!("Result -> qemu: {}, interpreter: {}", qemu_exit, interp_exit);
 
@@ -838,7 +842,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_asm_branches_single_function() {
+    fn test_get_start_single_function() {
         let mut interp = create_interpreter();
         interp.file = vec![
             "_start:".to_string(),
@@ -846,10 +850,10 @@ mod tests {
             "    svc #0".to_string()
         ];
 
-        let branches = interp.get_asm_branches();
-
-        assert!(branches.contains_key("_start"));
-        assert_eq!(branches["_start"].len(), 2);
+        let start_block = interp.get_start();
+        let test_label = "_start:".to_string();
+        assert!(start_block.contains(&test_label));
+        assert_eq!(start_block.len(), 3);
     }
 
     #[test]
@@ -864,10 +868,10 @@ mod tests {
             "    svc #0".to_string()
         ];
 
-        let branches = interp.get_asm_branches();
-
-        assert!(branches.contains_key("_start"));
-        assert!(branches.contains_key("else_block"));
+        let start_block = interp.get_start();
+        
+        assert!(start_block.contains(&"_start".to_string()));
+        assert!(start_block.contains(&"else_block".to_string()));
     }
 
     #[test]
