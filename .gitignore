@@ -8,3 +8,5 @@
 #/target
 /tmp
 /temp
+/interpreter/target
+/interpreter/tmp

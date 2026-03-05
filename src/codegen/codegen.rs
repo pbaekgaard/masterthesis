@@ -59,15 +59,31 @@ impl CodeGenerator {
         self.write_line("\n.size _start, .-_start", 0);
     }
     fn emit_block(&mut self, block: Block, is_main: bool) {
+        let initial_offset = self.stack_offset;
+        let initial_locals = self.locals.clone();
+
+        let mut has_return = false;
         for stmt in block.statements {
             match stmt {
                 Stmt::Let(_, _, _) => self.emit_let(stmt),
                 Stmt::AssignStatement(_, _) => self.emit_assign(stmt),
-                Stmt::Return(_) => self.emit_return(stmt, is_main),
+                Stmt::Return(_) => {
+                    self.emit_return(stmt, is_main);
+                    has_return = true;
+                },
                 Stmt::If { .. } => self.emit_if(stmt),
+                Stmt::While { .. } => self.emit_while(stmt),
                 _ => panic!("Error found in expression in return"),
             }
         }
+
+        let offset_diff = self.stack_offset - initial_offset;
+        if offset_diff > 0 && !has_return {
+            self.write_line(&format!("add sp, sp, #{}", offset_diff), 1);
+        }
+
+        self.stack_offset = initial_offset;
+        self.locals = initial_locals;
     }
     fn emit_if(&mut self, if_stmt: Stmt) {
         match if_stmt {
@@ -95,16 +111,30 @@ impl CodeGenerator {
         }
     }
 
+    fn emit_while(&mut self, while_stmt: Stmt) {
+        match while_stmt {
+            Stmt::While { expr, block } => {
+                let label_id = self.label_count;
+                self.label_count += 1;
+
+                self.write_line(&format!("while_{}:", label_id), 0);
+                self.emit_expr(expr);
+                self.write_line("cmp r0, #0", 1);
+                self.write_line(&format!("beq end_while_{}", label_id), 1);
+
+                self.emit_block(block, false);
+
+                self.write_line(&format!("b while_{}", label_id), 1);
+                self.write_line(&format!("end_while_{}:", label_id), 0);
+            }
+            _ => panic!("emit_while called with non-while statement"),
+        }
+    }
+
     fn emit_return(&mut self, return_stmt: Stmt, is_main: bool) {
         match return_stmt {
             Stmt::Return(expr) => {
-                match expr {
-                    | crate::parser::parser::Expr::IntegerLiteral(_)
-                    | crate::parser::parser::Expr::Identifier(_) => {
-                        self.emit_expr(expr);
-                    }
-                    _ => panic!("Unsupported expression type in return"),
-                }
+                self.emit_expr(expr);
                 if is_main {
                     self.write_line("mov r7, #1", 1);
                     self.write_line("svc #0", 1);
@@ -396,6 +426,242 @@ mod tests {
                     mov r0, #12
                     str r0, [sp]
                 endif_0:
+                    ldr r0, [sp, #0]
+                    mov r7, #1
+                    svc #0
+
+                .size _start, .-_start
+            "##
+            }
+        ).to_string();
+        assert_eq!(expected, buf)
+    }
+
+    #[test]
+    fn can_generate_while() {
+        initialize();
+        let source = std::fs
+            ::read_to_string("test_codes/test_while_simple.trv")
+            .expect("Failed to read file");
+        let mut lexer: Lexer = Lexer::new(source);
+        let tokens: Vec<Token> = lexer.tokenize();
+        let mut parser: Parser = Parser::new(tokens);
+        let ast: AST = parser.parse_program();
+        let output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_while.asm")
+            .expect("Failed to create file: /temp/tests/test_can_generate_while.asm");
+        let mut codegen = CodeGenerator::new(output_file);
+        codegen.generate(ast);
+        codegen.file.seek(SeekFrom::Start(0)).unwrap();
+        let mut buf = String::new();
+        codegen.file.read_to_string(&mut buf).unwrap();
+        let expected = (
+            indoc::indoc! {
+                r##"
+                .syntax unified
+                .thumb
+
+                .section .text
+                .global _start
+                .type _start, %function
+
+                _start:
+                    sub sp, sp, #4
+                    mov r0, #9
+                    str r0, [sp]
+                while_0:
+                    ldr r0, [sp, #0]
+                    mov r1, r0
+                    mov r0, #12
+                    cmp r1, r0
+                    mov r0, #0
+                    it lt
+                    movlt r0, #1
+                    cmp r0, #0
+                    beq end_while_0
+                    ldr r0, [sp, #0]
+                    mov r1, r0
+                    mov r0, #1
+                    add r0, r1, r0
+                    str r0, [sp]
+                    b while_0
+                end_while_0:
+                    ldr r0, [sp, #0]
+                    mov r7, #1
+                    svc #0
+
+                .size _start, .-_start
+            "##
+            }
+        ).to_string();
+        assert_eq!(expected, buf)
+    }
+
+    #[test]
+    fn can_generate_two_whiles() {
+        initialize();
+        let source = std::fs
+            ::read_to_string("test_codes/test_while_two_loops.trv")
+            .expect("Failed to read file");
+        let mut lexer: Lexer = Lexer::new(source);
+        let tokens: Vec<Token> = lexer.tokenize();
+        let mut parser: Parser = Parser::new(tokens);
+        let ast: AST = parser.parse_program();
+        let output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_two_whiles.asm")
+            .expect("Failed to create file: /temp/tests/test_can_generate_two_whiles.asm");
+        let mut codegen = CodeGenerator::new(output_file);
+        codegen.generate(ast);
+        codegen.file.seek(SeekFrom::Start(0)).unwrap();
+        let mut buf = String::new();
+        codegen.file.read_to_string(&mut buf).unwrap();
+        let expected = (
+            indoc::indoc! {
+                r##"
+                .syntax unified
+                .thumb
+
+                .section .text
+                .global _start
+                .type _start, %function
+
+                _start:
+                    sub sp, sp, #4
+                    mov r0, #0
+                    str r0, [sp]
+                    sub sp, sp, #4
+                    mov r0, #0
+                    str r0, [sp]
+                while_0:
+                    ldr r0, [sp, #4]
+                    mov r1, r0
+                    mov r0, #3
+                    cmp r1, r0
+                    mov r0, #0
+                    it lt
+                    movlt r0, #1
+                    cmp r0, #0
+                    beq end_while_0
+                    ldr r0, [sp, #4]
+                    mov r1, r0
+                    mov r0, #1
+                    add r0, r1, r0
+                    str r0, [sp, #4]
+                    b while_0
+                end_while_0:
+                while_1:
+                    ldr r0, [sp, #0]
+                    mov r1, r0
+                    mov r0, #4
+                    cmp r1, r0
+                    mov r0, #0
+                    it lt
+                    movlt r0, #1
+                    cmp r0, #0
+                    beq end_while_1
+                    ldr r0, [sp, #0]
+                    mov r1, r0
+                    mov r0, #1
+                    add r0, r1, r0
+                    str r0, [sp]
+                    b while_1
+                end_while_1:
+                    ldr r0, [sp, #4]
+                    mov r1, r0
+                    ldr r0, [sp, #0]
+                    add r0, r1, r0
+                    mov r7, #1
+                    svc #0
+
+                .size _start, .-_start
+            "##
+            }
+        ).to_string();
+        assert_eq!(expected, buf)
+    }
+
+    #[test]
+    fn can_generate_nested_while() {
+        initialize();
+        let source = std::fs
+            ::read_to_string("test_codes/test_while_nested.trv")
+            .expect("Failed to read file");
+        let mut lexer: Lexer = Lexer::new(source);
+        let tokens: Vec<Token> = lexer.tokenize();
+        let mut parser: Parser = Parser::new(tokens);
+        let ast: AST = parser.parse_program();
+        let output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_nested_while.asm")
+            .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.asm");
+        let mut codegen = CodeGenerator::new(output_file);
+        codegen.generate(ast);
+        codegen.file.seek(SeekFrom::Start(0)).unwrap();
+        let mut buf = String::new();
+        codegen.file.read_to_string(&mut buf).unwrap();
+        let expected = (
+            indoc::indoc! {
+                r##"
+                .syntax unified
+                .thumb
+
+                .section .text
+                .global _start
+                .type _start, %function
+
+                _start:
+                    sub sp, sp, #4
+                    mov r0, #0
+                    str r0, [sp]
+                while_0:
+                    ldr r0, [sp, #0]
+                    mov r1, r0
+                    mov r0, #3
+                    cmp r1, r0
+                    mov r0, #0
+                    it lt
+                    movlt r0, #1
+                    cmp r0, #0
+                    beq end_while_0
+                    sub sp, sp, #4
+                    mov r0, #0
+                    str r0, [sp]
+                while_1:
+                    ldr r0, [sp, #0]
+                    mov r1, r0
+                    mov r0, #2
+                    cmp r1, r0
+                    mov r0, #0
+                    it lt
+                    movlt r0, #1
+                    cmp r0, #0
+                    beq end_while_1
+                    ldr r0, [sp, #0]
+                    mov r1, r0
+                    mov r0, #1
+                    add r0, r1, r0
+                    str r0, [sp]
+                    b while_1
+                end_while_1:
+                    ldr r0, [sp, #4]
+                    mov r1, r0
+                    mov r0, #1
+                    add r0, r1, r0
+                    str r0, [sp, #4]
+                    add sp, sp, #4
+                    b while_0
+                end_while_0:
                     ldr r0, [sp, #0]
                     mov r7, #1
                     svc #0

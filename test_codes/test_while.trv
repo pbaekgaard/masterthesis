@@ -1,9 +1,7 @@
 func main() -> Integer {
   let num : Integer = 9;
-  if num > 10 {
-    num = 11;
-  } else {
-    num = 12;
+  while num < 12 {
+    num = num + 1;
   }
   return num;
 }
