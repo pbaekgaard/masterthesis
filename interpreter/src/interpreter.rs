@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufRead;
+use std::process::exit;
 
 use crate::memory::EmulatorMemory;
 
@@ -52,7 +53,11 @@ impl Cpsr {
         let is_then = self.it_state.mask[step_idx] == 't';
         let condition_met = self.evaluate_condition(&self.it_state.base_cond);
 
-        let execute = if is_then { condition_met } else { !condition_met };
+        let execute = if is_then {
+            condition_met
+        } else {
+            !condition_met
+        };
 
         // Advance or Reset
         self.it_state.current_instr += 1;
@@ -74,6 +79,8 @@ pub struct Interpreter {
     cpsr: Cpsr,
     file: Vec<String>,
     debug: bool,
+    start_time: std::time::Instant,
+    max_time: std::time::Duration,
 }
 
 impl Interpreter {
@@ -87,11 +94,17 @@ impl Interpreter {
             cpsr: Cpsr::default(),
             file: Vec::new(),
             debug: false,
+            start_time: std::time::Instant::now(),
+            max_time: std::time::Duration::from_millis(10),
         }
     }
 
     pub fn set_debug(&mut self, debug: bool) {
         self.debug = debug;
+    }
+
+    pub fn set_max_time(&mut self, nanoseconds: u128) {
+        self.max_time = std::time::Duration::from_nanos_u128(nanoseconds);
     }
 
     pub fn set_branch_map(&mut self, map: HashMap<String, u32>) {
@@ -119,8 +132,7 @@ impl Interpreter {
     }
     pub fn read_file(&mut self, file_path: &String) -> bool {
         let file = File::open(file_path).expect("Could not open file: {file_path}");
-        let lines: Vec<String> = std::io::BufReader
-            ::new(file)
+        let lines: Vec<String> = std::io::BufReader::new(file)
             .lines()
             .map(|line| line.expect("Could not read line from file"))
             .collect();
@@ -170,17 +182,28 @@ impl Interpreter {
         println!("╟──────────────────────────────────────────────────────────────────╢");
         println!("║ CPSR FLAGS:                                                      ║");
         println!("╟──────────────────────────────────────────────────────────────────╢");
-        println!("║   Z (Zero):     {:<5}                                          ║", self.cpsr.z);
-        println!("║   N (Negative): {:<5}                                          ║", self.cpsr.n);
-        println!("║   C (Carry):    {:<5}                                          ║", self.cpsr.c);
-        println!("║   V (Overflow): {:<5}                                          ║", self.cpsr.v);
+        println!(
+            "║   Z (Zero):     {:<5}                                          ║",
+            self.cpsr.z
+        );
+        println!(
+            "║   N (Negative): {:<5}                                          ║",
+            self.cpsr.n
+        );
+        println!(
+            "║   C (Carry):    {:<5}                                          ║",
+            self.cpsr.c
+        );
+        println!(
+            "║   V (Overflow): {:<5}                                          ║",
+            self.cpsr.v
+        );
 
         println!("╟──────────────────────────────────────────────────────────────────╢");
         println!("║ PROGRAM COUNTER:                                                 ║");
         println!(
             "║   PC: {:>10} (0x{:08x})                                    ║",
-            self.pc,
-            self.pc
+            self.pc, self.pc
         );
 
         println!("╟──────────────────────────────────────────────────────────────────╢");
@@ -298,7 +321,7 @@ impl Interpreter {
                     result.push(label.clone());
                     branch_map.insert(
                         label[0..label.len() - 1].to_string(),
-                        (result.len() - 1) as u32
+                        (result.len() - 1) as u32,
                     );
                 }
                 false => {
@@ -311,7 +334,7 @@ impl Interpreter {
                             if line.contains(":") {
                                 branch_map.insert(
                                     label[0..label.len() - 1].to_string(),
-                                    (result.len() - 1) as u32
+                                    (result.len() - 1) as u32,
                                 );
                             }
                         }
@@ -319,7 +342,6 @@ impl Interpreter {
                 }
             }
         }
-
 
         self.set_eof_pc(result.len() as u32);
         self.set_branch_map(branch_map);
@@ -348,7 +370,10 @@ impl Interpreter {
             value = self.get_reg(src_idx);
             self.set_reg(dest_idx, value);
             if self.debug {
-                println!("Mock: mov r{}, r{} (register to register)", dest_idx, src_idx);
+                println!(
+                    "Mock: mov r{}, r{} (register to register)",
+                    dest_idx, src_idx
+                );
             }
         }
     }
@@ -392,14 +417,20 @@ impl Interpreter {
 
         let src_val: u32;
         if let Some(src_str) = src.strip_prefix('r') {
-            let src_register = src_str.replace("r", "").parse().expect("Unable to parse register");
+            let src_register = src_str
+                .replace("r", "")
+                .parse()
+                .expect("Unable to parse register");
             src_val = self.get_reg(src_register);
         } else {
             src_val = self.memory.get_sp() as u32;
         }
 
         if let Some(dst_str) = dest.strip_prefix('r') {
-            let dst_register = dst_str.replace("r", "").parse().expect("Unable to parse register");
+            let dst_register = dst_str
+                .replace("r", "")
+                .parse()
+                .expect("Unable to parse register");
             let _dst_val = self.get_reg(dst_register);
         } else if src == "sp" {
             self.memory.set_sp((src_val - sub_value) as usize);
@@ -412,7 +443,9 @@ impl Interpreter {
         }
         let parts: Vec<&str> = content.split_whitespace().collect();
         let dest_reg = parts[1].replace(",", "");
-        let dest_idx: usize = dest_reg[1..].parse().expect("Failed to parse register index");
+        let dest_idx: usize = dest_reg[1..]
+            .parse()
+            .expect("Failed to parse register index");
         let value = self.get_reg(dest_idx);
 
         let addr_part = content
@@ -441,8 +474,7 @@ impl Interpreter {
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
-        let offset_from_sp =
-            ((base_addr as i32) - (self.memory.get_sp() as i32) + offset) as usize;
+        let offset_from_sp = ((base_addr as i32) - (self.memory.get_sp() as i32) + offset) as usize;
         self.memory.write_stack32(offset_from_sp, value);
 
         if self.debug {
@@ -506,7 +538,9 @@ impl Interpreter {
         if base_reg_name == "sp" {
             base_addr = self.memory.get_sp();
         } else if let Some(reg_num) = base_reg_name.strip_prefix('r') {
-            let reg_idx: usize = reg_num.parse().expect("Failed to parse base register index");
+            let reg_idx: usize = reg_num
+                .parse()
+                .expect("Failed to parse base register index");
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
@@ -521,9 +555,7 @@ impl Interpreter {
         if self.debug {
             println!(
                 "Loaded value {} from stack offset {} into r{}",
-                value,
-                effective_offset,
-                dest_idx
+                value, effective_offset, dest_idx
             );
         }
     }
@@ -565,13 +597,7 @@ impl Interpreter {
         if self.debug {
             println!(
                 "CMP Result: {:#x} - {:#x} = {:#x} | Flags: N:{} Z:{} C:{} V:{}",
-                val_n,
-                val_op2,
-                result,
-                self.cpsr.n,
-                self.cpsr.z,
-                self.cpsr.c,
-                self.cpsr.v
+                val_n, val_op2, result, self.cpsr.n, self.cpsr.z, self.cpsr.c, self.cpsr.v
             );
         }
     }
@@ -618,7 +644,11 @@ impl Interpreter {
         let op1 = parts[2].replace(",", "");
         let op2 = parts[3].replace(",", "");
 
-        let dest_idx: usize = if dest == "sp" { 13 } else { dest[1..].parse().unwrap() };
+        let dest_idx: usize = if dest == "sp" {
+            13
+        } else {
+            dest[1..].parse().unwrap()
+        };
 
         let src_val: u32 = if op1 == "sp" {
             self.memory.get_sp() as u32
@@ -630,7 +660,11 @@ impl Interpreter {
         let value = if let Some(imm) = op2.strip_prefix('#') {
             imm.parse::<u32>().unwrap()
         } else {
-            let reg_idx: usize = if op2 == "sp" { 13 } else { op2[1..].parse().unwrap() };
+            let reg_idx: usize = if op2 == "sp" {
+                13
+            } else {
+                op2[1..].parse().unwrap()
+            };
             self.get_reg(reg_idx)
         };
 
@@ -647,6 +681,10 @@ impl Interpreter {
         let start_block = self.get_start();
         while self.pc < self.eof_pc {
             let instruction = start_block.get(self.pc as usize).unwrap();
+            if self.start_time.elapsed().as_nanos() > self.max_time.as_nanos() {
+                println!("Detected Infinite Loop");
+                exit(88)
+            }
             if !self.cpsr.should_execute() {
                 if self.debug {
                     println!("   -> Condition not met, skipping.");
@@ -671,8 +709,7 @@ impl Interpreter {
                     continue;
                 }
                 f if f.starts_with("add") => self.exec_add(instruction.clone()),
-                f if f.contains(":") => {
-                }
+                f if f.contains(":") => {}
                 invalid => panic!("Invalid instruction: {invalid}"),
             }
             self.set_pc(self.pc + 1);
@@ -722,7 +759,10 @@ mod tests {
         assert!(status.success(), "Linker failed for {}", asm_path);
 
         // Run in qemu
-        let status = Command::new("qemu-arm").arg(&bin).status().expect("Failed to run qemu");
+        let status = Command::new("qemu-arm")
+            .arg(&bin)
+            .status()
+            .expect("Failed to run qemu");
 
         status.code().unwrap_or(-1)
     }
@@ -741,14 +781,12 @@ mod tests {
 
             let file_path = path.to_str().unwrap();
 
-
             // Run qemu
             let qemu_exit = run_qemu(file_path);
             // Run interpreter
             let mut interp = Interpreter::new();
             interp.read_file(&file_path.to_string());
             let interp_exit = interp.execute();
-
 
             assert_eq!(qemu_exit as u32, interp_exit, "Mismatch for {}", file_path);
         }
@@ -845,7 +883,7 @@ mod tests {
         interp.file = vec![
             "_start:".to_string(),
             "    mov r0, #1".to_string(),
-            "    svc #0".to_string()
+            "    svc #0".to_string(),
         ];
 
         let start_block = interp.get_start();
@@ -861,7 +899,7 @@ mod tests {
             "_start:".to_string(),
             "    mov r0, #10".to_string(),
             "    mov r7, #1".to_string(),
-            "    svc #0".to_string()
+            "    svc #0".to_string(),
         ];
 
         let exit_code = interp.execute();
@@ -880,7 +918,7 @@ mod tests {
             "    ldr r1, [sp]".to_string(),
             "    mov r0, r1".to_string(),
             "    mov r7, #1".to_string(),
-            "    svc #0".to_string()
+            "    svc #0".to_string(),
         ];
 
         let exit_code = interp.execute();
@@ -903,8 +941,14 @@ mod tests {
         interp.set_reg(1, 50);
         interp.exec_cmp("cmp r1, #100".to_string());
         assert!(!interp.cpsr.z, "Z should be false when not equal");
-        assert!(interp.cpsr.n, "N should be true because 50 - 100 is negative");
-        assert!(!interp.cpsr.c, "C should be false because 50 < 100 (borrow occurred)");
+        assert!(
+            interp.cpsr.n,
+            "N should be true because 50 - 100 is negative"
+        );
+        assert!(
+            !interp.cpsr.c,
+            "C should be false because 50 < 100 (borrow occurred)"
+        );
 
         // 3. Test Greater Than (Positive result)
         interp.set_reg(1, 200);
@@ -918,10 +962,13 @@ mod tests {
         // too big for 32-bit signed integer (wraps around)
         interp.set_reg(1, 0x7fffffff); // Max Positive i32
         interp.set_reg(2, 0xffffffff); // -1 in two's complement
-        // Math: 0x7FFFFFFF - (-1) = 0x80000000 (which is -2147483648 in signed)
+                                       // Math: 0x7FFFFFFF - (-1) = 0x80000000 (which is -2147483648 in signed)
         interp.exec_cmp("cmp r1, r2".to_string());
         assert!(interp.cpsr.v, "V should be true due to signed overflow");
-        assert!(interp.cpsr.n, "N should be true because result wrapped to 0x80000000");
+        assert!(
+            interp.cpsr.n,
+            "N should be true because result wrapped to 0x80000000"
+        );
     }
     #[test]
     fn test_it_block_execution_logic() {
@@ -950,7 +997,10 @@ mod tests {
 
         // Test Instruction 2 (E)
         let should_run_2 = interp.cpsr.should_execute();
-        assert!(!should_run_2, "Instruction 2 (E) should NOT run when GT is true");
+        assert!(
+            !should_run_2,
+            "Instruction 2 (E) should NOT run when GT is true"
+        );
         assert_eq!(interp.cpsr.it_state.current_instr, 2);
 
         // 3. Reset and Scenario B: Condition is FALSE (R1 < R0)
@@ -963,11 +1013,17 @@ mod tests {
 
         // Test Instruction 1 (T)
         let should_run_1_f = interp.cpsr.should_execute();
-        assert!(!should_run_1_f, "Instruction 1 (T) should NOT run when GT is false");
+        assert!(
+            !should_run_1_f,
+            "Instruction 1 (T) should NOT run when GT is false"
+        );
 
         // Test Instruction 2 (E)
         let should_run_2_f = interp.cpsr.should_execute();
-        assert!(should_run_2_f, "Instruction 2 (E) SHOULD run when GT is false (Else case)");
+        assert!(
+            should_run_2_f,
+            "Instruction 2 (E) SHOULD run when GT is false (Else case)"
+        );
 
         // Verify block auto-deactivates
         assert!(

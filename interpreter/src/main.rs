@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, time};
 use thumb2_interpreter::interpreter::Interpreter;
 
 fn main() {
@@ -14,9 +14,11 @@ fn main() {
     }  else {
         false
     };
+
     let file_path = &args[1];
     let mut interpreter = Interpreter::default();
     interpreter.set_debug(debug);
+    interpreter.set_max_time(std::time::Duration::from_micros(2).as_nanos());
     interpreter.read_file(file_path);
     interpreter.print_memory();
     let return_code = interpreter.execute();
