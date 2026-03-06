@@ -3,11 +3,16 @@ mod lexer;
 mod semantic;
 
 use clap::Parser as Psr;
+use std::fmt::format;
 use std::fs;
+use std::fs::File;
+use std::string;
 use lexer::token::Token;
 use lexer::lexer::Lexer; // adjust if needed
 use parser::parser::AST;
 use parser::parser::Parser;
+use codegen::codegen::CodeGenerator;
+
 
 /// The triviC compiler
 #[derive(Psr, Debug)]
@@ -15,6 +20,12 @@ use parser::parser::Parser;
 struct Args {
     /// The source file to compile
     filename: String,
+
+    #[arg(short, long)]
+    output: String,
+    
+    #[arg(long)]
+    hard: bool
 }
 
 fn main() {
@@ -25,10 +36,22 @@ fn main() {
     let source = fs::read_to_string(&args.filename)
         .expect("Failed to read file");
 
+    let output = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&args.output)
+        .expect(&format!("wrongdog output path {}", args.output));
+    
     let mut lexer: Lexer = Lexer::new(source);
     let _tokens: Vec<Token> = lexer.tokenize();
     let mut parser: Parser = Parser::new(_tokens);
     let _ast: AST = parser.parse_program();
+    let mut codegen: CodeGenerator = CodeGenerator::new(output);
+    if args.hard {
+        
+    }
 
     println!("Lexing and parsing completed successfully.");
 }

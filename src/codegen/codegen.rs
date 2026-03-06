@@ -11,6 +11,7 @@ pub struct CodeGenerator {
     locals: HashMap<String, i32>,
     stack_offset: i32,
     label_count: usize,
+    hard: bool
 }
 
 impl CodeGenerator {
@@ -20,9 +21,11 @@ impl CodeGenerator {
             locals: HashMap::new(),
             stack_offset: 0,
             label_count: 0,
+            hard: false
         }
     }
-    pub fn generate(&mut self, ast: AST) {
+    pub fn generate(&mut self, ast: AST, is_hard: bool) {
+        self.hard = is_hard;
         self.gen_init();
         for func in ast {
             self.emit(func);
