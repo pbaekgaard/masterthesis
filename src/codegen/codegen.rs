@@ -274,7 +274,7 @@ mod tests {
 
         let ast = AST::new();
         let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
+        codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -310,7 +310,7 @@ mod tests {
             .open("temp/tests/test_can_generate_return.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_return.asm");
         let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
+        codegen.generate(ast,false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -352,7 +352,7 @@ mod tests {
             .open("temp/tests/test_can_generate_let.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_let.asm");
         let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
+        codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -396,7 +396,7 @@ mod tests {
             .open("temp/tests/test_can_generate_if_else.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_if_else.asm");
         let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
+        codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -457,7 +457,7 @@ mod tests {
             .open("temp/tests/test_can_generate_while.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_while.asm");
         let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
+        codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -519,7 +519,7 @@ mod tests {
             .open("temp/tests/test_can_generate_two_whiles.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_two_whiles.asm");
         let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
+        codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -604,7 +604,7 @@ mod tests {
             .open("temp/tests/test_can_generate_nested_while.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.asm");
         let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast);
+        codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -705,7 +705,7 @@ mod tests {
                 .expect(&format!("Failed to create file: {}", output_asm_path));
 
             let mut codegen = CodeGenerator::new(output_file);
-            codegen.generate(ast);
+            codegen.generate(ast, false);
 
             let output_path = trv_path.with_extension("trv.output");
             let expected_exit_code = std::fs::read_to_string(&output_path)

@@ -1,3 +1,4 @@
+mod codegen;
 mod parser;
 mod lexer;
 mod semantic;
@@ -49,9 +50,8 @@ fn main() {
     let mut parser: Parser = Parser::new(_tokens);
     let _ast: AST = parser.parse_program();
     let mut codegen: CodeGenerator = CodeGenerator::new(output);
-    if args.hard {
-        
-    }
+    codegen.generate(_ast, args.hard);
+    
 
     println!("Lexing and parsing completed successfully.");
 }
