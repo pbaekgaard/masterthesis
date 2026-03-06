@@ -8,6 +8,7 @@ name = "trivic"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.5.60", features = ["derive"] }
 
 
 [dev-dependencies]
