@@ -1,5 +1,5 @@
 use std::env;
-use Thumb2Interpreter::interpreter::Interpreter;
+use thumb2_interpreter::interpreter::Interpreter;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -11,12 +11,9 @@ fn main() {
 
     let debug = if args.iter().any(|a| a == "--debug" || a == "-d") {
         true
-    } else if args.iter().any(|a| a == "--release-debug" || a == "-r") {
+    }  else {
         false
-    } else {
-        cfg!(debug_assertions)
     };
-
     let file_path = &args[1];
     let mut interpreter = Interpreter::default();
     interpreter.set_debug(debug);

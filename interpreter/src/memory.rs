@@ -1,10 +1,7 @@
 const STACK_SIZE: usize = 1024 * 1024;
 const HEAP_SIZE: usize = 1024 * 1024;
-const NUM_REGISTERS: usize = 32;
 
 pub struct EmulatorMemory {
-    registers: [u32; NUM_REGISTERS],
-    pc: u32,
     stack: Vec<u8>,
     heap: Vec<u8>,
     heap_alloc_index: usize,
@@ -14,8 +11,6 @@ pub struct EmulatorMemory {
 impl EmulatorMemory {
     pub fn new() -> Self {
         Self {
-            registers: [0; NUM_REGISTERS],
-            pc: 0,
             stack: vec![0; STACK_SIZE],
             heap: vec![0; HEAP_SIZE],
             heap_alloc_index: 0,
@@ -24,7 +19,6 @@ impl EmulatorMemory {
     }
 
     pub fn push32(&mut self, value: u32) {
-        self.stack_pointer -= 4;
         let bytes = value.to_le_bytes();
         self.stack[self.stack_pointer..self.stack_pointer + 4].copy_from_slice(&bytes);
     }
@@ -36,12 +30,10 @@ impl EmulatorMemory {
             self.stack[self.stack_pointer + 2],
             self.stack[self.stack_pointer + 3],
         ];
-        self.stack_pointer += 4;
         u32::from_le_bytes(bytes)
     }
 
     pub fn push16(&mut self, value: u16) {
-        self.stack_pointer -= 2;
         let bytes = value.to_le_bytes();
         self.stack[self.stack_pointer..self.stack_pointer + 2].copy_from_slice(&bytes);
     }
@@ -51,7 +43,6 @@ impl EmulatorMemory {
             self.stack[self.stack_pointer],
             self.stack[self.stack_pointer + 1],
         ];
-        self.stack_pointer += 2;
         u16::from_le_bytes(bytes)
     }
 
@@ -78,32 +69,32 @@ impl EmulatorMemory {
         self.heap[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
     }
 
+    pub fn write_stack32(&mut self, offset: usize, value: u32) {
+        let addr = self.stack_pointer + offset;
+        self.stack[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    pub fn read_stack32(&self, offset: usize) -> u32 {
+        let addr = self.stack_pointer + offset;
+
+        if addr + 4 > self.stack.len() {
+            panic!("Stack out of bounds read at offset {}", offset);
+        }
+
+        u32::from_le_bytes([
+            self.stack[addr],
+            self.stack[addr + 1],
+            self.stack[addr + 2],
+            self.stack[addr + 3],
+        ])
+    }
+
     pub fn get_sp(&self) -> usize {
         self.stack_pointer
     }
 
     pub fn set_sp(&mut self, sp: usize) {
         self.stack_pointer = sp;
-    }
-
-    pub fn get_pc(&self) -> u32 {
-        self.pc
-    }
-
-    pub fn set_pc(&mut self, pc: u32) {
-        self.pc = pc;
-    }
-
-    pub fn get_reg(&self, index: usize) -> u32 {
-        self.registers[index]
-    }
-
-    pub fn set_reg(&mut self, index: usize, value: u32) {
-        self.registers[index] = value;
-    }
-
-    pub fn get_registers(&self) -> &[u32; NUM_REGISTERS] {
-        &self.registers
     }
 
     pub fn get_heap_alloc_index(&self) -> usize {
@@ -118,10 +109,8 @@ impl EmulatorMemory {
         &self.heap
     }
 
-    pub fn print_registers(&self) {
-        for (i, &value) in self.registers.iter().enumerate() {
-            println!("r{}: {}", i, value);
-        }
+    pub fn get_stack(&self) -> &Vec<u8> {
+        &self.stack
     }
 }
 
