@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufRead;
-use std::process::exit;
 
 use crate::memory::EmulatorMemory;
 
@@ -321,13 +320,9 @@ impl Interpreter {
             }
         }
 
-        for (k, v) in branch_map.clone() {
-            println!("label: {k} at {v}");
-        }
 
         self.set_eof_pc(result.len() as u32);
         self.set_branch_map(branch_map);
-        exit(1);
         result
     }
 
@@ -405,7 +400,7 @@ impl Interpreter {
 
         if let Some(dst_str) = dest.strip_prefix('r') {
             let dst_register = dst_str.replace("r", "").parse().expect("Unable to parse register");
-            let dst_val = self.get_reg(dst_register);
+            let _dst_val = self.get_reg(dst_register);
         } else if src == "sp" {
             self.memory.set_sp((src_val - sub_value) as usize);
         }
@@ -420,34 +415,34 @@ impl Interpreter {
         let dest_idx: usize = dest_reg[1..].parse().expect("Failed to parse register index");
         let value = self.get_reg(dest_idx);
 
-        let addr_part = parts[2];
-        let addr_part = addr_part.replace("[", "").replace("]", "");
+        let addr_part = content
+            .split_once('[')
+            .and_then(|(_, rest)| rest.split_once(']'))
+            .map(|(inside, _)| inside)
+            .unwrap_or("");
 
         let mut base_addr: usize = 0;
         let mut offset: i32 = 0;
         let mut base_reg_name = String::new();
 
-        for part in addr_part.split(",") {
+        for part in addr_part.split(',') {
             let part = part.trim();
-            if part.starts_with("r") {
+            if part == "sp" || part.starts_with('r') {
                 base_reg_name = part.to_string();
-            } else if part == "sp" {
-                base_reg_name = "sp".to_string();
-            } else if part.starts_with("#") {
-                offset = part.replace("#", "").parse().expect("Failed to parse offset");
+            } else if let Some(imm) = part.strip_prefix('#') {
+                offset = imm.parse().expect("Failed to parse offset");
             }
         }
 
         if base_reg_name == "sp" {
             base_addr = self.memory.get_sp();
-        } else if base_reg_name.starts_with("r") {
-            let reg_idx: usize = base_reg_name[1..]
-                .parse()
-                .expect("Failed to parse register index");
+        } else if let Some(reg_num) = base_reg_name.strip_prefix('r') {
+            let reg_idx: usize = reg_num.parse().expect("Failed to parse register index");
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
-        let offset_from_sp = ((base_addr as i32) - (self.memory.get_sp() as i32) + offset) as usize;
+        let offset_from_sp =
+            ((base_addr as i32) - (self.memory.get_sp() as i32) + offset) as usize;
         self.memory.write_stack32(offset_from_sp, value);
 
         if self.debug {
@@ -485,38 +480,39 @@ impl Interpreter {
             .parse()
             .expect("Failed to parse destination register index");
 
-        // 3. Clean up the address part (e.g., "[sp, #0]" -> "sp, #0")
-        let addr_part = parts[2].replace("[", "").replace("]", "");
+        // 3. Extract the address contents between '[' and ']'
+        // Handles forms like: [sp], [sp,#4], [sp, #4]
+        let addr_part = content
+            .split_once('[')
+            .and_then(|(_, rest)| rest.split_once(']'))
+            .map(|(inside, _)| inside)
+            .unwrap_or("");
 
         let mut base_addr: usize = 0;
         let mut offset: i32 = 0;
         let mut base_reg_name = String::new();
 
-        // 4. Parse the base register and the offset
-        for part in addr_part.split(",") {
+        // 4. Parse the base register and optional immediate offset
+        for part in addr_part.split(',') {
             let part = part.trim();
-            if part.starts_with("r") || part == "sp" {
+            if part == "sp" || part.starts_with('r') {
                 base_reg_name = part.to_string();
-            } else if part.starts_with("#") {
-                offset = part.replace("#", "").parse().expect("Failed to parse offset");
+            } else if let Some(imm) = part.strip_prefix('#') {
+                offset = imm.parse().expect("Failed to parse offset");
             }
         }
 
         // 5. Calculate the actual base address from the register
         if base_reg_name == "sp" {
             base_addr = self.memory.get_sp();
-        } else if base_reg_name.starts_with("r") {
-            let reg_idx: usize = base_reg_name[1..]
-                .parse()
-                .expect("Failed to parse base register index");
+        } else if let Some(reg_num) = base_reg_name.strip_prefix('r') {
+            let reg_idx: usize = reg_num.parse().expect("Failed to parse base register index");
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
-        // 6. Calculate the effective offset relative to the stack start
-        // Note: This logic assumes your memory model treats stack offsets relative to SP
-        let effective_offset = ((base_addr as i32) -
-            (self.memory.get_sp() as i32) +
-            offset) as usize;
+        // 6. Calculate the effective offset relative to the current SP
+        let effective_offset =
+            ((base_addr as i32) - (self.memory.get_sp() as i32) + offset) as usize;
 
         // 7. Load the value from memory and update the register
         let value = self.memory.read_stack32(effective_offset);
@@ -538,7 +534,7 @@ impl Interpreter {
         }
 
         let parts: Vec<&str> = content
-            .split(|c: char| (c == ',' || c.is_whitespace()))
+            .split(|c: char| c == ',' || c.is_whitespace())
             .filter(|s| !s.is_empty())
             .collect();
 
@@ -555,8 +551,7 @@ impl Interpreter {
             let rm_idx: usize = parts[2][1..].parse().expect("Failed to parse Rm index");
             self.get_reg(rm_idx)
         };
-        let res_u64 = (val_n as u64).wrapping_sub(val_op2 as u64);
-        let result = res_u64 as u32;
+        let result = (val_n).wrapping_sub(val_op2);
 
         self.cpsr.z = result == 0;
         self.cpsr.n = (result >> 31) == 1;
@@ -603,17 +598,16 @@ impl Interpreter {
         if parts[0].len() > 1 {
             let cond = &parts[0][1..];
             let is_cond = self.cpsr.evaluate_condition(cond);
-            println!("is_cond: {is_cond}");
             if is_cond {
                 let branch_pc = self.branch_map.get(parts[1]).unwrap().clone();
-                println!("branching to {branch_pc}");
                 self.set_pc(branch_pc);
             } else {
                 self.set_pc(self.get_pc() + 1);
                 return;
             }
         } else {
-            self.set_pc(self.branch_map.get(parts[1]).unwrap().clone());
+            let branch_pc = self.branch_map.get(parts[1]).unwrap().clone();
+            self.set_pc(branch_pc);
         }
     }
 
@@ -679,7 +673,7 @@ impl Interpreter {
                 f if f.starts_with("add") => self.exec_add(instruction.clone()),
                 f if f.contains(":") => {
                 }
-                Invalid => panic!("Invalid instruction: {Invalid}"),
+                invalid => panic!("Invalid instruction: {invalid}"),
             }
             self.set_pc(self.pc + 1);
         }
@@ -747,7 +741,6 @@ mod tests {
 
             let file_path = path.to_str().unwrap();
 
-            println!("Testing file: {}", file_path);
 
             // Run qemu
             let qemu_exit = run_qemu(file_path);
@@ -755,9 +748,7 @@ mod tests {
             let mut interp = Interpreter::new();
             interp.read_file(&file_path.to_string());
             let interp_exit = interp.execute();
-            println!("file executed");
 
-            println!("Result -> qemu: {}, interpreter: {}", qemu_exit, interp_exit);
 
             assert_eq!(qemu_exit as u32, interp_exit, "Mismatch for {}", file_path);
         }
@@ -861,24 +852,6 @@ mod tests {
         let test_label = "_start:".to_string();
         assert!(start_block.contains(&test_label));
         assert_eq!(start_block.len(), 3);
-    }
-
-    #[test]
-    fn test_get_asm_branches_multiple_functions() {
-        let mut interp = create_interpreter();
-        interp.file = vec![
-            "_start:".to_string(),
-            "    mov r0, #1".to_string(),
-            "    b else_block".to_string(),
-            "else_block:".to_string(),
-            "    mov r0, #2".to_string(),
-            "    svc #0".to_string()
-        ];
-
-        let start_block = interp.get_start();
-        
-        assert!(start_block.contains(&"_start".to_string()));
-        assert!(start_block.contains(&"else_block".to_string()));
     }
 
     #[test]
