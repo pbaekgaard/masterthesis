@@ -11,7 +11,9 @@ pub struct CodeGenerator {
     locals: HashMap<String, i32>,
     stack_offset: i32,
     label_count: usize,
-    hard: bool
+    hard: bool,
+    string_literals: Vec<(String, String)>,
+    need_int_print: bool,
 }
 
 impl CodeGenerator {
@@ -21,7 +23,9 @@ impl CodeGenerator {
             locals: HashMap::new(),
             stack_offset: 0,
             label_count: 0,
-            hard: false
+            hard: false,
+            string_literals: Vec::new(),
+            need_int_print: false,
         }
     }
     pub fn generate(&mut self, ast: AST, is_hard: bool) {
@@ -30,6 +34,7 @@ impl CodeGenerator {
         for func in ast {
             self.emit(func);
         }
+        self.emit_print_data();
     }
 
     fn gen_init(&mut self) {
@@ -79,6 +84,7 @@ impl CodeGenerator {
                 }
                 Stmt::If { .. } => self.emit_if(stmt),
                 Stmt::While { .. } => self.emit_while(stmt),
+                Stmt::Print(exprs) => self.emit_print(exprs),
                 _ => panic!("Error found in expression in return"),
             }
         }
@@ -90,6 +96,26 @@ impl CodeGenerator {
 
         self.stack_offset = initial_offset;
         self.locals = initial_locals;
+    }
+    fn emit_print_data(&mut self) {
+        if self.string_literals.is_empty() && !self.need_int_print {
+            return;
+        }
+        self.write_line("", 0);
+        self.write_line(".section .data", 0);
+
+        // clone string literals to avoid borrow conflicts while writing
+        let literals = self.string_literals.clone();
+        for (label, contents) in literals {
+            self.write_line(&format!("{}:", label), 0);
+            self.write_line(&format!(".ascii \"{}\"", contents), 1);
+        }
+        if self.need_int_print {
+            self.write_line("newline:", 0);
+            self.write_line(".ascii \"\\n\"", 1);
+            self.write_line("num_buf:", 0);
+            self.write_line(".space 16", 1);
+        }
     }
     fn emit_if(&mut self, if_stmt: Stmt) {
         match if_stmt {
@@ -140,13 +166,98 @@ impl CodeGenerator {
             _ => panic!("emit_while called with non-while statement"),
         }
     }
+    fn emit_print(&mut self, exprs: Vec<Expr>) {
+        if exprs.is_empty() {
+            return;
+        }
+
+        let last_index = exprs.len().saturating_sub(1);
+        for (idx, expr) in exprs.into_iter().enumerate() {
+            let is_last = idx == last_index; // newline only after the whole print
+            match expr {
+                Expr::StringLiteral(raw) => {
+                    // Strip surrounding quotes if present
+                    let inner = if raw.len() >= 2 && raw.starts_with('"') && raw.ends_with('"') {
+                        raw[1..raw.len() - 1].to_string()
+                    } else {
+                        raw.clone()
+                    };
+
+                    let label = format!(".Lstr{}", self.string_literals.len());
+                    self.string_literals.push((label.clone(), inner.clone()));
+
+                    // write string to stdout (no newline)
+                    self.write_line("mov r0, #1", 1);
+                    self.write_line(&format!("ldr r1, ={}", label), 1);
+                    self.write_line(&format!("mov r2, #{}", inner.len()), 1);
+                    self.write_line("mov r7, #4", 1);
+                    self.write_line("svc #0", 1);
+                }
+                other => {
+                    // Print integer value; newline only after the last argument
+                    self.need_int_print = true;
+                    self.emit_expr(other);
+
+                    let id = self.label_count;
+                    self.label_count += 1;
+
+                    // r0 holds value to print
+                    self.write_line("mov r4, r0", 1);
+                    self.write_line("ldr r1, =num_buf", 1);
+                    self.write_line("add r1, r1, #16", 1);
+                    self.write_line("mov r2, #0", 1);
+
+                    // handle zero specially
+                    self.write_line("cmp r4, #0", 1);
+                    self.write_line(&format!("bne print_int_loop_{}", id), 1);
+                    self.write_line("mov r3, #48", 1);
+                    self.write_line("sub r1, r1, #1", 1);
+                    self.write_line("strb r3, [r1]", 1);
+                    self.write_line("mov r2, #1", 1);
+                    self.write_line(&format!("b print_int_done_{}", id), 1);
+
+                    // conversion loop
+                    self.write_line(&format!("print_int_loop_{}:", id), 0);
+                    self.write_line("mov r0, r4", 1);
+                    self.write_line("mov r3, #10", 1);
+                    self.write_line("sdiv r5, r0, r3", 1); // r5 = value / 10
+                    self.write_line("mul r6, r5, r3", 1);  // r6 = (value/10)*10
+                    self.write_line("sub r7, r0, r6", 1);  // r7 = value % 10
+                    self.write_line("add r7, r7, #48", 1); // to ASCII
+                    self.write_line("sub r1, r1, #1", 1);
+                    self.write_line("strb r7, [r1]", 1);
+                    self.write_line("add r2, r2, #1", 1);
+                    self.write_line("mov r4, r5", 1);      // value = value / 10
+                    self.write_line("cmp r4, #0", 1);
+                    self.write_line(&format!("bne print_int_loop_{}", id), 1);
+
+                    self.write_line(&format!("print_int_done_{}:", id), 0);
+                    // write digits
+                    self.write_line("mov r0, #1", 1);
+                    self.write_line("mov r1, r1", 1);
+                    self.write_line("mov r2, r2", 1);
+                    self.write_line("mov r7, #4", 1);
+                    self.write_line("svc #0", 1);
+
+                    // newline only once, after the last printed value
+                    if is_last {
+                        self.write_line("mov r0, #1", 1);
+                        self.write_line("ldr r1, =newline", 1);
+                        self.write_line("mov r2, #1", 1);
+                        self.write_line("mov r7, #4", 1);
+                        self.write_line("svc #0", 1);
+                    }
+                }
+            }
+        }
+    }
 
     fn emit_return(&mut self, return_stmt: Stmt, is_main: bool) {
         match return_stmt {
             Stmt::Return(expr) => {
                 self.emit_expr(expr);
-                    self.write_line("mov r7, #1", 1);
-                    self.write_line("svc #0", 1);
+                self.write_line("mov r7, #1", 1);
+                self.write_line("svc #0", 1);
             }
             _ => panic!("return poorly formed"),
         }
@@ -186,7 +297,7 @@ impl CodeGenerator {
                 } else {
                     self.write_line(&format!("mov r0, #{}", 0), 1)
                 }
-            },
+            }
             Expr::Identifier(name) => {
                 let offset = self.locals.get(&name).expect("Undefined variable");
                 self.write_line(&format!("ldr r0, [sp, #{}]", self.stack_offset - offset), 1);
@@ -209,6 +320,7 @@ impl CodeGenerator {
                     BinOp::Add => self.write_line("add r0, r1, r0", 1),
                     BinOp::Sub => self.write_line("sub r0, r1, r0", 1),
                     BinOp::Mul => self.write_line("mul r0, r1, r0", 1),
+                    BinOp::Div => self.write_line("sdiv r0, r1, r0", 1),
 
                     BinOp::Equals => {
                         self.write_line("cmp r1, r0", 1);
@@ -312,7 +424,7 @@ mod tests {
             .open("temp/tests/test_can_generate_return.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_return.asm");
         let mut codegen = CodeGenerator::new(output_file);
-        codegen.generate(ast,false);
+        codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();

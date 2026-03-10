@@ -121,7 +121,6 @@ impl Lexer {
             let line = self.line.clone();
             self.advance();
             Token::new("==".to_string(), TokenType::Equals, line, original_col)
-
         } else {
             Token::new("=".to_string(), TokenType::Assign, self.line, original_col)
         }
@@ -134,7 +133,6 @@ impl Lexer {
             let line = self.line.clone();
             self.advance();
             Token::new("!=".to_string(), TokenType::NotEquals, line, original_col)
-
         } else {
             Token::new("!".to_string(), TokenType::Not, self.line, original_col)
         }
@@ -220,7 +218,7 @@ impl Lexer {
         self.advance();
         while let Some(ch) = self.current_char() {
             match ch {
-                'A'..='Z' | 'a'..='z' | '_' => {
+                'A'..='Z' | 'a'..='z' | '_' | '0'..='9' => {
                     name.push(ch);
                     self.advance();
                 }
