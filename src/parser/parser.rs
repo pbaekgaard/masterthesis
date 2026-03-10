@@ -252,6 +252,7 @@ impl Parser {
             TokenType::Minus => BinOp::Sub,
             TokenType::Multiply => BinOp::Mul,
             TokenType::Equals => BinOp::Equals,
+            TokenType::NotEquals => BinOp::NotEquals,
             TokenType::GreaterThan => BinOp::GreaterThan,
             TokenType::LessThan => BinOp::LessThan,
             _ => panic!("Not a binary operator"),
@@ -270,6 +271,7 @@ impl Parser {
                     TokenType::GreaterThan,
                     TokenType::LessThan,
                     TokenType::Equals,
+                    TokenType::NotEquals,
                 ]) {
                     let op_token = self.consume();
                     let op = self.token_to_binop(&op_token.token_type);
@@ -296,7 +298,7 @@ impl Parser {
                 }
             }
             TokenType::BooleanLiteral => {
-                if self.match_token(TokenType::Equals) {
+                if self.match_any(&[TokenType::Equals, TokenType::NotEquals]) {
                     let op_token = self.consume();
                     let op = self.token_to_binop(&op_token.token_type);
                     let right = self.parse_expression();
@@ -305,17 +307,10 @@ impl Parser {
                         op,
                         Box::new(right),
                     )
-                } else if self.match_token(TokenType::Not) {
-                    let _ = self.expect(TokenType::Equals);
-                    let op = BinOp::NotEquals;
-                    let right = self.parse_expression();
-                    Expr::BinaryOp(
-                        Box::new(Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap())),
-                        op,
-                        Box::new(right),
-                    )
-                } else {
-                    Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap())
+                }
+               else {
+                    let val = tok.value.clone();
+                    Expr::BooleanLiteral(tok.value.to_lowercase().parse::<bool>().unwrap())
                 }
             }
             TokenType::StringLiteral => {

@@ -145,12 +145,8 @@ impl CodeGenerator {
         match return_stmt {
             Stmt::Return(expr) => {
                 self.emit_expr(expr);
-                if is_main {
                     self.write_line("mov r7, #1", 1);
                     self.write_line("svc #0", 1);
-                } else {
-                    self.write_line("bx lr", 1);
-                }
             }
             _ => panic!("return poorly formed"),
         }
@@ -184,7 +180,13 @@ impl CodeGenerator {
     fn emit_expr(&mut self, expr: Expr) {
         match expr {
             Expr::IntegerLiteral(val) => self.write_line(&format!("mov r0, #{}", val), 1),
-            Expr::BooleanLiteral(val) => self.write_line(&format!("mov r0, #{}", val), 1),
+            Expr::BooleanLiteral(val) => {
+                if val {
+                    self.write_line(&format!("mov r0, #{}", 1), 1)
+                } else {
+                    self.write_line(&format!("mov r0, #{}", 0), 1)
+                }
+            },
             Expr::Identifier(name) => {
                 let offset = self.locals.get(&name).expect("Undefined variable");
                 self.write_line(&format!("ldr r0, [sp, #{}]", self.stack_offset - offset), 1);

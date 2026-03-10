@@ -37,6 +37,9 @@ impl Lexer {
                 '=' => {
                     tokens.push(self.assign_or_equals());
                 }
+                '!' => {
+                    tokens.push(self.not_or_notequals());
+                }
                 ':' => {
                     tokens.push(self.simple_token(ch.to_string(), TokenType::Colon));
                 }
@@ -115,11 +118,28 @@ impl Lexer {
         let original_col = self.column;
         self.advance();
         if self.current_char().unwrap() == '=' {
-            Token::new("=".to_string(), TokenType::Equals, self.line, original_col)
+            let line = self.line.clone();
+            self.advance();
+            Token::new("==".to_string(), TokenType::Equals, line, original_col)
+
         } else {
-            Token::new("==".to_string(), TokenType::Assign, self.line, original_col)
+            Token::new("=".to_string(), TokenType::Assign, self.line, original_col)
         }
     }
+
+    fn not_or_notequals(&mut self) -> Token {
+        let original_col = self.column;
+        self.advance();
+        if self.current_char().unwrap() == '=' {
+            let line = self.line.clone();
+            self.advance();
+            Token::new("!=".to_string(), TokenType::NotEquals, line, original_col)
+
+        } else {
+            Token::new("!".to_string(), TokenType::Not, self.line, original_col)
+        }
+    }
+
     fn minus_or_arrow(&mut self) -> Token {
         let original_col = self.column;
         self.advance();
