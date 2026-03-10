@@ -11,3 +11,6 @@
 /interpreter/target
 /interpreter/tmp
 /playground
+
+*.asm
+*.core
