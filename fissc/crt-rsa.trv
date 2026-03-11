@@ -113,7 +113,5 @@ func main() -> Integer {
 
   g_sign = tmp;
 
-  print("gang_sign = ", g_sign);
-
   return g_sign;
 }
