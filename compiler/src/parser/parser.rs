@@ -1,6 +1,5 @@
 use crate::{
     lexer::token::{Token, TokenType},
-    semantic::symbol_table::SymbolTable,
 };
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
@@ -50,7 +49,7 @@ pub enum Expr {
     Identifier(String),
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     UnaryOp(UnOp, Box<Expr>),
-    Call(Vec<Expr>), //I do not understand what this one is, but the expert recommended it
+    Call(Vec<Expr>), 
 }
 
 #[derive(Debug, Clone, PartialEq)]

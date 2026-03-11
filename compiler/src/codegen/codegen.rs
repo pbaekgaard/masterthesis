@@ -1,9 +1,6 @@
-use crate::parser::{
-    parser::{BinOp, Block, Expr, Function, Stmt},
-    AST,
-};
+use crate::parser::{ parser::{ BinOp, Block, Expr, Function, Stmt }, AST };
 use core::panic;
-use std::{collections::HashMap, fs::File, io::Write};
+use std::{ collections::HashMap, fs::File, io::Write };
 
 #[derive(Debug)]
 pub struct CodeGenerator {
@@ -14,6 +11,7 @@ pub struct CodeGenerator {
     hard: bool,
     string_literals: Vec<(String, String)>,
     need_int_print: bool,
+    step_counter: i32,
 }
 
 impl CodeGenerator {
@@ -26,6 +24,7 @@ impl CodeGenerator {
             hard: false,
             string_literals: Vec::new(),
             need_int_print: false,
+            step_counter: 0,
         }
     }
     pub fn generate(&mut self, ast: AST, is_hard: bool) {
@@ -33,6 +32,9 @@ impl CodeGenerator {
         self.gen_init();
         for func in ast {
             self.emit(func);
+        }
+        if self.hard {
+            self.emit_countermeasure();
         }
         self.emit_print_data();
     }
@@ -87,6 +89,9 @@ impl CodeGenerator {
                 Stmt::Print(exprs) => self.emit_print(exprs),
                 _ => panic!("Error found in expression in return"),
             }
+            if self.hard {
+                self.emit_step_check();
+            }
         }
 
         let offset_diff = self.stack_offset - initial_offset;
@@ -97,6 +102,40 @@ impl CodeGenerator {
         self.stack_offset = initial_offset;
         self.locals = initial_locals;
     }
+    fn emit_countermeasure(&mut self) {
+        self.write_line("countermeasure:", 0);
+
+        // print message
+        self.write_line("mov r0, #1", 1);
+        self.write_line("ldr r1, =fault_msg", 1);
+        self.write_line("mov r2, #33", 1);
+        self.write_line("mov r7, #4", 1);
+        self.write_line("svc #0", 1);
+
+        // exit with special code
+        self.write_line("mov r0, #77", 1);
+        self.write_line("mov r7, #1", 1);
+        self.write_line("svc #0", 1);
+    }
+
+    fn emit_step_check(&mut self) {
+        if !self.hard {
+            return;
+        }
+
+        self.step_counter += 1;
+        let expected = self.step_counter;
+
+        self.write_line("ldr r0, =step_counter", 1);
+        self.write_line("ldr r1, [r0]", 1);
+
+        self.write_line("add r1, r1, #1", 1);
+        self.write_line("str r1, [r0]", 1);
+
+        self.write_line(&format!("cmp r1, #{}", expected), 1);
+        self.write_line("bne countermeasure", 1);
+    }
+
     fn emit_print_data(&mut self) {
         if self.string_literals.is_empty() && !self.need_int_print {
             return;
@@ -116,14 +155,16 @@ impl CodeGenerator {
             self.write_line("num_buf:", 0);
             self.write_line(".space 16", 1);
         }
+        if self.hard {
+            self.write_line("step_counter:", 0);
+            self.write_line(".word 0", 1);
+            self.write_line("fault_msg:", 0);
+            self.write_line(".ascii \"Control flow violation detected\\n\"", 1);
+        }
     }
     fn emit_if(&mut self, if_stmt: Stmt) {
         match if_stmt {
-            Stmt::If {
-                condition,
-                block,
-                option,
-            } => {
+            Stmt::If { condition, block, option } => {
                 let label_id = self.label_count;
                 self.label_count += 1;
 
@@ -221,13 +262,13 @@ impl CodeGenerator {
                     self.write_line("mov r0, r4", 1);
                     self.write_line("mov r3, #10", 1);
                     self.write_line("sdiv r5, r0, r3", 1); // r5 = value / 10
-                    self.write_line("mul r6, r5, r3", 1);  // r6 = (value/10)*10
-                    self.write_line("sub r7, r0, r6", 1);  // r7 = value % 10
+                    self.write_line("mul r6, r5, r3", 1); // r6 = (value/10)*10
+                    self.write_line("sub r7, r0, r6", 1); // r7 = value % 10
                     self.write_line("add r7, r7, #48", 1); // to ASCII
                     self.write_line("sub r1, r1, #1", 1);
                     self.write_line("strb r7, [r1]", 1);
                     self.write_line("add r2, r2, #1", 1);
-                    self.write_line("mov r4, r5", 1);      // value = value / 10
+                    self.write_line("mov r4, r5", 1); // value = value / 10
                     self.write_line("cmp r4, #0", 1);
                     self.write_line(&format!("bne print_int_loop_{}", id), 1);
 
@@ -358,11 +399,11 @@ impl CodeGenerator {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::{lexer::Lexer, token::Token};
-    use crate::parser::parser::{Parser, AST};
+    use crate::lexer::{ lexer::Lexer, token::Token };
+    use crate::parser::parser::{ Parser, AST };
     use crate::CodeGenerator;
     use std::fs::File;
-    use std::io::{Read, Seek, SeekFrom};
+    use std::io::{ Read, Seek, SeekFrom };
     use std::sync::Once;
 
     static INIT: Once = Once::new();
@@ -392,8 +433,9 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (indoc::indoc! {
-            r##"
+        let expected = (
+            indoc::indoc! {
+                r##"
             .syntax unified
             .thumb
 
@@ -402,15 +444,16 @@ mod tests {
             .type _start, %function
 
             "##
-        })
-        .to_string();
+            }
+        ).to_string();
         assert_eq!(expected, buf);
     }
 
     #[test]
     fn can_generate_return() {
         initialize();
-        let source = std::fs::read_to_string("test_codes/test_main_return.trv")
+        let source = std::fs
+            ::read_to_string("test_codes/test_main_return.trv")
             .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
@@ -428,8 +471,9 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (indoc::indoc! {
-            r##"
+        let expected = (
+            indoc::indoc! {
+                r##"
             .syntax unified
             .thumb
 
@@ -444,16 +488,17 @@ mod tests {
 
             .size _start, .-_start
             "##
-        })
-        .to_string();
+            }
+        ).to_string();
         assert_eq!(expected, buf)
     }
 
     #[test]
     fn can_generate_let() {
         initialize();
-        let source =
-            std::fs::read_to_string("test_codes/test_main_let.trv").expect("Failed to read file");
+        let source = std::fs
+            ::read_to_string("test_codes/test_main_let.trv")
+            .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
         let mut parser: Parser = Parser::new(tokens);
@@ -470,8 +515,9 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (indoc::indoc! {
-            r##"
+        let expected = (
+            indoc::indoc! {
+                r##"
                 .syntax unified
                 .thumb
 
@@ -489,15 +535,16 @@ mod tests {
 
                 .size _start, .-_start
             "##
-        })
-        .to_string();
+            }
+        ).to_string();
         assert_eq!(expected, buf)
     }
     #[test]
     fn can_generate_if_else_and_assign() {
         initialize();
-        let source =
-            std::fs::read_to_string("test_codes/test_if_else.trv").expect("Failed to read file");
+        let source = std::fs
+            ::read_to_string("test_codes/test_if_else.trv")
+            .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
         let mut parser: Parser = Parser::new(tokens);
@@ -514,8 +561,9 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (indoc::indoc! {
-            r##"
+        let expected = (
+            indoc::indoc! {
+                r##"
                 .syntax unified
                 .thumb
 
@@ -549,15 +597,16 @@ mod tests {
 
                 .size _start, .-_start
             "##
-        })
-        .to_string();
+            }
+        ).to_string();
         assert_eq!(expected, buf)
     }
 
     #[test]
     fn can_generate_while() {
         initialize();
-        let source = std::fs::read_to_string("test_codes/test_while_simple.trv")
+        let source = std::fs
+            ::read_to_string("test_codes/test_while_simple.trv")
             .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
@@ -575,8 +624,9 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (indoc::indoc! {
-            r##"
+        let expected = (
+            indoc::indoc! {
+                r##"
                 .syntax unified
                 .thumb
 
@@ -611,15 +661,16 @@ mod tests {
 
                 .size _start, .-_start
             "##
-        })
-        .to_string();
+            }
+        ).to_string();
         assert_eq!(expected, buf)
     }
 
     #[test]
     fn can_generate_two_whiles() {
         initialize();
-        let source = std::fs::read_to_string("test_codes/test_while_two_loops.trv")
+        let source = std::fs
+            ::read_to_string("test_codes/test_while_two_loops.trv")
             .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
@@ -637,8 +688,9 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (indoc::indoc! {
-            r##"
+        let expected = (
+            indoc::indoc! {
+                r##"
                 .syntax unified
                 .thumb
 
@@ -696,15 +748,16 @@ mod tests {
 
                 .size _start, .-_start
             "##
-        })
-        .to_string();
+            }
+        ).to_string();
         assert_eq!(expected, buf)
     }
 
     #[test]
     fn can_generate_nested_while() {
         initialize();
-        let source = std::fs::read_to_string("test_codes/test_while_nested.trv")
+        let source = std::fs
+            ::read_to_string("test_codes/test_while_nested.trv")
             .expect("Failed to read file");
         let mut lexer: Lexer = Lexer::new(source);
         let tokens: Vec<Token> = lexer.tokenize();
@@ -722,8 +775,9 @@ mod tests {
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (indoc::indoc! {
-            r##"
+        let expected = (
+            indoc::indoc! {
+                r##"
                 .syntax unified
                 .thumb
 
@@ -779,8 +833,8 @@ mod tests {
 
                 .size _start, .-_start
             "##
-        })
-        .to_string();
+            }
+        ).to_string();
         assert_eq!(expected, buf)
     }
 
@@ -789,7 +843,8 @@ mod tests {
         initialize();
 
         let test_codes_dir = std::path::Path::new("test_codes");
-        let trv_files: Vec<_> = std::fs::read_dir(test_codes_dir)
+        let trv_files: Vec<_> = std::fs
+            ::read_dir(test_codes_dir)
             .unwrap()
             .filter_map(|entry| {
                 let path = entry.unwrap().path();
@@ -822,15 +877,14 @@ mod tests {
             codegen.generate(ast, false);
 
             let output_path = trv_path.with_extension("trv.output");
-            let expected_exit_code = std::fs::read_to_string(&output_path)
+            let expected_exit_code = std::fs
+                ::read_to_string(&output_path)
                 .expect("Failed to read output file")
                 .trim()
                 .parse::<i32>()
                 .expect("Failed to parse exit code");
 
-            let result = std::process::Command::new("./run_asm")
-                .arg(&output_asm_path)
-                .output();
+            let result = std::process::Command::new("./run_asm").arg(&output_asm_path).output();
 
             let actual_exit_code = match result {
                 Ok(output) => output.status.code().unwrap_or(-1),
@@ -840,9 +894,12 @@ mod tests {
             std::fs::remove_file(&output_asm_path).ok();
 
             assert_eq!(
-                expected_exit_code, actual_exit_code,
+                expected_exit_code,
+                actual_exit_code,
                 "File {}: expected exit code {}, got {}",
-                file_stem, expected_exit_code, actual_exit_code
+                file_stem,
+                expected_exit_code,
+                actual_exit_code
             );
         }
     }
