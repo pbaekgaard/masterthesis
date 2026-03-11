@@ -1,0 +1,9 @@
+func main() -> Integer {
+  let num : Integer = 9;
+  if num > 10 {
+    num = 11;
+  } else {
+    num = 12;
+  }
+  return num;
+}

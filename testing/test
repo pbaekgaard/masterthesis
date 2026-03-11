@@ -1,0 +1,33 @@
+#!/bin/python3
+
+import argparse
+
+from src.testrunner import TestRunner
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, default=None, help='Path to config.toml')
+    parser.add_argument('--skip-run', action='store_true', help='Only setup and compile, skip running tests')
+    args = parser.parse_args()
+    
+    runner = TestRunner(config_path=args.config)
+    # check that the compiler and interpreter is present:
+    runner.check_bin()
+
+    
+    print(f"Setting up...")
+    folder = runner.setup()
+    print(f"Created folder: {folder}")
+    
+    print(f"\nCompiling tests...")
+    results = runner.compile()
+    print(f"Compiled {len(results)} tests")
+    
+    if not args.skip_run:
+        print(f"\nRunning tests...")
+        runner.run_tests()
+    else:
+        print(f"\nSkipping test run (--skip-run)")
+
+if __name__ == "__main__":
+    main()
