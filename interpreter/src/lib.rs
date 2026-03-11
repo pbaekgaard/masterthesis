@@ -68,7 +68,7 @@ mod tests {
         let mut interp = Interpreter::new();
         interp.read_file(&get_test_file_path("test_ittete_true.asm").to_string_lossy().to_string());
         let exit_code = interp.execute();
-        assert_eq!(exit_code, 1011, "ITTETE True: Only T instructions should sum");
+        assert_eq!(exit_code, 211, "ITTETE True: Only T instructions should sum");
     }
 
     #[test]
@@ -76,6 +76,6 @@ mod tests {
         let mut interp = Interpreter::new();
         interp.read_file(&get_test_file_path("test_ittete_false.asm").to_string_lossy().to_string());
         let exit_code = interp.execute();
-        assert_eq!(exit_code, 10100, "ITTETE False: Only E instructions should sum");
+        assert_eq!(exit_code, 103, "ITTETE False: Only E instructions should sum");
     }
 }

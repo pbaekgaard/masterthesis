@@ -13,8 +13,8 @@ _start:
     addgt r0, r0, #1      @ T: Run (+1)
     addgt r0, r0, #10     @ T: Run (+10)
     addle r0, r0, #100    @ E: Skip
-    addgt r0, r0, #1000   @ T: Run (+1000)
-    addle r0, r0, #10000  @ E: Skip
+    addgt r0, r0, #200   @ T: Run (+1000)
+    addle r0, r0, #3  @ E: Skip
     mov r7, #1
     svc #0
 
