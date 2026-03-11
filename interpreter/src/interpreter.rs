@@ -372,7 +372,10 @@ impl Interpreter {
             }
 
             if in_data_section {
-                if line.contains(":") {
+                // A label definition line is of the form `label:` (colon at end).
+                // Don't treat directives like `.ascii "a:b"` as a label just because
+                // the string literal contains ':'.
+                if line.ends_with(':') {
                     let label = line.trim_end_matches(':').to_string();
                     self.data_map.insert(label.clone(), current_addr);
                     last_label = Some(label);
