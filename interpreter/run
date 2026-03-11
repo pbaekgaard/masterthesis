@@ -1,8 +1,49 @@
 #!/bin/bash
 
+set -euo pipefail
+
+# Always run from the interpreter crate directory, even if invoked from repo root.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+rewrite_path_arg() {
+    local a="$1"
+    # If called from repo root like: ./interpreter/run interpreter/out.asm
+    if [[ "$a" == interpreter/* ]]; then
+        local stripped="${a#interpreter/}"
+        if [[ -f "$stripped" ]]; then
+            printf '%s' "$stripped"
+            return 0
+        fi
+    fi
+    # If passed an absolute/relative path that doesn't exist from here,
+    # but the basename does (e.g., repo-root paths), fall back to basename.
+    if [[ ! -f "$a" ]]; then
+        local base
+        base="$(basename -- "$a")"
+        if [[ -f "$base" ]]; then
+            printf '%s' "$base"
+            return 0
+        fi
+    fi
+    printf '%s' "$a"
+}
+
 if [ "$1" = "--debug" ]; then
     shift
-    cargo run -- "$@"
+    if [[ $# -ge 1 ]]; then
+        first="$(rewrite_path_arg "$1")"
+        shift
+        cargo run -- "$first" "$@"
+    else
+        cargo run --
+    fi
 else
-    RUSTFLAGS="-A warnings" cargo run --release -- "$@"
+    if [[ $# -ge 1 ]]; then
+        first="$(rewrite_path_arg "$1")"
+        shift
+        RUSTFLAGS="-A warnings" cargo run --release -- "$first" "$@"
+    else
+        RUSTFLAGS="-A warnings" cargo run --release --
+    fi
 fi

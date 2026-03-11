@@ -75,6 +75,7 @@ pub struct Interpreter {
     registers: [i32; NUM_REGISTERS],
     pc: u32,
     branch_map: HashMap<String, u32>,
+    data_map: HashMap<String, usize>,
     eof_pc: u32,
     cpsr: Cpsr,
     file: Vec<String>,
@@ -90,6 +91,7 @@ impl Interpreter {
             registers: [0; NUM_REGISTERS],
             pc: 0,
             branch_map: HashMap::new(),
+            data_map: HashMap::new(),
             eof_pc: 0,
             cpsr: Cpsr::default(),
             file: Vec::new(),
@@ -328,6 +330,9 @@ impl Interpreter {
                     if found_start {
                         if line.starts_with(".size _start") {
                             result.pop();
+                            break;
+                        } else if line.starts_with(".section .data") || line.starts_with(".data") {
+                            break;
                         } else {
                             let label = line.trim_start().to_string();
                             result.push(line.trim_start().to_string());
@@ -346,6 +351,76 @@ impl Interpreter {
         self.set_eof_pc(result.len() as u32);
         self.set_branch_map(branch_map);
         result
+    }
+
+    fn parse_data_section(&mut self) {
+        let mut in_data_section = false;
+        let mut current_addr = 0;
+        let mut last_label: Option<String> = None;
+
+        for line in &self.file {
+            let line = line.trim();
+
+            if line.starts_with(".section .data") || line == ".data" {
+                in_data_section = true;
+                continue;
+            }
+
+            if line.starts_with(".text") || line.starts_with(".section .text") {
+                in_data_section = false;
+                continue;
+            }
+
+            if in_data_section {
+                if line.contains(":") {
+                    let label = line.trim_end_matches(':').to_string();
+                    self.data_map.insert(label.clone(), current_addr);
+                    last_label = Some(label);
+                } else if line.contains(".ascii") {
+                    if let Some(_) = line.find("\"") {
+                        let start = line.find("\"").unwrap() + 1;
+                        let end = start + line[start..].find("\"").unwrap();
+                        let string_data = &line[start..end];
+
+                        // The assembler interprets escapes inside ".ascii" strings (e.g., "\n").
+                        // We store the resulting bytes into the emulated data/heap region.
+                        let mut chars = string_data.chars().peekable();
+                        while let Some(ch) = chars.next() {
+                            if ch == '\\' {
+                                let esc = chars.next().unwrap_or('\\');
+                                let byte = match esc {
+                                    'n' => b'\n',
+                                    'r' => b'\r',
+                                    't' => b'\t',
+                                    '0' => b'\0',
+                                    '\\' => b'\\',
+                                    '"' => b'"',
+                                    // Unknown escape: keep as-is (backslash + char)
+                                    other => {
+                                        self.memory.heap[current_addr] = b'\\';
+                                        current_addr += 1;
+                                        other as u8
+                                    }
+                                };
+                                self.memory.heap[current_addr] = byte;
+                                current_addr += 1;
+                            } else {
+                                self.memory.heap[current_addr] = ch as u8;
+                                current_addr += 1;
+                            }
+                        }
+                    }
+                } else if line.contains(".space") {
+                    if let Some(size_str) = line.split(".space").nth(1) {
+                        let size: usize = size_str.trim().parse().unwrap_or(0);
+                        for _ in 0..size {
+                            self.memory.heap[current_addr] = 0;
+                            current_addr += 1;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn exec_mov(&mut self, content: String) {
@@ -393,6 +468,17 @@ impl Interpreter {
                         println!("Exit syscall (r7=1), returning exit code: {}", exit_code);
                     }
                     return Some(exit_code);
+                } else if syscall_num == 4 {
+                    let fd = self.get_reg(0);
+                    let addr = self.get_reg(1) as usize;
+                    let len = self.get_reg(2) as usize;
+
+                    if fd == 1 {
+                        let data = self.memory.read_heap(addr, len);
+                        print!("{}", String::from_utf8_lossy(&data));
+                        use std::io::Write;
+                        std::io::stdout().flush().ok();
+                    }
                 }
             }
         }
@@ -474,11 +560,11 @@ impl Interpreter {
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
-        let offset_from_sp = ((base_addr as i32) - (self.memory.get_sp() as i32) + offset) as usize;
-        self.memory.write_stack32(offset_from_sp, value as u32);
+        let effective_addr = (base_addr as i32 + offset) as usize;
+        self.memory.write_stack32_at(effective_addr, value as u32);
 
         if self.debug {
-            println!("Stored value {} at stack offset {}", value, offset_from_sp);
+            println!("Stored value {} at address {}", value, effective_addr);
             let stack_data = self.memory.get_stack();
             let sp = self.memory.get_sp();
             println!(
@@ -501,6 +587,60 @@ impl Interpreter {
     fn exec_ldr(&mut self, content: String) {
         if self.debug {
             println!("Executing ldr instruction: {}", content);
+        }
+
+        // Handle "ldr rN, =label" form (load address of label)
+        if content.contains("=.") || content.contains("=num_buf") || content.contains("=newline") {
+            let parts: Vec<&str> = content.split_whitespace().collect();
+            let dest_reg = parts[1].replace(",", "");
+            let dest_idx: usize = dest_reg[1..]
+                .parse()
+                .expect("Failed to parse destination register index");
+
+            // Try to find the label
+            let mut label_found = false;
+
+            if let Some(label_start) = content.find("=.") {
+                let label = &content[label_start + 1..];
+                let label = label.trim().trim_end_matches('\n');
+                if let Some(&addr) = self.data_map.get(label) {
+                    self.set_reg(dest_idx, addr as i32);
+                    label_found = true;
+                    if self.debug {
+                        println!(
+                            "Loaded label address {} for {} into r{}",
+                            addr, label, dest_idx
+                        );
+                    }
+                }
+            }
+
+            if !label_found && content.contains("=num_buf") {
+                if let Some(&addr) = self.data_map.get("num_buf") {
+                    self.set_reg(dest_idx, addr as i32);
+                    label_found = true;
+                    if self.debug {
+                        println!(
+                            "Loaded label address {} for num_buf into r{}",
+                            addr, dest_idx
+                        );
+                    }
+                }
+            }
+
+            if !label_found && content.contains("=newline") {
+                if let Some(&addr) = self.data_map.get("newline") {
+                    self.set_reg(dest_idx, addr as i32);
+                    if self.debug {
+                        println!(
+                            "Loaded label address {} for newline into r{}",
+                            addr, dest_idx
+                        );
+                    }
+                }
+            }
+
+            return;
         }
 
         // 1. Parse the parts (e.g., "ldr", "r0,", "[sp, #0]")
@@ -544,18 +684,17 @@ impl Interpreter {
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
-        // 6. Calculate the effective offset relative to the current SP
-        let effective_offset =
-            ((base_addr as i32) - (self.memory.get_sp() as i32) + offset) as usize;
+        // 6. Calculate the effective address
+        let effective_addr = (base_addr as i32 + offset) as usize;
 
         // 7. Load the value from memory and update the register
-        let value = self.memory.read_stack32(effective_offset);
+        let value = self.memory.read_stack32_at(effective_addr);
         self.set_reg(dest_idx, value as i32);
 
         if self.debug {
             println!(
-                "Loaded value {} from stack offset {} into r{}",
-                value, effective_offset, dest_idx
+                "Loaded value {} from address {} into r{}",
+                value, effective_addr, dest_idx
             );
         }
     }
@@ -636,6 +775,9 @@ impl Interpreter {
     }
 
     fn exec_add(&mut self, content: String) {
+        if self.debug {
+            println!("Executing add instruction: {}", content);
+        }
         let parts: Vec<&str> = content.split_whitespace().collect();
 
         let dest = parts[1].replace(",", "");
@@ -698,7 +840,80 @@ impl Interpreter {
         self.set_reg(dest_idx, result);
     }
 
+    fn exec_sdiv(&mut self, content: String) {
+        if self.debug {
+            println!("Executing sdiv instruction: {}", content);
+        }
+        let parts: Vec<&str> = content.split_whitespace().collect();
+
+        let dest = parts[1].replace(",", "");
+        let op1 = parts[2].replace(",", "");
+        let op2 = parts[3].replace(",", "");
+
+        let dest_idx: usize = dest[1..].parse().unwrap();
+
+        let src_val: i32 = {
+            let src_idx: usize = op1[1..].parse().unwrap();
+            self.get_reg(src_idx)
+        };
+
+        let value: i32 = {
+            let reg_idx: usize = op2[1..].parse().unwrap();
+            self.get_reg(reg_idx)
+        };
+
+        let result = src_val / value;
+        self.set_reg(dest_idx, result);
+    }
+
+    fn exec_strb(&mut self, content: String) {
+        if self.debug {
+            println!("Executing strb instruction: {}", content);
+        }
+        let parts: Vec<&str> = content.split_whitespace().collect();
+        let src_reg = parts[1].replace(",", "");
+        let src_idx: usize = src_reg[1..]
+            .parse()
+            .expect("Failed to parse register index");
+        let value = self.get_reg(src_idx) as u8;
+
+        let addr_part = content
+            .split_once('[')
+            .and_then(|(_, rest)| rest.split_once(']'))
+            .map(|(inside, _)| inside)
+            .unwrap_or("");
+
+        let mut base_addr: usize = 0;
+        let mut offset: i32 = 0;
+        let mut base_reg_name = String::new();
+
+        for part in addr_part.split(',') {
+            let part = part.trim();
+            if part == "sp" || part.starts_with('r') {
+                base_reg_name = part.to_string();
+            } else if let Some(imm) = part.strip_prefix('#') {
+                offset = imm.parse().expect("Failed to parse offset");
+            }
+        }
+
+        if base_reg_name == "sp" {
+            base_addr = self.memory.get_sp();
+        } else if let Some(reg_num) = base_reg_name.strip_prefix('r') {
+            let reg_idx: usize = reg_num.parse().expect("Failed to parse register index");
+            base_addr = self.get_reg(reg_idx) as usize;
+        }
+
+        let effective_addr = (base_addr as i32 + offset) as usize;
+
+        if effective_addr < self.memory.heap.len() {
+            self.memory.heap[effective_addr] = value;
+        } else if effective_addr < self.memory.stack.len() {
+            self.memory.stack[effective_addr] = value;
+        }
+    }
+
     pub fn execute(&mut self) -> u32 {
+        self.parse_data_section();
         let start_block = self.get_start();
         if self.debug {
             eprintln!("DEBUG: start_block = {:?}", start_block);
@@ -727,6 +942,8 @@ impl Interpreter {
                     }
                 }
                 f if f.starts_with("sub") => self.exec_sub(instruction.clone()),
+                // Important: check "strb" before "str" since "strb".starts_with("str") is true.
+                f if f.starts_with("strb") => self.exec_strb(instruction.clone()),
                 f if f.starts_with("str") => self.exec_str(instruction.clone()),
                 f if f.starts_with("ldr") => self.exec_ldr(instruction.clone()),
                 f if f.starts_with("cmp") => self.exec_cmp(instruction.clone()),
@@ -737,6 +954,7 @@ impl Interpreter {
                 }
                 f if f.starts_with("add") => self.exec_add(instruction.clone()),
                 f if f.starts_with("mul") => self.exec_mul(instruction.clone()),
+                f if f.starts_with("sdiv") => self.exec_sdiv(instruction.clone()),
                 f if f.contains(":") => {}
                 invalid => panic!("Invalid instruction: {invalid}"),
             }

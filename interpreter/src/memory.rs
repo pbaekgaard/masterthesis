@@ -2,8 +2,8 @@ const STACK_SIZE: usize = 1024 * 1024;
 const HEAP_SIZE: usize = 1024 * 1024;
 
 pub struct EmulatorMemory {
-    stack: Vec<u8>,
-    heap: Vec<u8>,
+    pub stack: Vec<u8>,
+    pub heap: Vec<u8>,
     heap_alloc_index: usize,
     stack_pointer: usize,
 }
@@ -69,13 +69,70 @@ impl EmulatorMemory {
         self.heap[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
     }
 
+    pub fn write_heap(&mut self, addr: usize, value: u8) {
+        self.heap[addr] = value;
+    }
+
+    pub fn read_heap(&self, addr: usize, len: usize) -> Vec<u8> {
+        self.heap[addr..addr + len].to_vec()
+    }
+
     pub fn write_stack32(&mut self, offset: usize, value: u32) {
-        let addr = self.stack_pointer + offset;
+        let (addr, overflow) = self.stack_pointer.overflowing_add(offset);
+        if overflow || addr + 4 > self.stack.len() {
+            eprintln!(
+                "Warning: Stack write out of bounds at offset {} (sp={}, addr={}, stack_len={})",
+                offset,
+                self.stack_pointer,
+                addr,
+                self.stack.len()
+            );
+            return;
+        }
         self.stack[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
     }
 
+    pub fn write_stack32_at(&mut self, addr: usize, value: u32) {
+        if addr + 4 > self.stack.len() {
+            eprintln!(
+                "Warning: Stack write out of bounds at addr {} (stack_len={})",
+                addr,
+                self.stack.len()
+            );
+            return;
+        }
+        self.stack[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    pub fn read_stack32_at(&self, addr: usize) -> u32 {
+        if addr + 4 > self.stack.len() {
+            eprintln!(
+                "Warning: Stack read out of bounds at addr {} (stack_len={})",
+                addr,
+                self.stack.len()
+            );
+            return 0;
+        }
+        u32::from_le_bytes([
+            self.stack[addr],
+            self.stack[addr + 1],
+            self.stack[addr + 2],
+            self.stack[addr + 3],
+        ])
+    }
+
     pub fn read_stack32(&self, offset: usize) -> u32 {
-        let addr = self.stack_pointer + offset;
+        let (addr, overflow) = self.stack_pointer.overflowing_add(offset);
+        if overflow || addr + 4 > self.stack.len() {
+            eprintln!(
+                "Warning: Stack read out of bounds at offset {} (sp={}, addr={}, stack_len={})",
+                offset,
+                self.stack_pointer,
+                addr,
+                self.stack.len()
+            );
+            return 0;
+        }
 
         if addr + 4 > self.stack.len() {
             panic!("Stack out of bounds read at offset {}", offset);
