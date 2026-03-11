@@ -33,6 +33,9 @@ impl CodeGenerator {
         for func in ast {
             self.emit(func);
         }
+        if self.hard {
+            self.emit_countermeasure();
+        }
         self.emit_print_data();
     }
 
@@ -94,6 +97,9 @@ impl CodeGenerator {
                 Stmt::Print(exprs) => self.emit_print(exprs),
                 _ => panic!("Error found in expression in return"),
             }
+            if self.hard {
+                self.emit_step_check();
+            }
         }
 
         let offset_diff = self.stack_offset - initial_offset;
@@ -142,6 +148,12 @@ impl CodeGenerator {
             self.write_line(".ascii \"\\n\"", 1);
             self.write_line("num_buf:", 0);
             self.write_line(".space 16", 1);
+        }
+        if self.hard {
+            self.write_line("step_counter:", 0);
+            self.write_line(".word 0", 1);
+            self.write_line("fault_msg:", 0);
+            self.write_line(".ascii \"Control flow violation detected\\n\"", 1);
         }
     }
     fn emit_if(&mut self, if_stmt: Stmt) {
