@@ -12,7 +12,6 @@
 /interpreter/tmp
 /playground
 
-*.asm
 *.core
 **/tmp
 **/temp

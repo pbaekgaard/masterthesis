@@ -72,7 +72,7 @@ impl Cpsr {
 
 pub struct Interpreter {
     memory: EmulatorMemory,
-    registers: [u32; NUM_REGISTERS],
+    registers: [i32; NUM_REGISTERS],
     pc: u32,
     branch_map: HashMap<String, u32>,
     eof_pc: u32,
@@ -95,7 +95,7 @@ impl Interpreter {
             file: Vec::new(),
             debug: false,
             start_time: std::time::Instant::now(),
-            max_time: std::time::Duration::from_millis(10),
+            max_time: std::time::Duration::from_millis(500),
         }
     }
 
@@ -111,11 +111,11 @@ impl Interpreter {
         self.branch_map = map;
     }
 
-    pub fn get_reg(&self, index: usize) -> u32 {
+    pub fn get_reg(&self, index: usize) -> i32 {
         self.registers[index]
     }
 
-    pub fn set_reg(&mut self, index: usize, value: u32) {
+    pub fn set_reg(&mut self, index: usize, value: i32) {
         self.registers[index] = value;
     }
 
@@ -148,7 +148,7 @@ impl Interpreter {
         }
     }
 
-    pub fn get_registers(&self) -> &[u32; NUM_REGISTERS] {
+    pub fn get_registers(&self) -> &[i32; NUM_REGISTERS] {
         &self.registers
     }
 
@@ -357,17 +357,16 @@ impl Interpreter {
         let src = parts[2].replace(",", "");
 
         let dest_idx: usize = dest[1..].parse().expect("Failed to parse register index");
-        let value: u32;
 
         if let Some(value_str) = src.strip_prefix('#') {
-            value = value_str.parse().expect("Failed to parse immediate value");
+            let value: i32 = value_str.parse().expect("Failed to parse immediate value");
             self.set_reg(dest_idx, value);
             if self.debug {
                 println!("Mock: mov r{}, #{} (stored in register)", dest_idx, value);
             }
         } else {
             let src_idx: usize = src[1..].parse().expect("Failed to parse register index");
-            value = self.get_reg(src_idx);
+            let value = self.get_reg(src_idx);
             self.set_reg(dest_idx, value);
             if self.debug {
                 println!(
@@ -378,7 +377,7 @@ impl Interpreter {
         }
     }
 
-    fn exec_svc(&mut self, content: String) -> Option<u32> {
+    fn exec_svc(&mut self, content: String) -> Option<i32> {
         if self.debug {
             println!("Executing svc instruction: {}", content);
         }
@@ -405,7 +404,7 @@ impl Interpreter {
         let dest = parts[1].replace(",", "");
         let src = parts[2].replace(",", "");
         let val_or_reg = parts[3].replace(",", "");
-        let sub_value: u32;
+        let sub_value: i32;
         if let Some(value_str) = val_or_reg.strip_prefix('#') {
             let value_str = value_str.replace("#", "");
             sub_value = value_str.parse().expect("literal");
@@ -415,7 +414,7 @@ impl Interpreter {
             sub_value = self.get_reg(this_reg);
         }
 
-        let src_val: u32;
+        let src_val: i32;
         if let Some(src_str) = src.strip_prefix('r') {
             let src_register = src_str
                 .replace("r", "")
@@ -423,7 +422,7 @@ impl Interpreter {
                 .expect("Unable to parse register");
             src_val = self.get_reg(src_register);
         } else {
-            src_val = self.memory.get_sp() as u32;
+            src_val = self.memory.get_sp() as i32;
         }
 
         if let Some(dst_str) = dest.strip_prefix('r') {
@@ -431,7 +430,8 @@ impl Interpreter {
                 .replace("r", "")
                 .parse()
                 .expect("Unable to parse register");
-            let _dst_val = self.get_reg(dst_register);
+            let result = src_val - sub_value;
+            self.set_reg(dst_register, result);
         } else if src == "sp" {
             self.memory.set_sp((src_val - sub_value) as usize);
         }
@@ -475,7 +475,7 @@ impl Interpreter {
         }
 
         let offset_from_sp = ((base_addr as i32) - (self.memory.get_sp() as i32) + offset) as usize;
-        self.memory.write_stack32(offset_from_sp, value);
+        self.memory.write_stack32(offset_from_sp, value as u32);
 
         if self.debug {
             println!("Stored value {} at stack offset {}", value, offset_from_sp);
@@ -550,7 +550,7 @@ impl Interpreter {
 
         // 7. Load the value from memory and update the register
         let value = self.memory.read_stack32(effective_offset);
-        self.set_reg(dest_idx, value);
+        self.set_reg(dest_idx, value as i32);
 
         if self.debug {
             println!(
@@ -574,11 +574,11 @@ impl Interpreter {
             return;
         }
 
-        let rn_idx: usize = parts[1][1..].parse().expect("Failed to parse Rn index");
+        let rn_idx: usize = parts[1][1..].parse().expect("Failed to Rn index");
         let val_n = self.get_reg(rn_idx);
 
         let val_op2 = if let Some(imm_str) = parts[2].strip_prefix('#') {
-            imm_str.parse::<u32>().expect("Failed to parse immediate")
+            imm_str.parse::<i32>().expect("Failed to parse immediate")
         } else {
             let rm_idx: usize = parts[2][1..].parse().expect("Failed to parse Rm index");
             self.get_reg(rm_idx)
@@ -586,12 +586,10 @@ impl Interpreter {
         let result = (val_n).wrapping_sub(val_op2);
 
         self.cpsr.z = result == 0;
-        self.cpsr.n = (result >> 31) == 1;
-        self.cpsr.c = val_n >= val_op2;
+        self.cpsr.n = result < 0;
+        self.cpsr.c = (val_n as u32) >= (val_op2 as u32);
 
-        let rn_i = val_n as i32;
-        let op2_i = val_op2 as i32;
-        let (_, overflow) = rn_i.overflowing_sub(op2_i);
+        let (_, overflow) = val_n.overflowing_sub(val_op2);
         self.cpsr.v = overflow;
 
         if self.debug {
@@ -650,15 +648,15 @@ impl Interpreter {
             dest[1..].parse().unwrap()
         };
 
-        let src_val: u32 = if op1 == "sp" {
-            self.memory.get_sp() as u32
+        let src_val: i32 = if op1 == "sp" {
+            self.memory.get_sp() as i32
         } else {
             let src_idx: usize = op1[1..].parse().unwrap();
             self.get_reg(src_idx)
         };
 
         let value = if let Some(imm) = op2.strip_prefix('#') {
-            imm.parse::<u32>().unwrap()
+            imm.parse::<i32>().unwrap()
         } else {
             let reg_idx: usize = if op2 == "sp" {
                 13
@@ -677,10 +675,39 @@ impl Interpreter {
         }
     }
 
+    fn exec_mul(&mut self, content: String) {
+        let parts: Vec<&str> = content.split_whitespace().collect();
+
+        let dest = parts[1].replace(",", "");
+        let op1 = parts[2].replace(",", "");
+        let op2 = parts[3].replace(",", "");
+
+        let dest_idx: usize = dest[1..].parse().unwrap();
+
+        let src_val: i32 = {
+            let src_idx: usize = op1[1..].parse().unwrap();
+            self.get_reg(src_idx)
+        };
+
+        let value: i32 = {
+            let reg_idx: usize = op2[1..].parse().unwrap();
+            self.get_reg(reg_idx)
+        };
+
+        let result = src_val.wrapping_mul(value);
+        self.set_reg(dest_idx, result);
+    }
+
     pub fn execute(&mut self) -> u32 {
         let start_block = self.get_start();
+        if self.debug {
+            eprintln!("DEBUG: start_block = {:?}", start_block);
+        }
         while self.pc < self.eof_pc {
             let instruction = start_block.get(self.pc as usize).unwrap();
+            if self.debug {
+                eprintln!("DEBUG: PC={}, instruction={}", self.pc, instruction);
+            }
             if self.start_time.elapsed().as_nanos() > self.max_time.as_nanos() {
                 println!("Detected Infinite Loop");
                 exit(88)
@@ -696,7 +723,7 @@ impl Interpreter {
                 f if f.starts_with("mov") => self.exec_mov(instruction.clone()),
                 f if f.starts_with("svc") => {
                     if let Some(exit_code) = self.exec_svc(instruction.clone()) {
-                        return exit_code;
+                        return (exit_code as u32) & 0xFF;
                     }
                 }
                 f if f.starts_with("sub") => self.exec_sub(instruction.clone()),
@@ -709,6 +736,7 @@ impl Interpreter {
                     continue;
                 }
                 f if f.starts_with("add") => self.exec_add(instruction.clone()),
+                f if f.starts_with("mul") => self.exec_mul(instruction.clone()),
                 f if f.contains(":") => {}
                 invalid => panic!("Invalid instruction: {invalid}"),
             }
@@ -961,8 +989,8 @@ mod tests {
         // Large positive minus a large negative results in a value
         // too big for 32-bit signed integer (wraps around)
         interp.set_reg(1, 0x7fffffff); // Max Positive i32
-        interp.set_reg(2, 0xffffffff); // -1 in two's complement
-                                       // Math: 0x7FFFFFFF - (-1) = 0x80000000 (which is -2147483648 in signed)
+        interp.set_reg(2, -1); // -1 in two's complement
+                               // Math: 0x7FFFFFFF - (-1) = 0x80000000 (which is -2147483648 in signed)
         interp.exec_cmp("cmp r1, r2".to_string());
         assert!(interp.cpsr.v, "V should be true due to signed overflow");
         assert!(
