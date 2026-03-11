@@ -114,6 +114,7 @@ func main() -> Integer {
   g_sign = tmp;
 
   print("g_sign herro = ", 1337);
+  print("g_countermeasure: ", g_countermeasure);
 
   return g_sign;
 }
