@@ -113,5 +113,7 @@ func main() -> Integer {
 
   g_sign = tmp;
 
+  print("g_sign herro = ", 1337);
+
   return g_sign;
 }

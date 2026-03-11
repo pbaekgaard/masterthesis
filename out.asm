@@ -399,8 +399,57 @@ end_while_10:
     str r0, [sp, #52]
     ldr r0, [sp, #52]
     str r0, [sp, #68]
+    mov r0, #1
+    ldr r1, =.Lstr0
+    mov r2, #15
+    mov r7, #4
+    svc #0
+    mov r0, #1337
+    mov r4, r0
+    ldr r1, =num_buf
+    add r1, r1, #16
+    mov r2, #0
+    cmp r4, #0
+    bne print_int_loop_14
+    mov r3, #48
+    sub r1, r1, #1
+    strb r3, [r1]
+    mov r2, #1
+    b print_int_done_14
+print_int_loop_14:
+    mov r0, r4
+    mov r3, #10
+    sdiv r5, r0, r3
+    mul r6, r5, r3
+    sub r7, r0, r6
+    add r7, r7, #48
+    sub r1, r1, #1
+    strb r7, [r1]
+    add r2, r2, #1
+    mov r4, r5
+    cmp r4, #0
+    bne print_int_loop_14
+print_int_done_14:
+    mov r0, #1
+    mov r1, r1
+    mov r2, r2
+    mov r7, #4
+    svc #0
+    mov r0, #1
+    ldr r1, =newline
+    mov r2, #1
+    mov r7, #4
+    svc #0
     ldr r0, [sp, #68]
     mov r7, #1
     svc #0
 
 .size _start, .-_start
+
+.section .data
+.Lstr0:
+    .ascii "g_sign herro = "
+newline:
+    .ascii "\n"
+num_buf:
+    .space 16
