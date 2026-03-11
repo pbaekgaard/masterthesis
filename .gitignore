@@ -8,3 +8,9 @@
 #/target
 /tmp
 /temp
+/interpreter/target
+/interpreter/tmp
+/playground
+
+*.asm
+*.core

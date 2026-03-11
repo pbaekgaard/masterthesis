@@ -1,4 +1,7 @@
-use crate::{lexer::token::{Token, TokenType}, semantic::symbol_table::SymbolTable};
+use crate::{
+    lexer::token::{Token, TokenType},
+    semantic::symbol_table::SymbolTable,
+};
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Let(String, Type, Expr),
@@ -13,7 +16,7 @@ pub enum Stmt {
         expr: Expr,
         block: Block,
     },
-    Print(Expr),
+    Print(Vec<Expr>),
     Return(Expr),
 }
 
@@ -55,6 +58,7 @@ pub enum BinOp {
     Add,
     Sub,
     Mul,
+    Div,
     Equals,
     NotEquals,
     GreaterThan,
@@ -64,6 +68,7 @@ pub enum BinOp {
 #[derive(Debug, Clone, PartialEq)]
 pub enum UnOp {
     Not,
+    Neg,
 }
 pub type AST = Vec<Function>;
 pub struct Parser {
@@ -167,6 +172,8 @@ impl Parser {
                 statements.push(self.parse_if());
             } else if self.match_token(TokenType::While) {
                 statements.push(self.parse_while());
+            } else if self.match_token(TokenType::Print) {
+                statements.push(self.parse_print());
             } else if self.match_token(TokenType::Identifier) && self.peek(TokenType::Assign) {
                 statements.push(self.parse_assignment());
             } else if self.match_token(TokenType::Return) {
@@ -177,6 +184,25 @@ impl Parser {
             }
         }
         Block { statements }
+    }
+    fn parse_print(&mut self) -> Stmt {
+        // 'print' already matched by caller
+        self.consume(); // consume 'print'
+        let _ = self.expect(TokenType::LeftParen);
+
+        let mut args: Vec<Expr> = Vec::new();
+        // allow empty argument list: print();
+        if !self.match_token(TokenType::RightParen) {
+            args.push(self.parse_expression());
+            while self.match_token(TokenType::Comma) {
+                self.consume(); // consume ','
+                args.push(self.parse_expression());
+            }
+        }
+
+        let _ = self.expect(TokenType::RightParen);
+        let _ = self.expect(TokenType::Semicolon);
+        Stmt::Print(args)
     }
     fn parse_return(&mut self) -> Stmt {
         self.consume();
@@ -234,7 +260,9 @@ impl Parser {
             TokenType::Integer => Type::Integer,
             TokenType::Boolean => Type::Boolean,
             _ => panic!(
-                "Expected type, got something else at {}:{}",
+                "Expected type, got {:?} ({}) at {}:{}",
+                self.current().token_type,
+                self.current().value,
                 self.current().line,
                 self.current().column
             ),
@@ -251,7 +279,9 @@ impl Parser {
             TokenType::Plus => BinOp::Add,
             TokenType::Minus => BinOp::Sub,
             TokenType::Multiply => BinOp::Mul,
+            TokenType::Division => BinOp::Div,
             TokenType::Equals => BinOp::Equals,
+            TokenType::NotEquals => BinOp::NotEquals,
             TokenType::GreaterThan => BinOp::GreaterThan,
             TokenType::LessThan => BinOp::LessThan,
             _ => panic!("Not a binary operator"),
@@ -270,6 +300,7 @@ impl Parser {
                     TokenType::GreaterThan,
                     TokenType::LessThan,
                     TokenType::Equals,
+                    TokenType::NotEquals,
                 ]) {
                     let op_token = self.consume();
                     let op = self.token_to_binop(&op_token.token_type);
@@ -296,7 +327,7 @@ impl Parser {
                 }
             }
             TokenType::BooleanLiteral => {
-                if self.match_token(TokenType::Equals) {
+                if self.match_any(&[TokenType::Equals, TokenType::NotEquals]) {
                     let op_token = self.consume();
                     let op = self.token_to_binop(&op_token.token_type);
                     let right = self.parse_expression();
@@ -305,17 +336,9 @@ impl Parser {
                         op,
                         Box::new(right),
                     )
-                } else if self.match_token(TokenType::Not) {
-                    let _ = self.expect(TokenType::Equals);
-                    let op = BinOp::NotEquals;
-                    let right = self.parse_expression();
-                    Expr::BinaryOp(
-                        Box::new(Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap())),
-                        op,
-                        Box::new(right),
-                    )
                 } else {
-                    Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap())
+                    let val = tok.value.clone();
+                    Expr::BooleanLiteral(tok.value.to_lowercase().parse::<bool>().unwrap())
                 }
             }
             TokenType::StringLiteral => {
@@ -344,6 +367,37 @@ impl Parser {
             TokenType::Not => {
                 let exprs = self.parse_expression();
                 Expr::UnaryOp(UnOp::Not, Box::new(exprs))
+            }
+            TokenType::Minus => match self.current().token_type {
+                TokenType::IntegerLiteral => {
+                    let cur = self.consume();
+                    Expr::IntegerLiteral(-cur.value.parse::<i64>().unwrap())
+                }
+                _ => {
+                    let expr = self.parse_expression();
+                    Expr::UnaryOp(UnOp::Neg, Box::new(expr))
+                }
+            },
+            TokenType::LeftParen => {
+                let expr = self.parse_expression();
+                let _ = self.expect(TokenType::RightParen);
+                if self.match_any(&[
+                    TokenType::Minus,
+                    TokenType::Plus,
+                    TokenType::Multiply,
+                    TokenType::Division,
+                    TokenType::GreaterThan,
+                    TokenType::LessThan,
+                    TokenType::Equals,
+                    TokenType::NotEquals,
+                ]) {
+                    let op_token = self.consume();
+                    let op = self.token_to_binop(&op_token.token_type);
+                    let right = self.parse_expression();
+                    Expr::BinaryOp(Box::new(expr), op, Box::new(right))
+                } else {
+                    expr
+                }
             }
             _ => panic!("Unexpected token {:?} in expression", tok.token_type),
         }
@@ -392,13 +446,11 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::parser::parser::Parser;
+    use crate::parser::parser::Stmt;
     use crate::{
-        lexer::{
-            lexer::Lexer,
-        },
+        lexer::lexer::Lexer,
         parser::parser::{BinOp, Block, Expr, Function, Type, AST},
     };
-    use crate::parser::parser::Stmt;
 
     #[test]
     fn test_parser_parses_correct_ast() {
@@ -438,7 +490,7 @@ mod tests {
                         block: Block {
                             statements: vec![Stmt::AssignStatement(
                                 "num".to_string(),
-                                Expr::IntegerLiteral(11),
+                                Expr::IntegerLiteral(12),
                             )],
                         },
                         option: Some(Block {

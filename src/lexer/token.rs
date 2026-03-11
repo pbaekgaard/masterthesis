@@ -33,6 +33,7 @@ pub enum TokenType {
     GreaterThan, // >
     LessThan,    // <
     Equals,      // ==
+    NotEquals,      // !=
     Plus,        // +
     Minus,       // -
     Multiply,    // *
@@ -102,6 +103,7 @@ impl fmt::Display for TokenType {
             TokenType::GreaterThan => write!(f, ">"),
             TokenType::LessThan => write!(f, "<"),
             TokenType::Equals => write!(f, "=="),
+            TokenType::NotEquals => write!(f, "!="),
             TokenType::Plus => write!(f, "+"),
             TokenType::Minus => write!(f, "-"),
             TokenType::Multiply => write!(f, "*"),
