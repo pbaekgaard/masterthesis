@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn test_parser_parses_correct_ast() {
         use std::fs;
-        let source = fs::read_to_string("test_codes/simple.trv").expect("Failed to read file");
+        let source = fs::read_to_string("test_codes/test_correct_ast.trv").expect("Failed to read file");
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = Parser::new(tokens);
