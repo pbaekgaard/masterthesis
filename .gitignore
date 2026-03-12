@@ -16,3 +16,4 @@
 
 /testing/bin
 /testing/artifacts
+/testing/src/__pycache__

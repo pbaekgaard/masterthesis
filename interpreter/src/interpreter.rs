@@ -97,7 +97,7 @@ impl Interpreter {
             file: Vec::new(),
             debug: false,
             start_time: std::time::Instant::now(),
-            max_time: std::time::Duration::from_millis(500),
+            max_time: std::time::Duration::from_millis(1000),
         }
     }
 
