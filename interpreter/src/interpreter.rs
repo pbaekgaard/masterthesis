@@ -101,6 +101,10 @@ impl Interpreter {
         }
     }
 
+    pub fn inject(&mut self, injection_point: String){
+        println!("Injection point: {injection_point}")
+    }
+
     pub fn set_debug(&mut self, debug: bool) {
         self.debug = debug;
     }
@@ -176,9 +180,6 @@ impl Interpreter {
             if i % 4 == 3 {
                 println!(" ║");
             }
-        }
-        if 32 % 4 != 0 {
-            println!("║");
         }
 
         println!("╟──────────────────────────────────────────────────────────────────╢");

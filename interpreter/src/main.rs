@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use clap::Parser;
 use thumb2_interpreter::interpreter::Interpreter;
 
@@ -5,22 +7,19 @@ use thumb2_interpreter::interpreter::Interpreter;
 #[derive(Parser, Debug, Clone, PartialEq, Eq)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// The file path to read
     file_path: String,
 
-    /// Enable debug output
     #[arg(short, long)]
     debug: bool,
 
-    /// Stop execution after N nanoseconds
     #[arg(long)]
     max_time: Option<u128>,
+
+    #[arg(short, long)]
+    injection_point: Option<String>
 }
 
 fn main() {
-    // clap's Parser trait provides the parse() method. 
-    // If the user passes invalid args or -h/--help, clap automatically 
-    // prints the error/help message and exits the program safely.
     let args = Args::parse();
 
     let mut interpreter = Interpreter::default();
@@ -32,10 +31,10 @@ fn main() {
     }
     
     interpreter.read_file(&args.file_path);
-    interpreter.print_memory();
+    if let Some(injection_point) = args.injection_point {
+        interpreter.inject(injection_point);
+    }
     
     let return_code = interpreter.execute();
-    
-    interpreter.print_memory();
-    println!("Execution returned with return_code {return_code}");
+    exit(return_code as i32)
 }
