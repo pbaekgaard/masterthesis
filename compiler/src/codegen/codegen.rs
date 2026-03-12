@@ -33,9 +33,6 @@ impl CodeGenerator {
         for func in ast {
             self.emit(func);
         }
-        if self.hard {
-            self.emit_countermeasure();
-        }
         self.emit_print_data();
     }
 
@@ -68,7 +65,15 @@ impl CodeGenerator {
 
     fn emit_main(&mut self, func: Function) {
         self.write_line("_start:", 0);
+
+        if self.hard {
+            self.write_line("mov r9, #0", 1); // step counter in register
+            self.write_line("mov r10, #1", 1); // step counter in register
+        }
         self.emit_block(func.body, true);
+        if self.hard {
+            self.emit_countermeasure();
+        }
         self.write_line("\n.size _start, .-_start", 0);
     }
     fn emit_block(&mut self, block: Block, is_main: bool) {
@@ -89,9 +94,6 @@ impl CodeGenerator {
                 Stmt::Print(exprs) => self.emit_print(exprs),
                 _ => panic!("Error found in expression in return"),
             }
-            if self.hard {
-                self.emit_step_check();
-            }
         }
 
         let offset_diff = self.stack_offset - initial_offset;
@@ -105,14 +107,7 @@ impl CodeGenerator {
     fn emit_countermeasure(&mut self) {
         self.write_line("countermeasure:", 0);
 
-        // print message
-        self.write_line("mov r0, #1", 1);
-        self.write_line("ldr r1, =fault_msg", 1);
-        self.write_line("mov r2, #33", 1);
-        self.write_line("mov r7, #4", 1);
-        self.write_line("svc #0", 1);
-
-        // exit with special code
+        // exit(77)
         self.write_line("mov r0, #77", 1);
         self.write_line("mov r7, #1", 1);
         self.write_line("svc #0", 1);
@@ -123,17 +118,10 @@ impl CodeGenerator {
             return;
         }
 
-        self.step_counter += 1;
-        let expected = self.step_counter;
-
-        self.write_line("ldr r0, =step_counter", 1);
-        self.write_line("ldr r1, [r0]", 1);
-
-        self.write_line("add r1, r1, #1", 1);
-        self.write_line("str r1, [r0]", 1);
-
-        self.write_line(&format!("cmp r1, #{}", expected), 1);
+        self.write_line("add r9, r9, #1", 1);
+        self.write_line("cmp r9, r10", 1);
         self.write_line("bne countermeasure", 1);
+        self.write_line("add r10, r10, #1", 1);
     }
 
     fn emit_print_data(&mut self) {
@@ -155,12 +143,6 @@ impl CodeGenerator {
             self.write_line("num_buf:", 0);
             self.write_line(".space 16", 1);
         }
-        if self.hard {
-            self.write_line("step_counter:", 0);
-            self.write_line(".word 0", 1);
-            self.write_line("fault_msg:", 0);
-            self.write_line(".ascii \"Control flow violation detected\\n\"", 1);
-        }
     }
     fn emit_if(&mut self, if_stmt: Stmt) {
         match if_stmt {
@@ -172,17 +154,29 @@ impl CodeGenerator {
                 self.write_line("cmp r0, #0", 1);
                 self.write_line(&format!("beq else_{}", label_id), 1);
 
-                // then block
+                // save step state
+                let saved = self.step_counter;
+
+                // THEN branch
+                self.emit_step_check();
                 self.emit_block(block, false);
+                let then_end = self.step_counter;
+
                 self.write_line(&format!("b endif_{}", label_id), 1);
 
-                // else block
+                // ELSE branch
                 self.write_line(&format!("else_{}:", label_id), 0);
+
+                self.step_counter = saved;
+
                 if let Some(else_block) = option {
+                    self.emit_step_check();
                     self.emit_block(else_block, false);
                 }
 
+                let else_end = self.step_counter;
                 self.write_line(&format!("endif_{}:", label_id), 0);
+                self.step_counter = then_end.max(else_end);
             }
             _ => panic!("emit_if called with non-if statement"),
         }
@@ -195,11 +189,14 @@ impl CodeGenerator {
                 self.label_count += 1;
 
                 self.write_line(&format!("while_{}:", label_id), 0);
+
+                self.emit_step_check();
                 self.emit_expr(expr);
                 self.write_line("cmp r0, #0", 1);
                 self.write_line(&format!("beq end_while_{}", label_id), 1);
 
                 self.emit_block(block, false);
+                self.emit_step_check();
 
                 self.write_line(&format!("b while_{}", label_id), 1);
                 self.write_line(&format!("end_while_{}:", label_id), 0);
@@ -313,6 +310,9 @@ impl CodeGenerator {
                 } else {
                     self.write_line(&format!("str r0, [sp, #{}]", self.stack_offset - offset), 1);
                 }
+                if self.hard {
+                    self.emit_step_check();
+                }
             }
             _ => panic!("Not a valid assignment"),
         }
@@ -325,6 +325,9 @@ impl CodeGenerator {
                 self.emit_expr(expr);
                 self.write_line("str r0, [sp]", 1);
                 self.locals.insert(name, self.stack_offset);
+                if self.hard {
+                    self.emit_step_check();
+                }
             }
             _ => panic!("Not a let statement format sorry "),
         }
