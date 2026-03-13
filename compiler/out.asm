@@ -6,129 +6,493 @@
 .type _start, %function
 
 _start:
-    mov r9, #0
-    mov r10, #1
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
     sub sp, sp, #4
-    mov r0, #1
+    mov r0, #11413
     str r0, [sp]
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
+    sub sp, sp, #4
+    mov r0, #3533
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #101
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #113
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #59
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #97
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #101
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #-1
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #23
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    ldr r0, [sp, #64]
+    str r0, [sp, #48]
+    ldr r0, [sp, #76]
+    str r0, [sp, #44]
+    ldr r0, [sp, #88]
+    str r0, [sp, #40]
+    mov r0, #1
+    str r0, [sp, #36]
+    mov r0, #0
+    str r0, [sp, #4]
 while_0:
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
     ldr r0, [sp, #4]
     mov r1, r0
-    mov r0, #10
+    ldr r0, [sp, #44]
     cmp r1, r0
     mov r0, #0
     it lt
     movlt r0, #1
     cmp r0, #0
     beq end_while_0
-    sub sp, sp, #4
-    mov r0, #1
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-    ldr r0, [sp, #8]
+    ldr r0, [sp, #36]
+    str r0, [sp, #28]
+    ldr r0, [sp, #48]
+    str r0, [sp, #24]
+    ldr r0, [sp, #40]
+    str r0, [sp, #20]
+    mov r0, #0
+    str r0, [sp, #16]
+while_1:
+    ldr r0, [sp, #24]
     mov r1, r0
-    ldr r0, [sp, #0]
-    add r0, r1, r0
-    str r0, [sp, #8]
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-    add sp, sp, #4
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-    b while_0
-end_while_0:
-    ldr r0, [sp, #4]
-    mov r1, r0
-    mov r0, #10
+    mov r0, #0
     cmp r1, r0
     mov r0, #0
     it gt
     movgt r0, #1
     cmp r0, #0
-    beq else_1
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-    mov r0, #12
-    str r0, [sp, #4]
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-    sub sp, sp, #4
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-    add sp, sp, #4
-    b endif_1
-else_1:
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-    mov r0, #11
-    str r0, [sp, #4]
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-endif_1:
-    ldr r0, [sp, #0]
+    beq end_while_1
+    ldr r0, [sp, #16]
     mov r1, r0
-    mov r0, #1
+    ldr r0, [sp, #28]
+    add r0, r1, r0
+    str r0, [sp, #16]
+while_2:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
     cmp r1, r0
     mov r0, #0
-    it ne
-    movne r0, #1
+    it gt
+    movgt r0, #1
     cmp r0, #0
-    beq else_2
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
-    ldr r0, [sp, #0]
-    mov r7, #1
-    svc #0
-    b endif_2
-else_2:
-    add r9, r9, #1
-    cmp r9, r10
-    bne countermeasure
-    add r10, r10, #1
+    beq end_while_2
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    sub r0, r1, r0
+    str r0, [sp, #16]
+    b while_2
+end_while_2:
+while_3:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    mov r0, #0
+    cmp r1, r0
+    mov r0, #0
+    it lt
+    movlt r0, #1
+    cmp r0, #0
+    beq end_while_3
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    add r0, r1, r0
+    str r0, [sp, #16]
+    b while_3
+end_while_3:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    cmp r1, r0
+    mov r0, #0
+    it eq
+    moveq r0, #1
+    cmp r0, #0
+    beq else_4
+    mov r0, #0
+    str r0, [sp, #16]
+    b endif_4
+else_4:
+endif_4:
+    ldr r0, [sp, #24]
+    mov r1, r0
+    mov r0, #1
+    sub r0, r1, r0
+    str r0, [sp, #24]
+    b while_1
+end_while_1:
+    ldr r0, [sp, #16]
+    str r0, [sp, #36]
     ldr r0, [sp, #4]
-    mov r7, #1
+    mov r1, r0
+    mov r0, #1
+    add r0, r1, r0
+    str r0, [sp, #4]
+    b while_0
+end_while_0:
+    ldr r0, [sp, #36]
+    str r0, [sp, #60]
+    ldr r0, [sp, #64]
+    str r0, [sp, #48]
+    ldr r0, [sp, #72]
+    str r0, [sp, #44]
+    ldr r0, [sp, #84]
+    str r0, [sp, #40]
+    mov r0, #1
+    str r0, [sp, #36]
+    mov r0, #0
+    str r0, [sp, #4]
+while_5:
+    ldr r0, [sp, #4]
+    mov r1, r0
+    ldr r0, [sp, #44]
+    cmp r1, r0
+    mov r0, #0
+    it lt
+    movlt r0, #1
+    cmp r0, #0
+    beq end_while_5
+    ldr r0, [sp, #36]
+    str r0, [sp, #28]
+    ldr r0, [sp, #48]
+    str r0, [sp, #24]
+    ldr r0, [sp, #40]
+    str r0, [sp, #20]
+    mov r0, #0
+    str r0, [sp, #16]
+while_6:
+    ldr r0, [sp, #24]
+    mov r1, r0
+    mov r0, #0
+    cmp r1, r0
+    mov r0, #0
+    it gt
+    movgt r0, #1
+    cmp r0, #0
+    beq end_while_6
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #28]
+    add r0, r1, r0
+    str r0, [sp, #16]
+while_7:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    cmp r1, r0
+    mov r0, #0
+    it gt
+    movgt r0, #1
+    cmp r0, #0
+    beq end_while_7
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    sub r0, r1, r0
+    str r0, [sp, #16]
+    b while_7
+end_while_7:
+while_8:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    mov r0, #0
+    cmp r1, r0
+    mov r0, #0
+    it lt
+    movlt r0, #1
+    cmp r0, #0
+    beq end_while_8
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    add r0, r1, r0
+    str r0, [sp, #16]
+    b while_8
+end_while_8:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    cmp r1, r0
+    mov r0, #0
+    it eq
+    moveq r0, #1
+    cmp r0, #0
+    beq else_9
+    mov r0, #0
+    str r0, [sp, #16]
+    b endif_9
+else_9:
+endif_9:
+    ldr r0, [sp, #24]
+    mov r1, r0
+    mov r0, #1
+    sub r0, r1, r0
+    str r0, [sp, #24]
+    b while_6
+end_while_6:
+    ldr r0, [sp, #16]
+    str r0, [sp, #36]
+    ldr r0, [sp, #4]
+    mov r1, r0
+    mov r0, #1
+    add r0, r1, r0
+    str r0, [sp, #4]
+    b while_5
+end_while_5:
+    ldr r0, [sp, #36]
+    str r0, [sp, #56]
+    ldr r0, [sp, #60]
+    mov r1, r0
+    ldr r0, [sp, #56]
+    sub r0, r1, r0
+    str r0, [sp, #52]
+    ldr r0, [sp, #52]
+    str r0, [sp, #28]
+    ldr r0, [sp, #80]
+    str r0, [sp, #24]
+    ldr r0, [sp, #88]
+    str r0, [sp, #20]
+    mov r0, #0
+    str r0, [sp, #16]
+while_10:
+    ldr r0, [sp, #24]
+    mov r1, r0
+    mov r0, #0
+    cmp r1, r0
+    mov r0, #0
+    it gt
+    movgt r0, #1
+    cmp r0, #0
+    beq end_while_10
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #28]
+    add r0, r1, r0
+    str r0, [sp, #16]
+while_11:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    cmp r1, r0
+    mov r0, #0
+    it gt
+    movgt r0, #1
+    cmp r0, #0
+    beq end_while_11
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    sub r0, r1, r0
+    str r0, [sp, #16]
+    b while_11
+end_while_11:
+while_12:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    mov r0, #0
+    cmp r1, r0
+    mov r0, #0
+    it lt
+    movlt r0, #1
+    cmp r0, #0
+    beq end_while_12
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    add r0, r1, r0
+    str r0, [sp, #16]
+    b while_12
+end_while_12:
+    ldr r0, [sp, #16]
+    mov r1, r0
+    ldr r0, [sp, #20]
+    cmp r1, r0
+    mov r0, #0
+    it eq
+    moveq r0, #1
+    cmp r0, #0
+    beq else_13
+    mov r0, #0
+    str r0, [sp, #16]
+    b endif_13
+else_13:
+endif_13:
+    ldr r0, [sp, #24]
+    mov r1, r0
+    mov r0, #1
+    sub r0, r1, r0
+    str r0, [sp, #24]
+    b while_10
+end_while_10:
+    ldr r0, [sp, #16]
+    str r0, [sp, #52]
+    ldr r0, [sp, #52]
+    mov r1, r0
+    ldr r0, [sp, #84]
+    mul r0, r1, r0
+    str r0, [sp, #52]
+    ldr r0, [sp, #52]
+    mov r1, r0
+    ldr r0, [sp, #56]
+    add r0, r1, r0
+    str r0, [sp, #52]
+    ldr r0, [sp, #52]
+    str r0, [sp, #68]
+    mov r0, #1
+    ldr r1, =.Lstr0
+    mov r2, #15
+    mov r7, #4
     svc #0
-endif_2:
-    add sp, sp, #8
-countermeasure:
-    mov r0, #77
+    mov r0, #1337
+    mov r4, r0
+    ldr r1, =num_buf
+    add r1, r1, #16
+    mov r2, #0
+    cmp r4, #0
+    bne print_int_loop_14
+    mov r3, #48
+    sub r1, r1, #1
+    strb r3, [r1]
+    mov r2, #1
+    b print_int_done_14
+print_int_loop_14:
+    mov r0, r4
+    mov r3, #10
+    sdiv r5, r0, r3
+    mul r6, r5, r3
+    sub r7, r0, r6
+    add r7, r7, #48
+    sub r1, r1, #1
+    strb r7, [r1]
+    add r2, r2, #1
+    mov r4, r5
+    cmp r4, #0
+    bne print_int_loop_14
+print_int_done_14:
+    mov r0, #1
+    mov r1, r1
+    mov r2, r2
+    mov r7, #4
+    svc #0
+    mov r0, #1
+    ldr r1, =newline
+    mov r2, #1
+    mov r7, #4
+    svc #0
+    mov r0, #1
+    ldr r1, =.Lstr1
+    mov r2, #18
+    mov r7, #4
+    svc #0
+    ldr r0, [sp, #100]
+    mov r4, r0
+    ldr r1, =num_buf
+    add r1, r1, #16
+    mov r2, #0
+    cmp r4, #0
+    bne print_int_loop_15
+    mov r3, #48
+    sub r1, r1, #1
+    strb r3, [r1]
+    mov r2, #1
+    b print_int_done_15
+print_int_loop_15:
+    mov r0, r4
+    mov r3, #10
+    sdiv r5, r0, r3
+    mul r6, r5, r3
+    sub r7, r0, r6
+    add r7, r7, #48
+    sub r1, r1, #1
+    strb r7, [r1]
+    add r2, r2, #1
+    mov r4, r5
+    cmp r4, #0
+    bne print_int_loop_15
+print_int_done_15:
+    mov r0, #1
+    mov r1, r1
+    mov r2, r2
+    mov r7, #4
+    svc #0
+    mov r0, #1
+    ldr r1, =newline
+    mov r2, #1
+    mov r7, #4
+    svc #0
+    ldr r0, [sp, #68]
     mov r7, #1
     svc #0
 
 .size _start, .-_start
+
+.section .data
+.Lstr0:
+    .ascii "g_sign herro = "
+.Lstr1:
+    .ascii "g_countermeasure: "
+newline:
+    .ascii "\n"
+num_buf:
+    .space 16

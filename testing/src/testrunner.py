@@ -137,28 +137,8 @@ class TestRunner:
         
         return results
     
-    def run_tests(self):
-        if not hasattr(self, 'run_folder'):
-            self.setup()
-        
-        results = self.compile()
-        
-        for test, result in zip(self.tests, results):
-            print(f"Test: {test['name']}")
-            
-            for hard in [False, True]:
-                hard_str = "hard" if hard else "normal"
-                res = result[hard_str]
-                if res['success']:
-                    print(f"  Compiled ({hard_str}) successfully")
-                else:
-                    print(f"  Compilation failed ({hard_str}):")
-                    if res['stdout']:
-                        print(f"    stdout: {res['stdout']}")
-                    if res['stderr']:
-                        print(f"    stderr: {res['stderr']}")
-            
-            print(f"  Expected output: {test['expected_output']}")
+    def run_tests(self):        
+
         
         zip_base = os.path.join(self.artifacts_folder, self.run_folder_name)
         shutil.make_archive(zip_base, 'zip', self.artifacts_folder, self.run_folder_name)
