@@ -1,0 +1,4 @@
+func main() -> Integer {
+  let num : Integer = 27;
+  return num;
+}

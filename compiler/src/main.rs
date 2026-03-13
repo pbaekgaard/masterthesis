@@ -22,7 +22,7 @@ struct Args {
     /// The source file to compile
     filename: String,
 
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "out.asm")]
     output: String,
     
     #[arg(long)]
