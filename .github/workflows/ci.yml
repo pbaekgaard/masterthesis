@@ -8,56 +8,40 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
+  # This job handles all testing
+  test-all:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Cache cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+      # ... (insert your cache step here) ...
       
       - name: Compiler Tests
         working-directory: ./compiler
-        run: cargo test --verbose
-
+        run: cargo test
       - name: Interpreter Tests
         working-directory: ./interpreter
-        run: cargo test --verbose
+        run: cargo test
 
-  build:
+  # Now we split the builds into separate jobs
+  build-compiler:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Cache cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+      # ... (insert your cache step here) ...
       
       - name: Build Compiler
         working-directory: ./compiler
-        run: cargo build --release --verbose
+        run: cargo build --release
+
+  build-interpreter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # ... (insert your cache step here) ...
       
       - name: Build Interpreter
         working-directory: ./interpreter
-        run: cargo build --release --verbose
+        run: cargo build --release
