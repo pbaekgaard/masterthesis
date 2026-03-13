@@ -27,7 +27,12 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Run tests
+      - name: Compiler Tests
+        working-directory: ./compiler
+        run: cargo test --verbose
+
+      - name: Interpreter Tests
+        working-directory: ./interpreter
         run: cargo test --verbose
 
   build:
@@ -49,5 +54,10 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Build release
+      - name: Build Compiler
+        working-directory: ./compiler
+        run: cargo build --release --verbose
+      
+      - name: Build Interpreter
+        working-directory: ./interpreter
         run: cargo build --release --verbose

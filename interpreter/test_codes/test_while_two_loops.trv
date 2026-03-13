@@ -1,0 +1,11 @@
+func main() -> Integer {
+  let a : Integer = 0;
+  let b : Integer = 0;
+  while a < 3 {
+    a = a + 1;
+  }
+  while b < 4 {
+    b = b + 1;
+  }
+  return a+b;
+}
