@@ -9,7 +9,7 @@ env:
 
 jobs:
   # This job handles all testing
-  test-all:
+  test-compiler:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +19,14 @@ jobs:
       - name: Compiler Tests
         working-directory: ./compiler
         run: cargo test
+  
+  test-interpreter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # ... (insert your cache step here) ...
+      
       - name: Interpreter Tests
         working-directory: ./interpreter
         run: cargo test
