@@ -70,6 +70,19 @@ impl Cpsr {
     }
 }
 
+pub enum InjectionTarget {
+    Register { register: usize, bit: u32 },
+    Memory { address: u32, bit: u32 },
+    ProgramCounter { bit: u32 },
+    Cpsr { register: usize, bit: u32 },
+    None,
+}
+
+pub struct InjectionSpec {
+    pub target: InjectionTarget,
+    pub trigger_pc: i32,
+}
+
 pub struct Interpreter {
     memory: EmulatorMemory,
     registers: [i32; NUM_REGISTERS],
@@ -82,6 +95,7 @@ pub struct Interpreter {
     debug: bool,
     start_time: std::time::Instant,
     max_time: std::time::Duration,
+    fault_spec: InjectionSpec,
 }
 
 impl Interpreter {
@@ -98,11 +112,36 @@ impl Interpreter {
             debug: false,
             start_time: std::time::Instant::now(),
             max_time: std::time::Duration::from_millis(1000),
+            fault_spec: InjectionSpec {
+                target: InjectionTarget::None,
+                trigger_pc: -1,
+            },
         }
     }
 
     pub fn inject(&mut self, injection_point: String){
-        println!("Injection point: {injection_point}")
+        // FORMAT: X:Y:Z
+        // X = PC
+        // Y = Register
+        // Z = Bit to flip
+        let mut parts = injection_point.split(':');
+
+        // Get the first three parts
+        let pc = parts.next().ok_or("Missing PC value").unwrap().parse::<i32>().unwrap();
+        let register = parts.next().ok_or("Missing Register value").unwrap().parse::<usize>().unwrap();
+        let bit = parts.next().ok_or("Missing Bit value").unwrap().parse::<u32>().unwrap();
+
+
+
+        // CRITICAL: Check if there is a 4th part
+        if parts.next().is_some() {
+            panic!("Correct format for injection point is \"X:Y:Z\"")
+        }
+        let injection_target = InjectionTarget::Register { register, bit };
+
+        self.fault_spec.trigger_pc = pc;
+        self.fault_spec.target = injection_target;
+        println!("Setup Injection Specification:\nTrigger PC: {pc}\nRegister: {register}\nBit: {bit}");
     }
 
     pub fn set_debug(&mut self, debug: bool) {
@@ -704,9 +743,11 @@ impl Interpreter {
     }
 
     fn exec_cmp(&mut self, content: String) {
-        if self.debug {
-            println!("Executing cmp instruction: {}", content);
-        }
+        println!("Executing cmp instruction: {}", content);
+        let pc = self.pc;
+        println!("PC = {pc}");
+
+
 
         let parts: Vec<&str> = content
             .split(|c: char| c == ',' || c.is_whitespace())
@@ -916,6 +957,17 @@ impl Interpreter {
         }
     }
 
+    fn flip_bit(&self, flipee: i32, bit: u32) -> i32 {
+        let mask = 1 << bit;
+        flipee ^ mask
+    }
+
+    fn trigger_register_fault(&mut self, register: usize, bit: u32) {
+        let old_val = self.registers[register];
+        self.registers[register] = self.flip_bit(old_val, bit);
+        println!("REGISTER FAULT TRIGGERED!");
+    }
+
     pub fn execute(&mut self) -> u32 {
         self.parse_data_section();
         let start_block = self.get_start();
@@ -924,6 +976,17 @@ impl Interpreter {
         }
         while self.pc < self.eof_pc {
             let instruction = start_block.get(self.pc as usize).unwrap();
+
+            if self.pc as i32 == self.fault_spec.trigger_pc {
+                match self.fault_spec.target {
+                    InjectionTarget::Register { register, bit } => {
+                        self.trigger_register_fault(register, bit);
+                    }
+                    _ => panic!("Injection type not implemented yet.")
+                }
+            }
+
+
             if self.debug {
                 eprintln!("DEBUG: PC={}, instruction={}", self.pc, instruction);
             }
