@@ -6,8 +6,6 @@
 # already existing elements were commented out
 
 **/target
-/tmp
-/temp
 /interpreter/target
 /interpreter/tmp
 /playground
@@ -15,3 +13,7 @@
 *.core
 **/tmp
 **/temp
+
+/testing/bin
+/testing/artifacts
+/testing/src/__pycache__
