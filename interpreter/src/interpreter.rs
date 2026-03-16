@@ -53,11 +53,7 @@ impl Cpsr {
         let is_then = self.it_state.mask[step_idx] == 't';
         let condition_met = self.evaluate_condition(&self.it_state.base_cond);
 
-        let execute = if is_then {
-            condition_met
-        } else {
-            !condition_met
-        };
+        let execute = if is_then { condition_met } else { !condition_met };
 
         // Advance or Reset
         self.it_state.current_instr += 1;
@@ -134,7 +130,8 @@ impl Interpreter {
     }
     pub fn read_file(&mut self, file_path: &String) -> bool {
         let file = File::open(file_path).expect("Could not open file: {file_path}");
-        let lines: Vec<String> = std::io::BufReader::new(file)
+        let lines: Vec<String> = std::io::BufReader
+            ::new(file)
             .lines()
             .map(|line| line.expect("Could not read line from file"))
             .collect();
@@ -184,28 +181,17 @@ impl Interpreter {
         println!("╟──────────────────────────────────────────────────────────────────╢");
         println!("║ CPSR FLAGS:                                                      ║");
         println!("╟──────────────────────────────────────────────────────────────────╢");
-        println!(
-            "║   Z (Zero):     {:<5}                                          ║",
-            self.cpsr.z
-        );
-        println!(
-            "║   N (Negative): {:<5}                                          ║",
-            self.cpsr.n
-        );
-        println!(
-            "║   C (Carry):    {:<5}                                          ║",
-            self.cpsr.c
-        );
-        println!(
-            "║   V (Overflow): {:<5}                                          ║",
-            self.cpsr.v
-        );
+        println!("║   Z (Zero):     {:<5}                                          ║", self.cpsr.z);
+        println!("║   N (Negative): {:<5}                                          ║", self.cpsr.n);
+        println!("║   C (Carry):    {:<5}                                          ║", self.cpsr.c);
+        println!("║   V (Overflow): {:<5}                                          ║", self.cpsr.v);
 
         println!("╟──────────────────────────────────────────────────────────────────╢");
         println!("║ PROGRAM COUNTER:                                                 ║");
         println!(
             "║   PC: {:>10} (0x{:08x})                                    ║",
-            self.pc, self.pc
+            self.pc,
+            self.pc
         );
 
         println!("╟──────────────────────────────────────────────────────────────────╢");
@@ -323,7 +309,7 @@ impl Interpreter {
                     result.push(label.clone());
                     branch_map.insert(
                         label[0..label.len() - 1].to_string(),
-                        (result.len() - 1) as u32,
+                        (result.len() - 1) as u32
                     );
                 }
                 false => {
@@ -339,7 +325,7 @@ impl Interpreter {
                             if line.contains(":") {
                                 branch_map.insert(
                                     label[0..label.len() - 1].to_string(),
-                                    (result.len() - 1) as u32,
+                                    (result.len() - 1) as u32
                                 );
                             }
                         }
@@ -447,10 +433,7 @@ impl Interpreter {
             let value = self.get_reg(src_idx);
             self.set_reg(dest_idx, value);
             if self.debug {
-                println!(
-                    "Mock: mov r{}, r{} (register to register)",
-                    dest_idx, src_idx
-                );
+                println!("Mock: mov r{}, r{} (register to register)", dest_idx, src_idx);
             }
         }
     }
@@ -505,20 +488,14 @@ impl Interpreter {
 
         let src_val: i32;
         if let Some(src_str) = src.strip_prefix('r') {
-            let src_register = src_str
-                .replace("r", "")
-                .parse()
-                .expect("Unable to parse register");
+            let src_register = src_str.replace("r", "").parse().expect("Unable to parse register");
             src_val = self.get_reg(src_register);
         } else {
             src_val = self.memory.get_sp() as i32;
         }
 
         if let Some(dst_str) = dest.strip_prefix('r') {
-            let dst_register = dst_str
-                .replace("r", "")
-                .parse()
-                .expect("Unable to parse register");
+            let dst_register = dst_str.replace("r", "").parse().expect("Unable to parse register");
             let result = src_val - sub_value;
             self.set_reg(dst_register, result);
         } else if src == "sp" {
@@ -532,9 +509,7 @@ impl Interpreter {
         }
         let parts: Vec<&str> = content.split_whitespace().collect();
         let dest_reg = parts[1].replace(",", "");
-        let dest_idx: usize = dest_reg[1..]
-            .parse()
-            .expect("Failed to parse register index");
+        let dest_idx: usize = dest_reg[1..].parse().expect("Failed to parse register index");
         let value = self.get_reg(dest_idx);
 
         let addr_part = content
@@ -563,7 +538,7 @@ impl Interpreter {
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
-        let effective_addr = (base_addr as i32 + offset) as usize;
+        let effective_addr = ((base_addr as i32) + offset) as usize;
         self.memory.write_stack32_at(effective_addr, value as u32);
 
         if self.debug {
@@ -610,10 +585,7 @@ impl Interpreter {
                     self.set_reg(dest_idx, addr as i32);
                     label_found = true;
                     if self.debug {
-                        println!(
-                            "Loaded label address {} for {} into r{}",
-                            addr, label, dest_idx
-                        );
+                        println!("Loaded label address {} for {} into r{}", addr, label, dest_idx);
                     }
                 }
             }
@@ -623,10 +595,7 @@ impl Interpreter {
                     self.set_reg(dest_idx, addr as i32);
                     label_found = true;
                     if self.debug {
-                        println!(
-                            "Loaded label address {} for num_buf into r{}",
-                            addr, dest_idx
-                        );
+                        println!("Loaded label address {} for num_buf into r{}", addr, dest_idx);
                     }
                 }
             }
@@ -635,10 +604,7 @@ impl Interpreter {
                 if let Some(&addr) = self.data_map.get("newline") {
                     self.set_reg(dest_idx, addr as i32);
                     if self.debug {
-                        println!(
-                            "Loaded label address {} for newline into r{}",
-                            addr, dest_idx
-                        );
+                        println!("Loaded label address {} for newline into r{}", addr, dest_idx);
                     }
                 }
             }
@@ -681,24 +647,19 @@ impl Interpreter {
         if base_reg_name == "sp" {
             base_addr = self.memory.get_sp();
         } else if let Some(reg_num) = base_reg_name.strip_prefix('r') {
-            let reg_idx: usize = reg_num
-                .parse()
-                .expect("Failed to parse base register index");
+            let reg_idx: usize = reg_num.parse().expect("Failed to parse base register index");
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
         // 6. Calculate the effective address
-        let effective_addr = (base_addr as i32 + offset) as usize;
+        let effective_addr = ((base_addr as i32) + offset) as usize;
 
         // 7. Load the value from memory and update the register
         let value = self.memory.read_stack32_at(effective_addr);
         self.set_reg(dest_idx, value as i32);
 
         if self.debug {
-            println!(
-                "Loaded value {} from address {} into r{}",
-                value, effective_addr, dest_idx
-            );
+            println!("Loaded value {} from address {} into r{}", value, effective_addr, dest_idx);
         }
     }
 
@@ -708,7 +669,7 @@ impl Interpreter {
         }
 
         let parts: Vec<&str> = content
-            .split(|c: char| c == ',' || c.is_whitespace())
+            .split(|c: char| (c == ',' || c.is_whitespace()))
             .filter(|s| !s.is_empty())
             .collect();
 
@@ -725,7 +686,7 @@ impl Interpreter {
             let rm_idx: usize = parts[2][1..].parse().expect("Failed to parse Rm index");
             self.get_reg(rm_idx)
         };
-        let result = (val_n).wrapping_sub(val_op2);
+        let result = val_n.wrapping_sub(val_op2);
 
         self.cpsr.z = result == 0;
         self.cpsr.n = result < 0;
@@ -737,7 +698,13 @@ impl Interpreter {
         if self.debug {
             println!(
                 "CMP Result: {:#x} - {:#x} = {:#x} | Flags: N:{} Z:{} C:{} V:{}",
-                val_n, val_op2, result, self.cpsr.n, self.cpsr.z, self.cpsr.c, self.cpsr.v
+                val_n,
+                val_op2,
+                result,
+                self.cpsr.n,
+                self.cpsr.z,
+                self.cpsr.c,
+                self.cpsr.v
             );
         }
     }
@@ -787,11 +754,7 @@ impl Interpreter {
         let op1 = parts[2].replace(",", "");
         let op2 = parts[3].replace(",", "");
 
-        let dest_idx: usize = if dest == "sp" {
-            13
-        } else {
-            dest[1..].parse().unwrap()
-        };
+        let dest_idx: usize = if dest == "sp" { 13 } else { dest[1..].parse().unwrap() };
 
         let src_val: i32 = if op1 == "sp" {
             self.memory.get_sp() as i32
@@ -803,11 +766,7 @@ impl Interpreter {
         let value = if let Some(imm) = op2.strip_prefix('#') {
             imm.parse::<i32>().unwrap()
         } else {
-            let reg_idx: usize = if op2 == "sp" {
-                13
-            } else {
-                op2[1..].parse().unwrap()
-            };
+            let reg_idx: usize = if op2 == "sp" { 13 } else { op2[1..].parse().unwrap() };
             self.get_reg(reg_idx)
         };
 
@@ -875,9 +834,7 @@ impl Interpreter {
         }
         let parts: Vec<&str> = content.split_whitespace().collect();
         let src_reg = parts[1].replace(",", "");
-        let src_idx: usize = src_reg[1..]
-            .parse()
-            .expect("Failed to parse register index");
+        let src_idx: usize = src_reg[1..].parse().expect("Failed to parse register index");
         let value = self.get_reg(src_idx) as u8;
 
         let addr_part = content
@@ -906,7 +863,7 @@ impl Interpreter {
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
-        let effective_addr = (base_addr as i32 + offset) as usize;
+        let effective_addr = ((base_addr as i32) + offset) as usize;
 
         if effective_addr < self.memory.heap.len() {
             self.memory.heap[effective_addr] = value;
@@ -928,7 +885,7 @@ impl Interpreter {
             }
             if self.start_time.elapsed().as_nanos() > self.max_time.as_nanos() {
                 println!("Detected Infinite Loop");
-                exit(88)
+                exit(88);
             }
             if !self.cpsr.should_execute() {
                 if self.debug {
@@ -941,7 +898,7 @@ impl Interpreter {
                 f if f.starts_with("mov") => self.exec_mov(instruction.clone()),
                 f if f.starts_with("svc") => {
                     if let Some(exit_code) = self.exec_svc(instruction.clone()) {
-                        return (exit_code as u32) & 0xFF;
+                        return (exit_code as u32) & 0xff;
                     }
                 }
                 f if f.starts_with("sub") => self.exec_sub(instruction.clone()),
@@ -1008,10 +965,7 @@ mod tests {
         assert!(status.success(), "Linker failed for {}", asm_path);
 
         // Run in qemu
-        let status = Command::new("qemu-arm")
-            .arg(&bin)
-            .status()
-            .expect("Failed to run qemu");
+        let status = Command::new("qemu-arm").arg(&bin).status().expect("Failed to run qemu");
 
         status.code().unwrap_or(-1)
     }
@@ -1132,7 +1086,7 @@ mod tests {
         interp.file = vec![
             "_start:".to_string(),
             "    mov r0, #1".to_string(),
-            "    svc #0".to_string(),
+            "    svc #0".to_string()
         ];
 
         let start_block = interp.get_start();
@@ -1148,7 +1102,7 @@ mod tests {
             "_start:".to_string(),
             "    mov r0, #10".to_string(),
             "    mov r7, #1".to_string(),
-            "    svc #0".to_string(),
+            "    svc #0".to_string()
         ];
 
         let exit_code = interp.execute();
@@ -1167,7 +1121,7 @@ mod tests {
             "    ldr r1, [sp]".to_string(),
             "    mov r0, r1".to_string(),
             "    mov r7, #1".to_string(),
-            "    svc #0".to_string(),
+            "    svc #0".to_string()
         ];
 
         let exit_code = interp.execute();
@@ -1190,14 +1144,8 @@ mod tests {
         interp.set_reg(1, 50);
         interp.exec_cmp("cmp r1, #100".to_string());
         assert!(!interp.cpsr.z, "Z should be false when not equal");
-        assert!(
-            interp.cpsr.n,
-            "N should be true because 50 - 100 is negative"
-        );
-        assert!(
-            !interp.cpsr.c,
-            "C should be false because 50 < 100 (borrow occurred)"
-        );
+        assert!(interp.cpsr.n, "N should be true because 50 - 100 is negative");
+        assert!(!interp.cpsr.c, "C should be false because 50 < 100 (borrow occurred)");
 
         // 3. Test Greater Than (Positive result)
         interp.set_reg(1, 200);
@@ -1211,13 +1159,10 @@ mod tests {
         // too big for 32-bit signed integer (wraps around)
         interp.set_reg(1, 0x7fffffff); // Max Positive i32
         interp.set_reg(2, -1); // -1 in two's complement
-                               // Math: 0x7FFFFFFF - (-1) = 0x80000000 (which is -2147483648 in signed)
+        // Math: 0x7FFFFFFF - (-1) = 0x80000000 (which is -2147483648 in signed)
         interp.exec_cmp("cmp r1, r2".to_string());
         assert!(interp.cpsr.v, "V should be true due to signed overflow");
-        assert!(
-            interp.cpsr.n,
-            "N should be true because result wrapped to 0x80000000"
-        );
+        assert!(interp.cpsr.n, "N should be true because result wrapped to 0x80000000");
     }
     #[test]
     fn test_it_block_execution_logic() {
@@ -1246,10 +1191,7 @@ mod tests {
 
         // Test Instruction 2 (E)
         let should_run_2 = interp.cpsr.should_execute();
-        assert!(
-            !should_run_2,
-            "Instruction 2 (E) should NOT run when GT is true"
-        );
+        assert!(!should_run_2, "Instruction 2 (E) should NOT run when GT is true");
         assert_eq!(interp.cpsr.it_state.current_instr, 2);
 
         // 3. Reset and Scenario B: Condition is FALSE (R1 < R0)
@@ -1262,17 +1204,11 @@ mod tests {
 
         // Test Instruction 1 (T)
         let should_run_1_f = interp.cpsr.should_execute();
-        assert!(
-            !should_run_1_f,
-            "Instruction 1 (T) should NOT run when GT is false"
-        );
+        assert!(!should_run_1_f, "Instruction 1 (T) should NOT run when GT is false");
 
         // Test Instruction 2 (E)
         let should_run_2_f = interp.cpsr.should_execute();
-        assert!(
-            should_run_2_f,
-            "Instruction 2 (E) SHOULD run when GT is false (Else case)"
-        );
+        assert!(should_run_2_f, "Instruction 2 (E) SHOULD run when GT is false (Else case)");
 
         // Verify block auto-deactivates
         assert!(
