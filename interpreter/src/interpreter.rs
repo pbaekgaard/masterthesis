@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufRead;
 use std::process::exit;
+use std::usize;
 
 use crate::memory::EmulatorMemory;
 
@@ -66,18 +67,43 @@ impl Cpsr {
     }
 }
 
+pub enum InjectionTarget {
+    Register {
+        register: usize,
+        bit: u32,
+    },
+    Memory {
+        address: u32,
+        bit: u32,
+    },
+    ProgramCounter {
+        bit: u32,
+    },
+    Cpsr {
+        register: usize,
+        bit: u32,
+    },
+    None,
+}
+
+pub struct InjectionSpec {
+    pub target: InjectionTarget,
+    pub trigger_pc: i32,
+}
+
 pub struct Interpreter {
     memory: EmulatorMemory,
     registers: [i32; NUM_REGISTERS],
     pc: u32,
+    eof_pc: u32,
     branch_map: HashMap<String, u32>,
     data_map: HashMap<String, usize>,
-    eof_pc: u32,
     cpsr: Cpsr,
     file: Vec<String>,
     debug: bool,
     start_time: std::time::Instant,
     max_time: std::time::Duration,
+    fault_spec: InjectionSpec,
 }
 
 impl Interpreter {
@@ -93,7 +119,57 @@ impl Interpreter {
             file: Vec::new(),
             debug: false,
             start_time: std::time::Instant::now(),
-            max_time: std::time::Duration::from_millis(500),
+            max_time: std::time::Duration::from_millis(1000),
+            fault_spec: InjectionSpec {
+                target: InjectionTarget::None,
+                trigger_pc: -1,
+            },
+        }
+    }
+
+    pub fn inject(&mut self, injection_point: String) {
+        // FORMAT: X:Y:Z
+        // X = PC
+        // Y = Register
+        // Z = Bit to flip
+        let mut register: usize = usize::MAX;
+        let mut parts = injection_point.split(':');
+
+        // Get the first three parts
+        let fault_type = parts.next().ok_or("Missing PC value").unwrap();
+        let pc = parts.next().ok_or("Missing PC value").unwrap().parse::<i32>().unwrap();
+        if fault_type == "reg" {
+            register = parts
+                .next()
+                .ok_or("Missing Register value")
+                .unwrap()
+                .parse::<usize>()
+                .unwrap();
+        }
+        let bit = parts.next().ok_or("Missing Bit value").unwrap().parse::<u32>().unwrap();
+
+        // CRITICAL: Check if there is a 5th part
+        if parts.next().is_some() {
+            panic!("Correct format for injection point is \"Type:X:Y:Z\"");
+        }
+        if register == usize::MAX && fault_type == "reg" {
+            panic!("Register is usize::MAX");
+        }
+        let injection_target = if fault_type == "reg" {
+            InjectionTarget::Register { register, bit }
+        } else {
+            InjectionTarget::ProgramCounter { bit }
+        };
+        self.fault_spec.trigger_pc = pc;
+        self.fault_spec.target = injection_target;
+        if fault_type == "reg" {
+            println!(
+                "Setup Injection Specification:\n   Type: reg\n Trigger PC: {pc}\n  Register: {register}\n  Bit: {bit}"
+            );
+        } else {
+            println!(
+                "Setup Injection Specification:\n   Type: PC\n  Trigger PC: {pc}\n  Bit: {bit}"
+            );
         }
     }
 
@@ -667,6 +743,7 @@ impl Interpreter {
         if self.debug {
             println!("Executing cmp instruction: {}", content);
         }
+        let pc = self.pc;
 
         let parts: Vec<&str> = content
             .split(|c: char| (c == ',' || c.is_whitespace()))
@@ -872,6 +949,20 @@ impl Interpreter {
         }
     }
 
+    fn flip_bit(&self, flipee: i32, bit: u32) -> i32 {
+        let mask = 1 << bit;
+        flipee ^ mask
+    }
+    fn flip_bit_u32(&self, flipee: u32, bit: u32) -> u32 {
+        let mask = 1 << bit;
+        flipee ^ mask
+    }
+    fn trigger_register_fault(&mut self, register: usize, bit: u32) {
+        let old_val = self.registers[register];
+        self.registers[register] = self.flip_bit(old_val, bit);
+        println!("REGISTER FAULT TRIGGERED!");
+    }
+
     pub fn execute(&mut self) -> u32 {
         self.parse_data_section();
         let start_block = self.get_start();
@@ -880,6 +971,20 @@ impl Interpreter {
         }
         while self.pc < self.eof_pc {
             let instruction = start_block.get(self.pc as usize).unwrap();
+
+            if (self.pc as i32) == self.fault_spec.trigger_pc {
+                match self.fault_spec.target {
+                    InjectionTarget::Register { register, bit } => {
+                        self.trigger_register_fault(register, bit);
+                    }
+                    InjectionTarget::ProgramCounter { bit } => {
+                        self.pc = self.flip_bit_u32(self.pc, bit);
+                        continue;
+                    }
+                    _ => panic!("Injection type not implemented yet."),
+                }
+            }
+
             if self.debug {
                 eprintln!("DEBUG: PC={}, instruction={}", self.pc, instruction);
             }

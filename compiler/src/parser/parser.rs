@@ -1,6 +1,5 @@
 use crate::{
     lexer::token::{Token, TokenType},
-    semantic::symbol_table::SymbolTable,
 };
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
@@ -50,7 +49,7 @@ pub enum Expr {
     Identifier(String),
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     UnaryOp(UnOp, Box<Expr>),
-    Call(Vec<Expr>), //I do not understand what this one is, but the expert recommended it
+    Call(Vec<Expr>), 
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -455,7 +454,7 @@ mod tests {
     #[test]
     fn test_parser_parses_correct_ast() {
         use std::fs;
-        let source = fs::read_to_string("test_codes/simple.trv").expect("Failed to read file");
+        let source = fs::read_to_string("test_codes/test_correct_ast.trv").expect("Failed to read file");
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = Parser::new(tokens);
