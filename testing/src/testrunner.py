@@ -3,48 +3,99 @@ import sys
 import subprocess
 import shutil
 import toml
+import csv
 from datetime import datetime
+import concurrent.futures
+import multiprocessing
+from tqdm import tqdm
+
+
+def _fault_worker(args):
+    asm_path, injection_point, expected_output = args
+
+    bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
+    interpreter_path = os.path.join(bin_dir, "interpreter")
+
+    cmd = [interpreter_path, asm_path, "--injection-point", injection_point]
+
+    result = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
+
+    observed = str(result.returncode)
+    passed = observed == expected_output
+
+    return {
+        "injection_point": injection_point,
+        "returncode": result.returncode,
+        "stdout": result.stdout.strip(),
+        "stderr": result.stderr.strip(),
+        "expected_output": expected_output,
+        "passed": passed,
+    }
+
 
 class TestRunner:
     def __init__(self, config_path=None):
         if config_path is None:
             config_path = os.path.join(os.path.dirname(__file__), "..", "config.toml")
-        
-        with open(config_path, 'r') as f:
+
+        with open(config_path, "r") as f:
             config = toml.load(f)
-        
+
         self.base_dir = os.path.join(os.path.dirname(__file__), "..")
-        self.tests_folder = os.path.join(self.base_dir, config.get('tests_folder', 'tests'))
+        self.tests_folder = os.path.join(
+            self.base_dir, config.get("fissc_folder", "fissc")
+        )
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
+        self.modeled_registers = config.get(
+            "modeled_registers",
+            [
+                "r0",
+                "r1",
+                "r2",
+                "r3",
+                "r4",
+                "r5",
+                "r6",
+                "r7",
+                "r8",
+                "r9",
+                "r10",
+                "r11",
+                "r12",
+            ],
+        )
         self.tests = self._discover_tests()
-    
+        self.compile_results = None
+
     def _discover_tests(self):
         tests = []
         if not os.path.exists(self.tests_folder):
             return tests
-        
+
         files = os.listdir(self.tests_folder)
-        trv_files = sorted([f for f in files if f.endswith('.trv')])
-        
+        trv_files = sorted([f for f in files if f.endswith(".trv")])
+
         for trv_file in trv_files:
             test_name = trv_file[:-4]
             output_file = trv_file + ".output"
-            
+
             if output_file in files:
                 trv_path = os.path.join(self.tests_folder, trv_file)
                 output_path = os.path.join(self.tests_folder, output_file)
-                
-                with open(output_path, 'r') as f:
+
+                with open(output_path, "r") as f:
                     expected_output = f.read().strip()
-                
-                tests.append({
-                    'name': test_name,
-                    'path': trv_path,
-                    'expected_output': expected_output
-                })
-        
+
+                tests.append(
+                    {
+                        "name": test_name,
+                        "path": trv_path,
+                        "expected_output": expected_output,
+                    }
+                )
+
         return tests
-    
+
     def check_bin(self):
         from pathlib import Path
 
@@ -72,39 +123,61 @@ class TestRunner:
             )
 
     def compile_test(self, test, hard, compiled_folder):
-        trv_path = test['path']
-        test_name = test['name']
-        
+        trv_path = test["path"]
+        test_name = test["name"]
+
         if hard:
             asm_path = os.path.join(compiled_folder, f"{test_name}.hard.asm")
         else:
             asm_path = os.path.join(compiled_folder, f"{test_name}.asm")
-        
+
         compiler_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
-        
+
         cmd = [os.path.join(compiler_dir, "compiler"), trv_path, "-o", asm_path]
         if hard:
             cmd.append("--hard")
-        
+
         result = subprocess.run(cmd, cwd=compiler_dir, capture_output=True, text=True)
         return result.returncode == 0, asm_path, result.stdout, result.stderr
-    
+
+    def interpret_test(self, asm_path, injection_point=None, debug=False):
+        bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
+        interpreter_path = os.path.join(bin_dir, "interpreter")
+
+        cmd = [interpreter_path, asm_path]
+
+        if debug:
+            cmd.append("--debug")
+
+        if injection_point:
+            cmd.extend(["--injection-point", injection_point])
+
+        result = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
+
+        return {
+            "returncode": result.returncode,
+            "stdout": result.stdout.strip(),
+            "stderr": result.stderr.strip(),
+        }
+
     def list_tests(self):
         return self.tests
-    
+
     def _get_next_run_number(self):
         if not os.path.exists(self.artifacts_folder):
             return 1
-        
+
         max_num = 0
         for item in os.listdir(self.artifacts_folder):
-            base_name = item[:-4] if item.endswith('.zip') else item
-            if os.path.isdir(os.path.join(self.artifacts_folder, item)) or item.endswith('.zip'):
-                parts = base_name.split('-', 1)
+            base_name = item[:-4] if item.endswith(".zip") else item
+            if os.path.isdir(
+                os.path.join(self.artifacts_folder, item)
+            ) or item.endswith(".zip"):
+                parts = base_name.split("-", 1)
                 if len(parts) == 2 and parts[0].isdigit():
                     max_num = max(max_num, int(parts[0]))
         return max_num + 1
-    
+
     def setup(self):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_num = self._get_next_run_number()
@@ -112,64 +185,195 @@ class TestRunner:
         self.run_folder = os.path.join(self.artifacts_folder, self.run_folder_name)
         self.run_tests_folder = os.path.join(self.run_folder, "tests")
         self.compiled_folder = os.path.join(self.run_folder, "compiled_test_files")
-        
+
         os.makedirs(self.run_folder, exist_ok=True)
         os.makedirs(self.run_tests_folder, exist_ok=True)
         os.makedirs(self.compiled_folder, exist_ok=True)
-        
+
         for f in os.listdir(self.tests_folder):
-            if f.endswith('.trv') or f.endswith('.trv.output'):
+            if f.endswith(".trv") or f.endswith(".trv.output"):
                 shutil.copy(os.path.join(self.tests_folder, f), self.run_tests_folder)
-        
+
         return self.run_folder
-    
+
+    def _get_program_max_pc(self, asm_path):
+        with open(asm_path, "r") as f:
+            lines = f.readlines()
+
+        in_start = False
+        instruction_count = 0
+
+        for raw_line in lines:
+            line = raw_line.strip()
+
+            if not line:
+                continue
+
+            # remove comments
+            if ";" in line:
+                line = line.split(";", 1)[0].strip()
+            if "//" in line:
+                line = line.split("//", 1)[0].strip()
+
+            if not line:
+                continue
+
+            if not in_start:
+                if line == "_start:":
+                    in_start = True
+                continue
+
+            # skip labels after _start
+            if line.endswith(":"):
+                continue
+
+            if line.startswith("."):
+                continue
+
+            # count everything else as an instruction
+            instruction_count += 1
+
+        return instruction_count
+
+    def _generate_injection_points(self, asm_path):
+        max_pc = self._get_program_max_pc(asm_path)
+        injection_points = []
+
+        # pc faults: pc:<pc>:<bit>
+        for pc in range(1, max_pc):
+            for bit in range(
+                1, 32
+            ):  # TODO: Find ud af om den skal hedde 33 eller 32, ændrede til 32 selvom chatten mente 33
+                injection_points.append(f"pc:{pc}:{bit}")
+
+        # reg faults: reg:<pc>:<reg>:<bit>
+        for pc in range(1, max_pc):
+            for reg in range(13):
+                for bit in range(1, 33):
+                    injection_points.append(f"reg:{pc}:{reg}:{bit}")
+
+        return injection_points
+
+    def _run_fault_campaign(self, test_name, variant, asm_path, expected_output):
+        injection_points = self._generate_injection_points(asm_path)
+
+        cpu_count = multiprocessing.cpu_count()
+        print(f"  Using {cpu_count} workers")
+
+        results = []
+
+        tasks = [
+            (asm_path, injection_point, expected_output)
+            for injection_point in injection_points
+        ]
+
+        with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count) as executor:
+            for res in tqdm(
+                executor.map(_fault_worker, tasks, chunksize=50),
+                total=len(tasks),
+                desc="Fault Injection",
+            ):
+                res["test"] = test_name
+                res["variant"] = variant
+                results.append(res)
+
+        return results
+
+    def _write_fault_results_csv(self, rows, output_path):
+        fieldnames = [
+            "test",
+            "variant",
+            "injection_point",
+            "returncode",
+            "stdout",
+            "stderr",
+            "expected_output",
+            "passed",
+        ]
+
+        with open(output_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
     def compile(self):
         results = []
         for test in self.tests:
-            test_result = {'name': test['name'], 'normal': None, 'hard': None}
-            
+            test_result = {"name": test["name"], "normal": None, "hard": None}
+
             for hard in [False, True]:
                 hard_str = "hard" if hard else "normal"
-                success, asm_path, stdout, stderr = self.compile_test(test, hard, self.compiled_folder)
-                test_result[hard_str] = {'success': success, 'asm_path': asm_path, 'stdout': stdout, 'stderr': stderr}
-            
+                success, asm_path, stdout, stderr = self.compile_test(
+                    test, hard, self.compiled_folder
+                )
+                test_result[hard_str] = {
+                    "success": success,
+                    "asm_path": asm_path,
+                    "stdout": stdout,
+                    "stderr": stderr,
+                }
+
             results.append(test_result)
-        
+        self.compile_results = results
         return results
-    
+
     def run_tests(self):
-        if not hasattr(self, 'run_folder'):
+        if not hasattr(self, "run_folder"):
             self.setup()
-        
-        results = self.compile()
-        
-        for test, result in zip(self.tests, results):
+
+        if self.compile_results is None:
+            self.compile()
+
+        all_fault_results = []
+
+        for test, result in zip(self.tests, self.compile_results):
             print(f"Test: {test['name']}")
-            
+
             for hard in [False, True]:
                 hard_str = "hard" if hard else "normal"
                 res = result[hard_str]
-                if res['success']:
-                    print(f"  Compiled ({hard_str}) successfully")
-                else:
-                    print(f"  Compilation failed ({hard_str}):")
-                    if res['stdout']:
+
+                if not res["success"]:
+                    print(f"  Compilation failed ({hard_str})")
+                    if res["stdout"]:
                         print(f"    stdout: {res['stdout']}")
-                    if res['stderr']:
+                    if res["stderr"]:
                         print(f"    stderr: {res['stderr']}")
-            
-            print(f"  Expected output: {test['expected_output']}")
-        
+                    continue
+
+                asm_path = res["asm_path"]
+                max_pc = self._get_program_max_pc(asm_path)
+                injection_points = self._generate_injection_points(asm_path)
+
+                print(f"  Compiled ({hard_str}) successfully")
+                print(f"  ASM path: {asm_path}")
+                print(f"  Max PC: {max_pc}")
+                print(f"  Fault runs to execute: {len(injection_points)}")
+
+                fault_results = self._run_fault_campaign(
+                    test_name=test["name"],
+                    variant=hard_str,
+                    asm_path=asm_path,
+                    expected_output=test["expected_output"],
+                )
+
+                all_fault_results.extend(fault_results)
+
+        csv_path = os.path.join(self.run_folder, "fault_results.csv")
+        self._write_fault_results_csv(all_fault_results, csv_path)
+
         zip_base = os.path.join(self.artifacts_folder, self.run_folder_name)
-        shutil.make_archive(zip_base, 'zip', self.artifacts_folder, self.run_folder_name)
+        shutil.make_archive(
+            zip_base, "zip", self.artifacts_folder, self.run_folder_name
+        )
         shutil.rmtree(self.run_folder)
-        
+
         print(f"\nArtifacts saved to: {zip_base}.zip")
 
 
 if __name__ == "__main__":
     runner = TestRunner()
-    
+
     print(f"Running test runner")
     print(f"Found {len(runner.tests)} tests")
     runner.run_tests()

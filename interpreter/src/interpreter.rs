@@ -6,7 +6,8 @@ use std::usize;
 
 use crate::memory::EmulatorMemory;
 
-const NUM_REGISTERS: usize = 32;
+const NUM_REGISTERS: usize = 13; //FIXME: Find out if num registers is 13 (r0-r12) plsssss
+//FIXME: Also find out what to do with sp, lr, apsr, cpsr
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct ItState {
