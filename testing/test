@@ -8,6 +8,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default=None, help='Path to config.toml')
     parser.add_argument('--skip-run', action='store_true', help='Only setup and compile, skip running tests')
+    parser.add_argument('--limit', type=int, default=None, help='Limit number of injection points to test')
     args = parser.parse_args()
     
     runner = TestRunner(config_path=args.config)
@@ -25,7 +26,7 @@ def main():
     
     if not args.skip_run:
         print(f"\nRunning tests...")
-        runner.run_tests()
+        runner.run_tests(limit=args.limit)
     else:
         print(f"\nSkipping test run (--skip-run)")
 
