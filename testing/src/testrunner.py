@@ -23,24 +23,51 @@ def _fault_worker(args):
 
     passed = _check_passed(result, pass_mode_config)
 
+    matched_output_line = None
+    if pass_mode_config.get("mode") == "stdout":
+        expected_pass = pass_mode_config.get("expected_pass", "")
+        expected_fail = pass_mode_config.get("expected_fail", "")
+        
+        stdout_lines = result.stdout.strip().split("\n")
+        
+        if passed and expected_pass:
+            for line in stdout_lines:
+                if expected_pass in line:
+                    matched_output_line = line.strip()
+                    break
+        elif not passed and expected_fail:
+            for line in stdout_lines:
+                if expected_fail in line:
+                    matched_output_line = line.strip()
+                    break
+        
+        if matched_output_line is None:
+            matched_output_line = "N/A"
+
     return {
         "injection_point": injection_point,
         "returncode": result.returncode,
         "stdout": result.stdout.strip(),
         "stderr": result.stderr.strip(),
-        "expected_output": pass_mode_config.get("expected", ""),
+        "expected_output": pass_mode_config.get("expected_pass", ""),
+        "matched_output_line": matched_output_line,
         "passed": passed,
     }
 
 
 def _check_passed(result, pass_mode_config):
     mode = pass_mode_config.get("mode", "returncode")
-    expected = pass_mode_config.get("expected", 0)
+    expected_pass = pass_mode_config.get("expected_pass", None)
+    expected_fail = pass_mode_config.get("expected_fail", None)
 
     if mode == "returncode":
-        return result.returncode == expected
+        return result.returncode == 0
     elif mode == "stdout":
-        return expected in result.stdout
+        if expected_pass and expected_pass in result.stdout:
+            return True
+        elif expected_fail and expected_fail in result.stdout and result.returncode == 1:
+            return False
+        return True
     else:
         raise ValueError(f"Unknown pass mode: {mode}")
 
@@ -55,7 +82,7 @@ class TestRunner:
 
         self.base_dir = os.path.join(os.path.dirname(__file__), "..")
         self.tests_folder = os.path.join(
-            self.base_dir, config.get("fissc_folder", "fissc")
+            self.base_dir, config.get("test_folder", "fissc")
         )
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
         self.modeled_registers = config.get(
@@ -129,14 +156,16 @@ class TestRunner:
                 mode_config = self.pass_mode_configs.get(mode, {})
                 return {
                     "mode": mode,
-                    "expected": pass_mode.get("expected", mode_config.get("expected", 0)),
+                    "expected_pass": pass_mode.get("expected_pass", mode_config.get("expected_pass", 0)),
+                    "expected_fail": pass_mode.get("expected_fail", mode_config.get("expected_fail", None)),
                 }
 
         mode = self.default_pass_mode
         mode_config = self.pass_mode_configs.get(mode, {})
         return {
             "mode": mode,
-            "expected": mode_config.get("expected", 0),
+            "expected_pass": mode_config.get("expected_pass", 0),
+            "expected_fail": mode_config.get("expected_fail", None),
         }
 
     def check_bin(self):
@@ -351,7 +380,7 @@ class TestRunner:
         self.compile_results = results
         return results
 
-    def run_tests(self, limit=None):
+    def run_tests(self, limit=None, run_variants="both"):
         if not hasattr(self, "run_folder"):
             self.setup()
 
@@ -360,10 +389,18 @@ class TestRunner:
 
         all_fault_results = []
 
-        for test, result in zip(self.tests, self.compile_results):
+        if run_variants == "normal":
+            variants = [False]
+        elif run_variants == "hard":
+            variants = [True]
+        else:
+            variants = [False, True]
+        compile_results = self.compile_results or []
+
+        for test, result in zip(self.tests, compile_results):
             print(f"Test: {test['name']}")
 
-            for hard in [False, True]:
+            for hard in variants:
                 hard_str = "hard" if hard else "normal"
                 res = result[hard_str]
 

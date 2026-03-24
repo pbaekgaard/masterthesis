@@ -26,6 +26,7 @@ class ResultsDatabase:
         stdout TEXT,
         stderr TEXT,
         expected_output TEXT NOT NULL,
+        matched_output_line TEXT,
         passed INTEGER NOT NULL,
         FOREIGN KEY (run_id) REFERENCES runs(id)
     );
@@ -90,6 +91,7 @@ class ResultsDatabase:
                 res["stdout"],
                 res["stderr"],
                 res["expected_output"],
+                res.get("matched_output_line"),
                 int(res["passed"]),
             ))
         
@@ -97,8 +99,8 @@ class ResultsDatabase:
             """
             INSERT INTO test_results 
             (run_id, test, variant, injection_point, fault_type, fault_pc, fault_reg, fault_bit,
-             returncode, stdout, stderr, expected_output, passed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             returncode, stdout, stderr, expected_output, matched_output_line, passed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
