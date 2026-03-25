@@ -1,5 +1,4 @@
 func main() -> Integer {
-  let g_countermeasure : Integer = 0;
   let ptc : Integer = 3;
   let authenticated : Integer = 0;
   let cardPin1 : Integer = 1;
@@ -38,7 +37,6 @@ func main() -> Integer {
       ptc = ptc - 1;
     }
   }
-  print("g_countermeasure: ", g_countermeasure);
   print("g_authenticated: ", authenticated);
   print("g_ptc: ", ptc);
 

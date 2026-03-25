@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import datetime
 
@@ -23,6 +24,12 @@ class ResultsDatabase:
         fault_reg INTEGER,
         fault_bit INTEGER,
         returncode INTEGER NOT NULL,
+        pc_before INTEGER,
+        pc_after INTEGER,
+        expected_exec_instr TEXT,
+        actual_exec_instr TEXT,
+        reg_old_value INTEGER,
+        reg_new_value INTEGER,
         stdout TEXT,
         stderr TEXT,
         expected_output TEXT NOT NULL,
@@ -77,7 +84,30 @@ class ResultsDatabase:
                 fault_type, fault_pc, fault_reg, fault_bit = ("reg", int(parts[1]), int(parts[2]), int(parts[3]))
             else:
                 fault_type, fault_pc, fault_reg, fault_bit = (None, None, None, None)
-            
+            test_report = json.loads(res["test_report"])
+            pc_before = test_report.get("pc_old_value", None)
+            pc_new = test_report.get("pc_new_value", None)
+            expected_exec_instr = test_report.get("expected_exec_instr", "N/A")
+            actual_exec_instr = test_report.get("actual_exec_instr", "N/A")
+            reg_old_value = test_report.get("reg_old_value", None)
+            reg_new_value = test_report.get("reg_new_value", None)
+
+            def _clamp_int(val, max_val=2**63 - 1, min_val=-(2**63)):
+                if val is None:
+                    return None
+                try:
+                    int_val = int(val)
+                except (ValueError, TypeError):
+                    return None
+                if int_val > max_val or int_val < min_val:
+                    return str(int_val)
+                return int_val
+
+            pc_before = _clamp_int(pc_before)
+            pc_new = _clamp_int(pc_new)
+            reg_old_value = _clamp_int(reg_old_value)
+            reg_new_value = _clamp_int(reg_new_value)
+
             rows.append((
                 run_id,
                 res["test"],
@@ -88,6 +118,12 @@ class ResultsDatabase:
                 fault_reg,
                 fault_bit,
                 res["returncode"],
+                pc_before,
+                pc_new,
+                expected_exec_instr,
+                actual_exec_instr,
+                reg_old_value,
+                reg_new_value,
                 res["stdout"],
                 res["stderr"],
                 res["expected_output"],
@@ -99,8 +135,8 @@ class ResultsDatabase:
             """
             INSERT INTO test_results 
             (run_id, test, variant, injection_point, fault_type, fault_pc, fault_reg, fault_bit,
-             returncode, stdout, stderr, expected_output, matched_output_line, passed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            returncode, pc_before, pc_after, expected_exec_instr, actual_exec_instr, reg_old_value, reg_new_value, stdout, stderr, expected_output, matched_output_line, passed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )

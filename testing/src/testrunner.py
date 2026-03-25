@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import subprocess
 import shutil
@@ -17,7 +18,7 @@ def _fault_worker(args):
     bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
     interpreter_path = os.path.join(bin_dir, "interpreter")
 
-    cmd = [interpreter_path, asm_path, "--injection-point", injection_point]
+    cmd = [interpreter_path, asm_path, "--injection-point", injection_point, "--test-mode"]
 
     result = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
 
@@ -43,7 +44,6 @@ def _fault_worker(args):
         
         if matched_output_line is None:
             matched_output_line = "N/A"
-
     return {
         "injection_point": injection_point,
         "returncode": result.returncode,
@@ -52,9 +52,17 @@ def _fault_worker(args):
         "expected_output": pass_mode_config.get("expected_pass", ""),
         "matched_output_line": matched_output_line,
         "passed": passed,
+        "test_report": _extract_test_report(result.stdout),
     }
 
-
+def _extract_test_report(stdout: str):
+    keyword = '"title":\s*"test_report"'
+    pattern = rf'\{{[^{{}}]*{keyword}[^{{}}]*\}}'
+    match = re.search(pattern, stdout,flags=re.MULTILINE)
+    if match: 
+        return match.group(0)
+    return '{"title": "test_report"}'
+    
 def _check_passed(result, pass_mode_config):
     mode = pass_mode_config.get("mode", "returncode")
     expected_pass = pass_mode_config.get("expected_pass", None)
@@ -318,14 +326,14 @@ class TestRunner:
         # pc faults: pc:<pc>:<bit>
         for pc in range(1, max_pc):
             for bit in range(
-                1, 32
+                0, 31
             ):  # TODO: Find ud af om den skal hedde 33 eller 32, ændrede til 32 selvom chatten mente 33
                 injection_points.append(f"pc:{pc}:{bit}")
 
         # reg faults: reg:<pc>:<reg>:<bit>
         for pc in range(1, max_pc):
             for reg in range(13):
-                for bit in range(1, 33):
+                for bit in range(0, 31):
                     injection_points.append(f"reg:{pc}:{reg}:{bit}")
 
         return injection_points

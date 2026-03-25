@@ -16,7 +16,10 @@ struct Args {
     max_time: Option<u128>,
 
     #[arg(short, long)]
-    injection_point: Option<String>
+    injection_point: Option<String>,
+
+    #[arg(long)]
+    test_mode: bool
 }
 
 fn main() {
@@ -25,7 +28,7 @@ fn main() {
     let mut interpreter = Interpreter::default();
     
     interpreter.set_debug(args.debug);
-    
+    interpreter.set_test_mode(args.test_mode);
     if let Some(time) = args.max_time {
         interpreter.set_max_time(time);
     }

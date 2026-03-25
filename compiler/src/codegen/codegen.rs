@@ -33,9 +33,6 @@ impl CodeGenerator {
         for func in ast {
             self.emit(func);
         }
-        if self.hard {
-            self.emit_countermeasure();
-        }
         self.emit_print_data();
     }
 

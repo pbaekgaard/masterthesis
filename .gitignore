@@ -17,3 +17,6 @@
 /testing/bin
 /testing/artifacts
 /testing/src/__pycache__
+/testing/[0-9]*-*/
+/testing/hardened.asm
+/testing/out.asm
