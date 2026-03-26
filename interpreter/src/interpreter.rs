@@ -757,7 +757,7 @@ impl Interpreter {
         }
 
         let parts: Vec<&str> = content
-            .split(|c: char| (c == ',' || c.is_whitespace()))
+            .split(|c: char| c == ',' || c.is_whitespace())
             .filter(|s| !s.is_empty())
             .collect();
 
