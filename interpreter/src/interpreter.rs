@@ -1018,6 +1018,7 @@ impl Interpreter {
                 self.set_pc(self.pc + 1);
                 continue; // Skip the match logic entirely
             }
+
             match instruction {
                 f if f.starts_with("mov") => self.exec_mov(instruction.clone()),
                 f if f.starts_with("svc") => {
