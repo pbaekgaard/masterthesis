@@ -8,6 +8,29 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Now we split the builds into separate jobs
+  build-compiler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # ... (insert your cache step here) ...
+      
+      - name: Build Compiler
+        working-directory: ./compiler
+        run: cargo build --release
+
+  build-interpreter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # ... (insert your cache step here) ...
+      
+      - name: Build Interpreter
+        working-directory: ./interpreter
+        run: cargo build --release
+
   # This job handles all testing
   test-compiler:
     runs-on: ubuntu-latest
@@ -31,25 +54,3 @@ jobs:
         working-directory: ./interpreter
         run: cargo test
 
-  # Now we split the builds into separate jobs
-  build-compiler:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      # ... (insert your cache step here) ...
-      
-      - name: Build Compiler
-        working-directory: ./compiler
-        run: cargo build --release
-
-  build-interpreter:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      # ... (insert your cache step here) ...
-      
-      - name: Build Interpreter
-        working-directory: ./interpreter
-        run: cargo build --release
