@@ -12,6 +12,7 @@ pub struct CodeGenerator {
     string_literals: Vec<(String, String)>,
     need_int_print: bool,
     step_counter: i32,
+    in_loop: bool,
 }
 
 impl CodeGenerator {
@@ -25,6 +26,7 @@ impl CodeGenerator {
             string_literals: Vec::new(),
             need_int_print: false,
             step_counter: 0,
+            in_loop: false,
         }
     }
     pub fn generate(&mut self, ast: AST, is_hard: bool) {
@@ -32,9 +34,6 @@ impl CodeGenerator {
         self.gen_init();
         for func in ast {
             self.emit(func);
-        }
-        if self.hard {
-            self.emit_countermeasure();
         }
         self.emit_print_data();
     }
@@ -123,11 +122,19 @@ impl CodeGenerator {
         if !self.hard {
             return;
         }
+        self.step_counter += 1;
 
-        self.write_line("add r9, r9, #1", 1);
-        self.write_line("cmp r9, r10", 1);
-        self.write_line("bne countermeasure", 1);
-        self.write_line("add r10, r10, #1", 1);
+        if self.in_loop {
+            self.write_line("add r9, r9, #1", 1);
+            self.write_line("cmp r9, r10", 1);
+            self.write_line("bne countermeasure", 1);
+            self.write_line("add r10, r10, #1", 1);
+
+        } else {
+            self.write_line("add r9, r9, #1", 1);
+            self.write_line(&format!("cmp r9, #{}", self.step_counter), 1);
+            self.write_line("bne countermeasure", 1);
+        }
     }
 
     fn emit_print_data(&mut self) {
@@ -172,23 +179,30 @@ impl CodeGenerator {
                 // THEN branch
                 self.emit_step_check();
                 self.emit_block(block, false);
-                let then_end = self.step_counter;
 
+                if self.hard {
+                    self.step_counter = saved;
+                    self.write_line(&format!("mov r9, #{}", self.step_counter), 1);
+                }
                 self.write_line(&format!("b endif_{}", label_id), 1);
 
                 // ELSE branch
                 self.write_line(&format!("else_{}:", label_id), 0);
 
-                self.step_counter = saved;
+                if self.hard {
+                    self.step_counter = saved;
+                }
 
                 if let Some(else_block) = option {
                     self.emit_step_check();
                     self.emit_block(else_block, false);
+                    if self.hard {
+                        self.step_counter = saved;
+                        self.write_line(&format!("mov r9, #{}", self.step_counter), 1);
+                    }
                 }
 
-                let else_end = self.step_counter;
                 self.write_line(&format!("endif_{}:", label_id), 0);
-                self.step_counter = then_end.max(else_end);
             }
             _ => panic!("emit_if called with non-if statement"),
         }
@@ -199,7 +213,13 @@ impl CodeGenerator {
             Stmt::While { expr, block } => {
                 let label_id = self.label_count;
                 self.label_count += 1;
+                let saved = self.step_counter;
+                self.in_loop = true;
 
+
+                if self.hard {
+                    self.write_line(&format!("mov r10, #{}", self.step_counter + 1), 1);
+                }
                 self.write_line(&format!("while_{}:", label_id), 0);
 
                 self.emit_step_check();
@@ -212,6 +232,11 @@ impl CodeGenerator {
 
                 self.write_line(&format!("b while_{}", label_id), 1);
                 self.write_line(&format!("end_while_{}:", label_id), 0);
+                if self.hard {
+                    self.step_counter = saved;
+                    self.write_line(&format!("mov r9, #{}", self.step_counter), 1);
+                }
+                self.in_loop = false;
             }
             _ => panic!("emit_while called with non-while statement"),
         }

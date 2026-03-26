@@ -1,0 +1,44 @@
+func main() -> Integer {
+  let ptc : Integer = 3;
+  let authenticated : Integer = 0;
+  let cardPin1 : Integer = 1;
+  let cardPin2 : Integer = 2;
+  let cardPin3 : Integer = 3;
+  let cardPin4 : Integer = 4;
+  let userPin1 : Integer = 0;
+  let userPin2 : Integer = 0;
+  let userPin3 : Integer = 0;
+  let userPin4 : Integer = 0;
+
+  authenticated = 0;
+
+  if ptc > 0 then {
+    let pinsEqual : Integer = 1;
+    if userPin1 != cardPin1 then {
+      pinsEqual = 0;
+    }
+
+    if userPin2 != cardPin2 then {
+      pinsEqual = 0;
+    }
+
+    if userPin3 != cardPin3 then {
+      pinsEqual = 0;
+    }
+
+    if userPin4 != cardPin4 then {
+      pinsEqual = 0;
+    } 
+
+    if pinsEqual == 1 then {
+      ptc = 3;
+      authenticated = 1;
+    } else {
+      ptc = ptc - 1;
+    }
+  }
+  print("g_authenticated: ", authenticated);
+  print("g_ptc: ", ptc);
+
+  return authenticated;
+}

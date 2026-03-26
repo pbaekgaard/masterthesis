@@ -1,3 +1,16 @@
-tests_folder = "tests"
+test_folder = "fissc"
 
+modeled_registers = [
+  "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
+  "r8", "r9", "r10", "r11", "r12"
+]
 
+[pass_mode]
+default = "stdout"
+
+[pass_mode.returncode]
+expected = 0
+
+[pass_mode.stdout]
+expected_pass = "g_authenticated: 0"
+expected_fail = "g_authenticated: 1"

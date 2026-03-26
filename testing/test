@@ -8,7 +8,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default=None, help='Path to config.toml')
     parser.add_argument('--skip-run', action='store_true', help='Only setup and compile, skip running tests')
+    parser.add_argument('--limit', type=int, default=None, help='Limit number of injection points to test')
+    parser.add_argument('--nohard', action='store_true', help='Skip hardened version when running tests')
+    parser.add_argument('--hard', action='store_true', help='Only run hardened version')
     args = parser.parse_args()
+    
+    if args.nohard and args.hard:
+        print("Error: Cannot use both --nohard and --hard")
+        return
+    
+    if args.hard:
+        run_variants = "hard"
+    elif args.nohard:
+        run_variants = "normal"
+    else:
+        run_variants = "both"
     
     runner = TestRunner(config_path=args.config)
     # check that the compiler and interpreter is present:
@@ -25,7 +39,7 @@ def main():
     
     if not args.skip_run:
         print(f"\nRunning tests...")
-        runner.run_tests()
+        runner.run_tests(limit=args.limit, run_variants=run_variants)
     else:
         print(f"\nSkipping test run (--skip-run)")
 

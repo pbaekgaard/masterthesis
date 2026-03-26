@@ -4,9 +4,12 @@ use std::io::BufRead;
 use std::process::exit;
 use std::usize;
 
+use json::{ JsonValue, object };
+
 use crate::memory::EmulatorMemory;
 
-const NUM_REGISTERS: usize = 32;
+const NUM_REGISTERS: usize = 13; //FIXME: Find out if num registers is 13 (r0-r12) plsssss
+//FIXME: Also find out what to do with sp, lr, apsr, cpsr
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct ItState {
@@ -89,6 +92,7 @@ pub enum InjectionTarget {
 pub struct InjectionSpec {
     pub target: InjectionTarget,
     pub trigger_pc: i32,
+    pub has_triggered: bool,
 }
 
 pub struct Interpreter {
@@ -101,9 +105,11 @@ pub struct Interpreter {
     cpsr: Cpsr,
     file: Vec<String>,
     debug: bool,
+    test_mode: bool,
     start_time: std::time::Instant,
     max_time: std::time::Duration,
     fault_spec: InjectionSpec,
+    test_report: json::JsonValue,
 }
 
 impl Interpreter {
@@ -118,12 +124,15 @@ impl Interpreter {
             cpsr: Cpsr::default(),
             file: Vec::new(),
             debug: false,
+            test_mode: false,
             start_time: std::time::Instant::now(),
             max_time: std::time::Duration::from_millis(1000),
             fault_spec: InjectionSpec {
                 target: InjectionTarget::None,
                 trigger_pc: -1,
+                has_triggered: false,
             },
+            test_report: object! { title: "test_report" },
         }
     }
 
@@ -171,6 +180,9 @@ impl Interpreter {
                 "Setup Injection Specification:\n   Type: PC\n  Trigger PC: {pc}\n  Bit: {bit}"
             );
         }
+    }
+    pub fn set_test_mode(&mut self, test_mode: bool) {
+        self.test_mode = test_mode;
     }
 
     pub fn set_debug(&mut self, debug: bool) {
@@ -249,6 +261,9 @@ impl Interpreter {
             if i % 4 == 3 {
                 println!(" ║");
             }
+        }
+        if 32 % 4 != 0 {
+            println!("║");
         }
 
         println!("╟──────────────────────────────────────────────────────────────────╢");
@@ -740,10 +755,9 @@ impl Interpreter {
         if self.debug {
             println!("Executing cmp instruction: {}", content);
         }
-        let pc = self.pc;
 
         let parts: Vec<&str> = content
-            .split(|c: char| (c == ',' || c.is_whitespace()))
+            .split(|c: char| c == ',' || c.is_whitespace())
             .filter(|s| !s.is_empty())
             .collect();
 
@@ -956,7 +970,9 @@ impl Interpreter {
     }
     fn trigger_register_fault(&mut self, register: usize, bit: u32) {
         let old_val = self.registers[register];
+        self.test_report["reg_old_value"] = old_val.into();
         self.registers[register] = self.flip_bit(old_val, bit);
+        self.test_report["reg_new_value"] = self.registers[register].clone().into();
         println!("REGISTER FAULT TRIGGERED!");
     }
 
@@ -968,14 +984,20 @@ impl Interpreter {
         }
         while self.pc < self.eof_pc {
             let instruction = start_block.get(self.pc as usize).unwrap();
-
-            if (self.pc as i32) == self.fault_spec.trigger_pc {
+            if (self.pc as i32) == self.fault_spec.trigger_pc && !self.fault_spec.has_triggered {
                 match self.fault_spec.target {
                     InjectionTarget::Register { register, bit } => {
                         self.trigger_register_fault(register, bit);
+                        self.fault_spec.has_triggered = true;
                     }
                     InjectionTarget::ProgramCounter { bit } => {
+                        self.test_report["pc_old_value"] = self.pc.clone().into();
                         self.pc = self.flip_bit_u32(self.pc, bit);
+                        self.test_report["pc_new_value"] = self.pc.clone().into();
+                        let actual_exec_instr = start_block.get(self.pc as usize).unwrap();
+                        self.test_report["expected_exec_instr"] = instruction.as_str().into();
+                        self.test_report["actual_exec_instr"] = actual_exec_instr.as_str().into();
+                        self.fault_spec.has_triggered = true;
                         continue;
                     }
                     _ => panic!("Injection type not implemented yet."),
@@ -996,10 +1018,14 @@ impl Interpreter {
                 self.set_pc(self.pc + 1);
                 continue; // Skip the match logic entirely
             }
+
             match instruction {
                 f if f.starts_with("mov") => self.exec_mov(instruction.clone()),
                 f if f.starts_with("svc") => {
                     if let Some(exit_code) = self.exec_svc(instruction.clone()) {
+                        if self.test_mode {
+                            println!("{}", self.test_report.dump());
+                        }
                         return (exit_code as u32) & 0xff;
                     }
                 }
@@ -1021,6 +1047,9 @@ impl Interpreter {
                 invalid => panic!("Invalid instruction: {invalid}"),
             }
             self.set_pc(self.pc + 1);
+        }
+        if self.test_mode {
+            println!("{}", self.test_report.dump());
         }
         0
     }
