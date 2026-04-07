@@ -346,6 +346,7 @@ impl CodeGenerator {
         }
     }
     fn emit_assign(&mut self, assign_stmt: Stmt) {
+        self.wh_emit_assign(assign_stmt.clone());
         match assign_stmt {
             Stmt::AssignStatement(name, expr) => {
                 self.emit_expr(expr);
@@ -360,6 +361,18 @@ impl CodeGenerator {
                 }
             }
             _ => panic!("Not a valid assignment"),
+        }
+    }
+    fn wh_emit_assign(&mut self, assign_stmt: Stmt) {
+        match assign_stmt {
+            Stmt::AssignStatement(identifyer, expr) => {
+                let expr_str = self.wh_build_expr_str(expr);
+                if expr_str == "".to_string() {
+                    return;
+                }
+                self.wh_write_line(&format!("{identifyer} = {expr_str}"), 1);
+            }
+            _ => panic!("Not an assign stmt (wh)"),
         }
     }
     fn emit_let(&mut self, let_stmt: Stmt) {
@@ -384,8 +397,8 @@ impl CodeGenerator {
                 match type_name {
                     Type::Integer => {
                         let expr_str = self.wh_build_expr_str(expr);
-                        if expr_str == "".to_string(){
-                            return
+                        if expr_str == "".to_string() {
+                            return;
                         }
                         self.wh_write_line(&format!("si32 {name};"), 1);
                         self.wh_write_line(&format!("{name} = {expr_str}"), 1);
@@ -397,48 +410,48 @@ impl CodeGenerator {
         }
     }
     fn wh_build_expr_str(&self, expr: Expr) -> String {
-            // IntegerLiteral(i64),
-            // BooleanLiteral(bool),
-            // StringLiteral(String),
-            // Identifier(String),
-            // BinaryOp(Box<Expr>, BinOp, Box<Expr>),
-            // UnaryOp(UnOp, Box<Expr>),
-            match expr {
-                Expr::IntegerLiteral(val) => {
-                    return format!("{val}")
-                }
-                Expr::BooleanLiteral(val) => {
-                    let ival = if val {1} else {0};
-                    return format!("{ival}")
-                }
-                Expr::StringLiteral(val) => {
-                    return "".to_string()
-                }
-                Expr::Identifier(val) => {
-                    return val
-                }
-                Expr::BinaryOp(left, op , right ) => {
-                    let left_str = self.wh_build_expr_str(*left);
-                    let right_str = self.wh_build_expr_str(*right);
-                    let op_str = match op { 
-                        BinOp::Add => "+",
-                        BinOp::Sub => "-",
-                        BinOp::Mul => "*",
-                        BinOp::Div => "/",
-                        BinOp::LessThan => "<",
-                        BinOp::GreaterThan => ">",
-                        BinOp::Equals => "==",
-                        BinOp::NotEquals => "!=",
-                    };
-                    return format!("{left_str} {op_str} {right_str}")
-                }
-                Expr::UnaryOp(_,_) => {
-                    return "".to_string()
-                }
-                _ => panic!("building expr string went wrong")
+        // IntegerLiteral(i64),
+        // BooleanLiteral(bool),
+        // StringLiteral(String),
+        // Identifier(String),
+        // BinaryOp(Box<Expr>, BinOp, Box<Expr>),
+        // UnaryOp(UnOp, Box<Expr>),
+        match expr {
+            Expr::IntegerLiteral(val) => {
+                return format!("{val}");
             }
+            Expr::BooleanLiteral(val) => {
+                let ival = if val { 1 } else { 0 };
+                return format!("{ival}");
+            }
+            Expr::StringLiteral(val) => {
+                return "".to_string();
+            }
+            Expr::Identifier(val) => {
+                return val;
+            }
+            Expr::BinaryOp(left, op, right) => {
+                let left_str = self.wh_build_expr_str(*left);
+                let right_str = self.wh_build_expr_str(*right);
+                let op_str = match op {
+                    BinOp::Add => "+",
+                    BinOp::Sub => "-",
+                    BinOp::Mul => "*",
+                    BinOp::Div => "/",
+                    BinOp::LessThan => "<",
+                    BinOp::GreaterThan => ">",
+                    BinOp::Equals => "==",
+                    BinOp::NotEquals => "!=",
+                };
+                return format!("{left_str} {op_str} {right_str}");
+            }
+            Expr::UnaryOp(_, _) => {
+                return "".to_string();
+            }
+            _ => panic!("building expr string went wrong"),
+        }
     }
-    
+
     fn emit_expr(&mut self, expr: Expr) {
         match expr {
             Expr::IntegerLiteral(val) => self.write_line(&format!("mov r0, #{}", val), 1),
