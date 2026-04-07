@@ -1,10 +1,11 @@
-use crate::parser::{ parser::{ BinOp, Block, Expr, Function, Stmt }, AST };
+use crate::parser::{ AST, parser::{ BinOp, Block, Expr, Function, Stmt, Type } };
 use core::panic;
-use std::{ collections::HashMap, fs::File, io::Write };
+use std::{ collections::HashMap, fmt::format, fs::File, io::Write };
 
 #[derive(Debug)]
 pub struct CodeGenerator {
     pub file: File,
+    pub wh_file: File,
     locals: HashMap<String, i32>,
     stack_offset: i32,
     label_count: usize,
@@ -16,9 +17,10 @@ pub struct CodeGenerator {
 }
 
 impl CodeGenerator {
-    pub fn new(file: File) -> Self {
+    pub fn new(file: File, wh_file: File) -> Self {
         Self {
             file,
+            wh_file,
             locals: HashMap::new(),
             stack_offset: 0,
             label_count: 0,
@@ -55,6 +57,13 @@ impl CodeGenerator {
         let _ = writeln!(self.file, "{}{}", indent_str, string);
     }
 
+    fn wh_write_line(&mut self, string: &str, indents: usize) {
+        let indent_str = "    ".repeat(indents);
+
+        // writeln! automatically appends \n
+        let _ = writeln!(self.wh_file, "{}{}", indent_str, string);
+    }
+
     fn emit(&mut self, func: Function) {
         match func.name.as_str() {
             "main" => self.emit_main(func),
@@ -67,7 +76,7 @@ impl CodeGenerator {
 
     fn emit_main(&mut self, func: Function) {
         self.write_line("_start:", 0);
-
+        self.wh_write_line("fn main() -> ui8 {", 0);
         if self.hard {
             self.write_line("mov r9, #0", 1); // step counter in register
             self.write_line("mov r10, #1", 1); // step counter in register
@@ -77,6 +86,7 @@ impl CodeGenerator {
             self.emit_countermeasure();
         }
         self.write_line("\n.size _start, .-_start", 0);
+        self.wh_write_line("}", 0);
     }
     fn emit_block(&mut self, block: Block, is_main: bool) {
         let initial_offset = self.stack_offset;
@@ -129,7 +139,6 @@ impl CodeGenerator {
             self.write_line("cmp r9, r10", 1);
             self.write_line("bne countermeasure", 1);
             self.write_line("add r10, r10, #1", 1);
-
         } else {
             self.write_line("add r9, r9, #1", 1);
             self.write_line(&format!("cmp r9, #{}", self.step_counter), 1);
@@ -215,7 +224,6 @@ impl CodeGenerator {
                 self.label_count += 1;
                 let saved = self.step_counter;
                 self.in_loop = true;
-
 
                 if self.hard {
                     self.write_line(&format!("mov r10, #{}", self.step_counter + 1), 1);
@@ -355,6 +363,7 @@ impl CodeGenerator {
         }
     }
     fn emit_let(&mut self, let_stmt: Stmt) {
+        self.wh_emit_let(let_stmt.clone());
         match let_stmt {
             Stmt::Let(name, type_name, expr) => {
                 self.stack_offset += 4;
@@ -369,6 +378,67 @@ impl CodeGenerator {
             _ => panic!("Not a let statement format sorry "),
         }
     }
+    fn wh_emit_let(&mut self, let_stmt: Stmt) {
+        match let_stmt {
+            Stmt::Let(name, type_name, expr) => {
+                match type_name {
+                    Type::Integer => {
+                        let expr_str = self.wh_build_expr_str(expr);
+                        if expr_str == "".to_string(){
+                            return
+                        }
+                        self.wh_write_line(&format!("si32 {name};"), 1);
+                        self.wh_write_line(&format!("{name} = {expr_str}"), 1);
+                    }
+                    Type::Boolean => {}
+                }
+            }
+            _ => panic!("Not a let statement format sorry (wh emit)"),
+        }
+    }
+    fn wh_build_expr_str(&self, expr: Expr) -> String {
+            // IntegerLiteral(i64),
+            // BooleanLiteral(bool),
+            // StringLiteral(String),
+            // Identifier(String),
+            // BinaryOp(Box<Expr>, BinOp, Box<Expr>),
+            // UnaryOp(UnOp, Box<Expr>),
+            match expr {
+                Expr::IntegerLiteral(val) => {
+                    return format!("{val}")
+                }
+                Expr::BooleanLiteral(val) => {
+                    let ival = if val {1} else {0};
+                    return format!("{ival}")
+                }
+                Expr::StringLiteral(val) => {
+                    return "".to_string()
+                }
+                Expr::Identifier(val) => {
+                    return val
+                }
+                Expr::BinaryOp(left, op , right ) => {
+                    let left_str = self.wh_build_expr_str(*left);
+                    let right_str = self.wh_build_expr_str(*right);
+                    let op_str = match op { 
+                        BinOp::Add => "+",
+                        BinOp::Sub => "-",
+                        BinOp::Mul => "*",
+                        BinOp::Div => "/",
+                        BinOp::LessThan => "<",
+                        BinOp::GreaterThan => ">",
+                        BinOp::Equals => "==",
+                        BinOp::NotEquals => "!=",
+                    };
+                    return format!("{left_str} {op_str} {right_str}")
+                }
+                Expr::UnaryOp(_,_) => {
+                    return "".to_string()
+                }
+                _ => panic!("building expr string went wrong")
+            }
+    }
+    
     fn emit_expr(&mut self, expr: Expr) {
         match expr {
             Expr::IntegerLiteral(val) => self.write_line(&format!("mov r0, #{}", val), 1),
@@ -466,9 +536,15 @@ mod tests {
             .truncate(true)
             .open("temp/tests/test_can_generate_init.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_init.asm");
-
+        let wh_output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_init.wh")
+            .expect("Failed to create file: /temp/tests/test_can_generate_init.wh");
         let ast = AST::new();
-        let mut codegen = CodeGenerator::new(output_file);
+        let mut codegen = CodeGenerator::new(output_file, wh_output_file);
         codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
@@ -506,7 +582,14 @@ mod tests {
             .truncate(true)
             .open("temp/tests/test_can_generate_return.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_return.asm");
-        let mut codegen = CodeGenerator::new(output_file);
+        let wh_output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_return.wh")
+            .expect("Failed to create file: /temp/tests/test_can_generate_return.wh");
+        let mut codegen = CodeGenerator::new(output_file, wh_output_file);
         codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
@@ -550,7 +633,14 @@ mod tests {
             .truncate(true)
             .open("temp/tests/test_can_generate_let.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_let.asm");
-        let mut codegen = CodeGenerator::new(output_file);
+        let wh_output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_let.wh")
+            .expect("Failed to create file: /temp/tests/test_can_generate_let.wh");
+        let mut codegen = CodeGenerator::new(output_file, wh_output_file);
         codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
@@ -596,7 +686,14 @@ mod tests {
             .truncate(true)
             .open("temp/tests/test_can_generate_if_else.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_if_else.asm");
-        let mut codegen = CodeGenerator::new(output_file);
+        let wh_output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_if_else.wh")
+            .expect("Failed to create file: /temp/tests/test_can_generate_if_else.wh");
+        let mut codegen = CodeGenerator::new(output_file, wh_output_file);
         codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
@@ -659,7 +756,14 @@ mod tests {
             .truncate(true)
             .open("temp/tests/test_can_generate_while.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_while.asm");
-        let mut codegen = CodeGenerator::new(output_file);
+        let wh_output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_while.wh")
+            .expect("Failed to create file: /temp/tests/test_can_generate_while.wh");
+        let mut codegen = CodeGenerator::new(output_file, wh_output_file);
         codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
@@ -723,7 +827,14 @@ mod tests {
             .truncate(true)
             .open("temp/tests/test_can_generate_two_whiles.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_two_whiles.asm");
-        let mut codegen = CodeGenerator::new(output_file);
+        let wh_output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_two_whiles.wh")
+            .expect("Failed to create file: /temp/tests/test_can_generate_two_whiles.wh");
+        let mut codegen = CodeGenerator::new(output_file, wh_output_file);
         codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
@@ -810,7 +921,14 @@ mod tests {
             .truncate(true)
             .open("temp/tests/test_can_generate_nested_while.asm")
             .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.asm");
-        let mut codegen = CodeGenerator::new(output_file);
+        let wh_output_file = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("temp/tests/test_can_generate_nested_while.wh")
+            .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.wh");
+        let mut codegen = CodeGenerator::new(output_file, wh_output_file);
         codegen.generate(ast, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
@@ -905,6 +1023,7 @@ mod tests {
 
             let file_stem = trv_path.file_stem().unwrap().to_str().unwrap();
             let output_asm_path = format!("temp/tests/{}.asm", file_stem);
+            let output_wh_path = format!("temp/tests/{}.wh", file_stem);
             let output_file = File::options()
                 .read(true)
                 .write(true)
@@ -913,7 +1032,14 @@ mod tests {
                 .open(&output_asm_path)
                 .expect(&format!("Failed to create file: {}", output_asm_path));
 
-            let mut codegen = CodeGenerator::new(output_file);
+            let wh_output_file = File::options()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&output_wh_path)
+                .expect(&format!("Failed to create file: {}", output_wh_path));
+            let mut codegen = CodeGenerator::new(output_file, wh_output_file);
             codegen.generate(ast, false);
 
             let output_path = trv_path.with_extension("trv.output");

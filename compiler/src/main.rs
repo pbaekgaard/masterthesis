@@ -26,12 +26,13 @@ struct Args {
     output: String,
     
     #[arg(long)]
-    hard: bool
+    hard: bool,
+
+    #[arg(long, default_value = "wh_out.wh")]
+    wh_output: String
 }
 
 fn main() {
-    // This entirely replaces the manual env::args() collection, 
-    // the length check, and the manual error/exit logic.
     let args = Args::parse();
 
     let source = fs::read_to_string(&args.filename)
@@ -45,11 +46,19 @@ fn main() {
         .open(&args.output)
         .expect(&format!("wrongdog output path {}", args.output));
     
+    let wh_output = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&args.wh_output)
+        .expect(&format!("wrong whiley output path: {}", args.wh_output));
+
     let mut lexer: Lexer = Lexer::new(source);
     let _tokens: Vec<Token> = lexer.tokenize();
     let mut parser: Parser = Parser::new(_tokens);
     let _ast: AST = parser.parse_program();
-    let mut codegen: CodeGenerator = CodeGenerator::new(output);
+    let mut codegen: CodeGenerator = CodeGenerator::new(output,wh_output);
     codegen.generate(_ast, args.hard);
     
 
