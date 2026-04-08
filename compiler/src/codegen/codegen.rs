@@ -15,6 +15,7 @@ pub struct CodeGenerator {
     step_counter: i32,
     in_loop: bool,
     next_assignment_location: usize,
+    wh_indent: usize,
 }
 
 impl CodeGenerator {
@@ -31,6 +32,7 @@ impl CodeGenerator {
             step_counter: 0,
             in_loop: false,
             next_assignment_location: 1,
+            wh_indent: 0,
         }
     }
     pub fn generate(&mut self, ast: AST, is_hard: bool) {
@@ -79,7 +81,7 @@ impl CodeGenerator {
 
     fn emit_main(&mut self, func: Function) {
         self.write_line("_start:", 0);
-        self.wh_write_line("fn main() -> ui8 {", 0);
+        self.wh_write_line("fn main() -> si32 {", 0);
         if self.hard {
             self.write_line("mov r9, #0", 1); // step counter in register
             self.write_line("mov r10, #1", 1); // step counter in register
@@ -175,13 +177,28 @@ impl CodeGenerator {
             self.write_line(".ascii \"Control flow violation detected\\n\"", 1);
         }
     }
+
+    fn wh_emit_if_start(&mut self, condition : Expr) {
+        let expr = self.wh_build_expr_str(condition);
+        self.wh_write_line(&format!("if ( {expr}) {{"), 1);
+    }
+
+    fn wh_emit_if_block(&mut self, block: Block) {
+
+    }
+    fn wh_emit_else(&mut self, block: Block) {
+
+    }
+
     fn emit_if(&mut self, if_stmt: Stmt) {
         match if_stmt {
             Stmt::If { condition, block, option } => {
                 let label_id = self.label_count;
                 self.label_count += 1;
 
-                self.emit_expr(condition);
+                self.emit_expr(condition.clone());
+                self.wh_emit_if_start(condition);
+                self.wh_emit_if_block(block.clone());
                 self.write_line("cmp r0, #0", 1);
                 self.write_line(&format!("beq else_{}", label_id), 1);
 
@@ -207,6 +224,7 @@ impl CodeGenerator {
 
                 if let Some(else_block) = option {
                     self.emit_step_check();
+                    self.wh_emit_else(else_block.clone());
                     self.emit_block(else_block, false);
                     if self.hard {
                         self.step_counter = saved;
@@ -338,9 +356,15 @@ impl CodeGenerator {
         }
     }
 
+    fn wh_emit_return(&mut self, return_str: &str) {
+        self.wh_write_line(("return (".to_string() +return_str + " as si32);").as_str(), 1);
+    }
+
     fn emit_return(&mut self, return_stmt: Stmt, is_main: bool) {
         match return_stmt {
             Stmt::Return(expr) => {
+                let return_string = self.wh_build_expr_str(expr.clone());
+                self.wh_emit_return(&return_string);
                 self.emit_expr(expr);
                 self.write_line("mov r7, #1", 1);
                 self.write_line("svc #0", 1);
@@ -373,7 +397,7 @@ impl CodeGenerator {
                 if expr_str == "".to_string() {
                     return;
                 }
-                self.wh_write_line(&format!("{identifyer} = {expr_str}"), 1);
+                self.wh_write_line(&format!("{identifyer} = {expr_str};"), 1);
             }
             _ => panic!("Not an assign stmt (wh)"),
         }
@@ -435,7 +459,7 @@ impl CodeGenerator {
                 self.insert_at_line(self.next_assignment_location, combined.as_str());
                 self.next_assignment_location += 1;
                 let val = self.wh_build_expr_str(expr);
-                let assign_line = name + " = " + val.as_str();
+                let assign_line = name + " = (" + val.as_str() + " as si32);";
 
                 self.wh_write_line(assign_line.as_str(), 1);
 
@@ -452,7 +476,7 @@ impl CodeGenerator {
         // UnaryOp(UnOp, Box<Expr>),
         match expr {
             Expr::IntegerLiteral(val) => {
-                return format!("{val}");
+                return format!("({val} as si32)");
             }
             Expr::BooleanLiteral(val) => {
                 let ival = if val { 1 } else { 0 };

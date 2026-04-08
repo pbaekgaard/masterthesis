@@ -36,8 +36,6 @@ _start:
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
-    mov r0, #0
-    str r0, [sp, #32]
     ldr r0, [sp, #36]
     mov r1, r0
     mov r0, #0

@@ -1,4 +1,4 @@
-fn main() -> ui8 {
+fn main() -> si32 {
     si32 ptc;
     si32 authenticated;
     si32 cardPin1;
@@ -11,30 +11,36 @@ fn main() -> ui8 {
     si32 userPin4;
     si32 pinsEqual;
     si32 x;
-    ptc = 3
-    authenticated = 0
-    cardPin1 = 1
-    cardPin2 = 2
-    cardPin3 = 3
-    cardPin4 = 4
-    userPin1 = 0
-    userPin2 = 0
-    userPin3 = 0
-    userPin4 = 0
-    authenticated = 0
-    pinsEqual = 1
-    pinsEqual = 0
-    pinsEqual = 1
-    pinsEqual = 0
-    pinsEqual = 1
-    pinsEqual = 0
-    pinsEqual = 1
-    pinsEqual = 0
-    pinsEqual = 1
-    ptc = 3
-    authenticated = 1
-    ptc = ptc - 1
-    x = 1
+    ptc = ((3 as si32) as si32);
+    authenticated = ((0 as si32) as si32);
+    cardPin1 = ((1 as si32) as si32);
+    cardPin2 = ((2 as si32) as si32);
+    cardPin3 = ((3 as si32) as si32);
+    cardPin4 = ((4 as si32) as si32);
+    userPin1 = ((0 as si32) as si32);
+    userPin2 = ((0 as si32) as si32);
+    userPin3 = ((0 as si32) as si32);
+    userPin4 = ((0 as si32) as si32);
+    if ( ptc > (0 as si32)) {
+    pinsEqual = ((1 as si32) as si32);
+    if ( userPin1 != cardPin1) {
+    pinsEqual = (0 as si32);
+    pinsEqual = (1 as si32);
+    if ( userPin2 != cardPin2) {
+    pinsEqual = (0 as si32);
+    pinsEqual = (1 as si32);
+    if ( userPin3 != cardPin3) {
+    pinsEqual = (0 as si32);
+    pinsEqual = (1 as si32);
+    if ( userPin4 != cardPin4) {
+    pinsEqual = (0 as si32);
+    pinsEqual = (1 as si32);
+    if ( pinsEqual == (1 as si32)) {
+    ptc = (3 as si32);
+    authenticated = (1 as si32);
+    ptc = ptc - (1 as si32);
+    x = ((1 as si32) as si32);
+    return (authenticated as si32);
 }
 
 main();
