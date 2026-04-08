@@ -1,0 +1,40 @@
+fn main() -> ui8 {
+    si32 ptc;
+    si32 authenticated;
+    si32 cardPin1;
+    si32 cardPin2;
+    si32 cardPin3;
+    si32 cardPin4;
+    si32 userPin1;
+    si32 userPin2;
+    si32 userPin3;
+    si32 userPin4;
+    si32 pinsEqual;
+    si32 x;
+    ptc = 3
+    authenticated = 0
+    cardPin1 = 1
+    cardPin2 = 2
+    cardPin3 = 3
+    cardPin4 = 4
+    userPin1 = 0
+    userPin2 = 0
+    userPin3 = 0
+    userPin4 = 0
+    authenticated = 0
+    pinsEqual = 1
+    pinsEqual = 0
+    pinsEqual = 1
+    pinsEqual = 0
+    pinsEqual = 1
+    pinsEqual = 0
+    pinsEqual = 1
+    pinsEqual = 0
+    pinsEqual = 1
+    ptc = 3
+    authenticated = 1
+    ptc = ptc - 1
+    x = 1
+}
+
+main();

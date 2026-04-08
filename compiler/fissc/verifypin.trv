@@ -10,8 +10,6 @@ func main() -> Integer {
   let userPin3 : Integer = 0;
   let userPin4 : Integer = 0;
 
-  authenticated = 0;
-
   if ptc > 0 then {
     let pinsEqual : Integer = 1;
     if userPin1 != cardPin1 then {

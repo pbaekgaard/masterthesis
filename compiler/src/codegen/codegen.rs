@@ -14,6 +14,7 @@ pub struct CodeGenerator {
     need_int_print: bool,
     step_counter: i32,
     in_loop: bool,
+    next_assignment_location: usize,
 }
 
 impl CodeGenerator {
@@ -29,6 +30,7 @@ impl CodeGenerator {
             need_int_print: false,
             step_counter: 0,
             in_loop: false,
+            next_assignment_location: 1,
         }
     }
     pub fn generate(&mut self, ast: AST, is_hard: bool) {
@@ -38,6 +40,7 @@ impl CodeGenerator {
             self.emit(func);
         }
         self.emit_print_data();
+        self.wh_write_line("\nmain();", 0);
     }
 
     fn gen_init(&mut self) {
@@ -375,6 +378,39 @@ impl CodeGenerator {
             _ => panic!("Not an assign stmt (wh)"),
         }
     }
+    fn insert_at_line(&mut self, line_num: usize, new_content: &str) -> std::io::Result<()> {
+        use std::io::{Read, Write, Seek, SeekFrom};
+
+        // 1. Read existing content
+        let mut content = String::new();
+        self.wh_file.seek(SeekFrom::Start(0))?;
+        self.wh_file.read_to_string(&mut content)?;
+
+        // 2. Split into lines
+        // Note: lines() omits the trailing newline; we'll add it back during join
+        let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+        // 3. Insert the line
+        // If line_num is 2 (1-based), user likely means index 1
+        // Adjust logic here if you want 0-based or 1-based indexing
+        if line_num <= lines.len() {
+            lines.insert(line_num, new_content.to_string());
+        } else {
+            // If line_num is beyond the end, just push it
+            lines.push(new_content.to_string());
+        }
+
+        // 4. Overwrite the file
+        self.wh_file.set_len(0)?; 
+        self.wh_file.seek(SeekFrom::Start(0))?;
+        self.wh_file.write_all(lines.join("\n").as_bytes())?;
+        
+        // Add a final newline if you want the file to end with one
+        self.wh_file.write_all(b"\n")?;
+
+        Ok(())
+    }
+
     fn emit_let(&mut self, let_stmt: Stmt) {
         self.wh_emit_let(let_stmt.clone());
         match let_stmt {
@@ -394,17 +430,15 @@ impl CodeGenerator {
     fn wh_emit_let(&mut self, let_stmt: Stmt) {
         match let_stmt {
             Stmt::Let(name, type_name, expr) => {
-                match type_name {
-                    Type::Integer => {
-                        let expr_str = self.wh_build_expr_str(expr);
-                        if expr_str == "".to_string() {
-                            return;
-                        }
-                        self.wh_write_line(&format!("si32 {name};"), 1);
-                        self.wh_write_line(&format!("{name} = {expr_str}"), 1);
-                    }
-                    Type::Boolean => {}
-                }
+                let indent_str = "    ".to_string();
+                let combined = indent_str + "si32 " + name.as_str() + ";"; 
+                self.insert_at_line(self.next_assignment_location, combined.as_str());
+                self.next_assignment_location += 1;
+                let val = self.wh_build_expr_str(expr);
+                let assign_line = name + " = " + val.as_str();
+
+                self.wh_write_line(assign_line.as_str(), 1);
+
             }
             _ => panic!("Not a let statement format sorry (wh emit)"),
         }
