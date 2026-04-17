@@ -1,3 +1,7 @@
+si32 res;
+si32 res2;
+si32 test;
+
 fn main() -> si32 {
     si32 ptc;
     si32 authenticated;
@@ -47,4 +51,9 @@ fn main() -> si32 {
     return (authenticated as si32);
 }
 
-main();
+test = (0 as si32);
+
+res = main();
+res2 = main();
+assume (res == (32 as si32));
+assert (res == (139 as si32));
