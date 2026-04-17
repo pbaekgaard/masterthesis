@@ -243,42 +243,6 @@ class TestRunner:
     def list_tests(self):
         return self.tests
 
-    def _get_next_run_number(self):
-        if not os.path.exists(self.artifacts_folder):
-            return 1
-
-        max_num = 0
-        for item in os.listdir(self.artifacts_folder):
-            base_name = item[:-4] if item.endswith(".zip") else item
-            if os.path.isdir(
-                os.path.join(self.artifacts_folder, item)
-            ) or item.endswith(".zip"):
-                parts = base_name.split("-", 1)
-                if len(parts) == 2 and parts[0].isdigit():
-                    max_num = max(max_num, int(parts[0]))
-        return max_num + 1
-
-    def setup(self):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_num = self._get_next_run_number()
-        self.run_folder_name = f"{run_num}-{timestamp}"
-        self.run_folder = os.path.join(self.artifacts_folder, self.run_folder_name)
-        self.run_tests_folder = os.path.join(self.run_folder, "tests")
-        self.compiled_folder = os.path.join(self.run_folder, "compiled_test_files")
-        self.db_path = os.path.join(self.run_folder, "results.db")
-
-        os.makedirs(self.run_folder, exist_ok=True)
-        os.makedirs(self.run_tests_folder, exist_ok=True)
-        os.makedirs(self.compiled_folder, exist_ok=True)
-
-        for f in os.listdir(self.tests_folder):
-            if f.endswith(".trv") or f.endswith(".trv.output"):
-                shutil.copy(os.path.join(self.tests_folder, f), self.run_tests_folder)
-
-        self.db = ResultsDatabase(self.db_path)
-        self.run_id = self.db.create_run(run_num, self.tests_folder)
-
-        return self.run_folder
 
     def _get_program_max_pc(self, asm_path):
         with open(asm_path, "r") as f:
@@ -389,8 +353,6 @@ class TestRunner:
         return results
 
     def run_tests(self, limit=None, run_variants="both"):
-        if not hasattr(self, "run_folder"):
-            self.setup()
 
         if self.compile_results is None:
             self.compile()
@@ -438,17 +400,7 @@ class TestRunner:
                 )
 
                 all_fault_results.extend(fault_results)
-
-        self.db.insert_results_batch(self.run_id, all_fault_results)
-        self.db.close()
-
-        zip_base = os.path.join(self.artifacts_folder, self.run_folder_name)
-        shutil.make_archive(
-            zip_base, "zip", self.artifacts_folder, self.run_folder_name
-        )
-        shutil.rmtree(self.run_folder)
-
-        print(f"\nArtifacts saved to: {zip_base}.zip")
+        return all_fault_results
 
 
 if __name__ == "__main__":
