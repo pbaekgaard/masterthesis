@@ -18,12 +18,13 @@ class SymexRunner:
         self.minimc_path = os.path.join(bin_dir, "minimc")
     def run(self):
         wh_files = sorted(
-            [f for f in os.listdir(self.tests_folder) if f.endswith(".wh")]
+            [f for f in os.listdir(self.artifacts_folder) if f.endswith(".wh")]
         )
 
         all_results = []
 
         for wh_file in wh_files:
+            print(f"Running MiniMC on {wh_file}")
             cmd = [self.minimc_path, wh_file, "mcall"]
 
             result = subprocess.run(
@@ -36,12 +37,16 @@ class SymexRunner:
 
             violations = extract_violations(result.stdout)
             parsed = [parse_violation(v) for v in violations]
+            variant = "Normal"
+            if wh_file.__contains__(".hard.wh"):
+                variant = "Hard"
+
 
             for v in parsed:
                 all_results.append(
                     {
-                        "test": wh_file.replace(".wh", ""),
-                        "variant": "symex",
+                        "test": wh_file.replace(".hard.wh", "").replace(".wh", ""),
+                        "variant": variant,
                         "stmt": v.get("stmt"),
                         "faulty_bit": v.get("bit_shift") + 1,
                         "result": v.get("res"),

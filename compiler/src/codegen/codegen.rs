@@ -464,7 +464,7 @@ impl CodeGenerator {
     fn wh_emit_let(&mut self, let_stmt: Stmt) {
         match let_stmt {
             Stmt::Let(name, _type_name, expr) => {
-                let indent_str = "    ".repeat(self.wh_indent);
+                let indent_str = "    ".repeat(1);
                 let combined = indent_str + "si32 " + name.as_str() + ";"; 
                 self.insert_at_line(self.next_assignment_location, combined.as_str());
                 self.next_assignment_location += 1;

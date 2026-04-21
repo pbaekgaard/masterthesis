@@ -5,7 +5,7 @@ from datetime import datetime
 from src.database import ResultsDatabase
 from src.testrunner import TestRunner
 from src.symexrunner import SymexRunner
-
+from rich.console import Console
 
 class Experiment:
     def __init__(self, args, run_variants, config_path=None):
@@ -70,8 +70,17 @@ class Experiment:
 
         self.db.insert_interpreter_results_batch(self.run_id, all_fault_results)
 
+        wh_files = sorted(
+            [f for f in os.listdir(self.runner.compiled_folder) if f.endswith(".wh")]
+        )
+
+        print("Whiley Files are ready for adding fault injections...")
+        console = Console()
+        console.print(f"Go ahead and add Fault Injections to [bold][blue]{wh_files[1]}[/blue][/bold] and [bold][blue]{wh_files[0]}[/blue][/bold]")
+        input("Press any key to continue the evaluation!")
         print("\nRunning symex...")
         symex_runner = SymexRunner(config_path=self.args.config)
+        symex_runner.artifacts_folder = self.runner.compiled_folder
         symex_results = symex_runner.run()
 
         self.db.insert_symex_results_batch(self.run_id, symex_results)

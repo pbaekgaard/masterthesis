@@ -210,9 +210,9 @@ class TestRunner:
         test_name = test["name"]
 
         if hard:
-            asm_path = os.path.join(compiled_folder, f"{test_name}.hard.asm")
+            asm_path = os.path.join(compiled_folder, f"{test_name}.hard")
         else:
-            asm_path = os.path.join(compiled_folder, f"{test_name}.asm")
+            asm_path = os.path.join(compiled_folder, f"{test_name}")
 
         compiler_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
 
@@ -221,6 +221,7 @@ class TestRunner:
             cmd.append("--hard")
 
         result = subprocess.run(cmd, cwd=compiler_dir, capture_output=True, text=True)
+        asm_path = asm_path + ".asm"
         return result.returncode == 0, asm_path, result.stdout, result.stderr
 
     def interpret_test(self, asm_path, injection_point=None, debug=False):
