@@ -6,42 +6,80 @@
 .type _start, %function
 
 _start:
+    mov r9, #0
+    mov r10, #1
     sub sp, sp, #4
     mov r0, #3
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #1
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #2
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #1
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #3
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #2
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #4
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #3
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #5
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #4
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #6
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #7
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #8
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #9
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #10
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #11
+    bne countermeasure
     sub sp, sp, #4
     mov r0, #1
     str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #12
+    bne countermeasure
     ldr r0, [sp, #44]
     mov r1, r0
     mov r0, #0
@@ -51,6 +89,9 @@ _start:
     movgt r0, #1
     cmp r0, #0
     beq else_0
+    add r9, r9, #1
+    cmp r9, #13
+    bne countermeasure
     ldr r0, [sp, #20]
     mov r1, r0
     ldr r0, [sp, #36]
@@ -60,11 +101,18 @@ _start:
     moveq r0, #1
     cmp r0, #0
     beq else_1
+    add r9, r9, #1
+    cmp r9, #14
+    bne countermeasure
     ldr r0, [sp, #4]
     mov r1, r0
     mov r0, #1
     add r0, r1, r0
     str r0, [sp, #4]
+    add r9, r9, #1
+    cmp r9, #15
+    bne countermeasure
+    mov r9, #13
     b endif_1
 else_1:
 endif_1:
@@ -77,11 +125,18 @@ endif_1:
     movne r0, #1
     cmp r0, #0
     beq else_2
+    add r9, r9, #1
+    cmp r9, #14
+    bne countermeasure
     ldr r0, [sp, #4]
     mov r1, r0
     mov r0, #1
     add r0, r1, r0
     str r0, [sp, #4]
+    add r9, r9, #1
+    cmp r9, #15
+    bne countermeasure
+    mov r9, #13
     b endif_2
 else_2:
 endif_2:
@@ -94,11 +149,18 @@ endif_2:
     movne r0, #1
     cmp r0, #0
     beq else_3
+    add r9, r9, #1
+    cmp r9, #14
+    bne countermeasure
     ldr r0, [sp, #4]
     mov r1, r0
     mov r0, #1
     add r0, r1, r0
     str r0, [sp, #4]
+    add r9, r9, #1
+    cmp r9, #15
+    bne countermeasure
+    mov r9, #13
     b endif_3
 else_3:
 endif_3:
@@ -111,11 +173,18 @@ endif_3:
     movne r0, #1
     cmp r0, #0
     beq else_4
+    add r9, r9, #1
+    cmp r9, #14
+    bne countermeasure
     ldr r0, [sp, #4]
     mov r1, r0
     mov r0, #1
     add r0, r1, r0
     str r0, [sp, #4]
+    add r9, r9, #1
+    cmp r9, #15
+    bne countermeasure
+    mov r9, #13
     b endif_4
 else_4:
 endif_4:
@@ -128,18 +197,36 @@ endif_4:
     moveq r0, #1
     cmp r0, #0
     beq else_5
+    add r9, r9, #1
+    cmp r9, #14
+    bne countermeasure
     mov r0, #3
     str r0, [sp, #44]
+    add r9, r9, #1
+    cmp r9, #15
+    bne countermeasure
     mov r0, #1
     str r0, [sp, #40]
+    add r9, r9, #1
+    cmp r9, #16
+    bne countermeasure
+    mov r9, #13
     b endif_5
 else_5:
+    add r9, r9, #1
+    cmp r9, #14
+    bne countermeasure
     ldr r0, [sp, #44]
     mov r1, r0
     mov r0, #1
     sub r0, r1, r0
     str r0, [sp, #44]
+    add r9, r9, #1
+    cmp r9, #15
+    bne countermeasure
+    mov r9, #13
 endif_5:
+    mov r9, #12
     b endif_0
 else_0:
 endif_0:
@@ -228,6 +315,10 @@ print_int_done_7:
     ldr r0, [sp, #40]
     mov r7, #1
     svc #0
+countermeasure:
+    mov r0, #77
+    mov r7, #1
+    svc #0
 
 .size _start, .-_start
 
@@ -240,3 +331,7 @@ newline:
     .ascii "\n"
 num_buf:
     .space 16
+step_counter:
+    .word 0
+fault_msg:
+    .ascii "Control flow violation detected\n"

@@ -1,6 +1,6 @@
-use crate::parser::{ AST, parser::{ BinOp, Block, Expr, Function, Stmt, Type } };
+use crate::parser::{ AST, parser::{ BinOp, Block, Expr, Function, Stmt } };
 use core::panic;
-use std::{ collections::HashMap, fmt::format, fs::File, io::Write };
+use std::{ collections::HashMap, fs::File, io::Write };
 
 #[derive(Debug)]
 pub struct CodeGenerator {
@@ -77,7 +77,7 @@ impl CodeGenerator {
         self.file.sync_all().unwrap();
     }
 
-    fn emit_func(&mut self, func: Function) {}
+    fn emit_func(&mut self, _func: Function) {}
 
     fn emit_main(&mut self, func: Function) {
         self.write_line("_start:", 0);
@@ -85,6 +85,8 @@ impl CodeGenerator {
         if self.hard {
             self.write_line("mov r9, #0", 1); // step counter in register
             self.write_line("mov r10, #1", 1); // step counter in register
+            self.wh_write_line("ui32 step_counter;", 1);
+            self.wh_write_line("step_counter = (0 as ui32);", 1);
         }
         self.emit_block(func.body, true);
         if self.hard {
@@ -111,9 +113,9 @@ impl CodeGenerator {
                 Stmt::Print(exprs) => self.emit_print(exprs),
                 _ => panic!("Error found in expression in return"),
             }
-            if self.hard {
-                self.emit_step_check();
-            }
+            // if self.hard {
+            //     self.emit_step_check();
+            // }
         }
 
         let offset_diff = self.stack_offset - initial_offset;
@@ -139,6 +141,7 @@ impl CodeGenerator {
         }
         self.step_counter += 1;
 
+
         if self.in_loop {
             self.write_line("add r9, r9, #1", 1);
             self.write_line("cmp r9, r10", 1);
@@ -148,6 +151,13 @@ impl CodeGenerator {
             self.write_line("add r9, r9, #1", 1);
             self.write_line(&format!("cmp r9, #{}", self.step_counter), 1);
             self.write_line("bne countermeasure", 1);
+
+            self.wh_write_line("step_counter++;", self.wh_indent);
+            self.wh_write_line(&format!("if (step_counter != ({} as ui32)) {{", self.step_counter), self.wh_indent);
+            self.wh_indent += 1;
+            self.wh_write_line("return (77 as si32);", self.wh_indent);
+            self.wh_indent -= 1;
+            self.wh_write_line("}", self.wh_indent);
         }
     }
 
@@ -205,6 +215,7 @@ impl CodeGenerator {
                 if self.hard {
                     self.step_counter = saved;
                     self.write_line(&format!("mov r9, #{}", self.step_counter), 1);
+                    self.wh_write_line(&format!("step_counter = ({} as ui32);", self.step_counter), self.wh_indent);
                 }
                 self.write_line(&format!("b endif_{}", label_id), 1);
 
@@ -222,12 +233,13 @@ impl CodeGenerator {
                     self.wh_write_line("else {", self.wh_indent);
                     self.wh_indent += 1;
                     self.emit_block(else_block, false);
-                    self.wh_indent -= 1;
-                    self.wh_write_line("}", self.wh_indent);
                     if self.hard {
                         self.step_counter = saved;
                         self.write_line(&format!("mov r9, #{}", self.step_counter), 1);
+                        self.wh_write_line(&format!("step_counter = ({} as ui32);", self.step_counter), self.wh_indent);
                     }
+                    self.wh_indent -= 1;
+                    self.wh_write_line("}", self.wh_indent);
                 }
 
                 self.write_line(&format!("endif_{}:", label_id), 0);
@@ -358,7 +370,7 @@ impl CodeGenerator {
         self.wh_write_line(("return (".to_string() +return_str + " as si32);").as_str(), self.wh_indent);
     }
 
-    fn emit_return(&mut self, return_stmt: Stmt, is_main: bool) {
+    fn emit_return(&mut self, return_stmt: Stmt, _is_main: bool) {
         match return_stmt {
             Stmt::Return(expr) => {
                 let return_string = self.wh_build_expr_str(expr.clone());
@@ -371,16 +383,16 @@ impl CodeGenerator {
         }
     }
     fn emit_assign(&mut self, assign_stmt: Stmt) {
-        self.wh_emit_assign(assign_stmt.clone());
-        match assign_stmt {
+        match assign_stmt.clone() {
             Stmt::AssignStatement(name, expr) => {
                 self.emit_expr(expr);
                 let offset = self.locals.get(&name).expect("Undefined variable");
                 if self.stack_offset - offset == 0 {
-                    self.write_line(&format!("str r0, [sp]"), 1);
+                    self.write_line("str r0, [sp]", 1);
                 } else {
                     self.write_line(&format!("str r0, [sp, #{}]", self.stack_offset - offset), 1);
                 }
+                self.wh_emit_assign(assign_stmt);
                 if self.hard {
                     self.emit_step_check();
                 }
@@ -436,7 +448,7 @@ impl CodeGenerator {
     fn emit_let(&mut self, let_stmt: Stmt) {
         self.wh_emit_let(let_stmt.clone());
         match let_stmt {
-            Stmt::Let(name, type_name, expr) => {
+            Stmt::Let(name, _type_name, expr) => {
                 self.stack_offset += 4;
                 self.write_line("sub sp, sp, #4", 1);
                 self.emit_expr(expr);
@@ -451,7 +463,7 @@ impl CodeGenerator {
     }
     fn wh_emit_let(&mut self, let_stmt: Stmt) {
         match let_stmt {
-            Stmt::Let(name, type_name, expr) => {
+            Stmt::Let(name, _type_name, expr) => {
                 let indent_str = "    ".repeat(self.wh_indent);
                 let combined = indent_str + "si32 " + name.as_str() + ";"; 
                 self.insert_at_line(self.next_assignment_location, combined.as_str());
@@ -480,7 +492,7 @@ impl CodeGenerator {
                 let ival = if val { 1 } else { 0 };
                 return format!("{ival}");
             }
-            Expr::StringLiteral(val) => {
+            Expr::StringLiteral(_val) => {
                 return "".to_string();
             }
             Expr::Identifier(val) => {
