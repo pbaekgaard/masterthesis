@@ -197,6 +197,9 @@ class TestRunner:
         if not (bin_dir / "interpreter").is_file():
             missing.append("interpreter")
 
+        if not (bin_dir / "minimc").is_file():
+            missing.append("minimc")
+
         if missing:
             raise FileNotFoundError(
                 f"Missing: {', '.join(missing)}. Fix by running: {setup_path}"

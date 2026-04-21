@@ -14,12 +14,8 @@ class SymexRunner:
             self.base_dir, config.get("test_folder", "fissc")
         )
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
-        self.minimc_path = os.path.abspath(
-            os.path.join(
-                self.base_dir, config.get("minimc_path", "../minimc/build/bin/minimc")
-            )
-        )
-
+        bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
+        self.minimc_path = os.path.join(bin_dir, "minimc")
     def run(self):
         wh_files = sorted(
             [f for f in os.listdir(self.tests_folder) if f.endswith(".wh")]
