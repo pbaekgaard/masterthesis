@@ -1,6 +1,6 @@
 #!/bin/python3
 
-import argparse, os, toml, shutil
+import argparse, os, toml, shutil, subprocess, sys
 from datetime import datetime
 from src.database import ResultsDatabase
 from src.testrunner import TestRunner
@@ -126,9 +126,37 @@ class Experiment:
         return max_num + 1
 
 
+def run_setup(force=False):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    setup_module = os.path.join(script_dir, "src", "setup.py")
+
+    cmd = [sys.executable, setup_module]
+    if force:
+        cmd.append("-f")
+
+    result = subprocess.run(cmd)
+    return result.returncode
+
+
+def get_missing_binaries():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    bin_dir = os.path.join(script_dir, "bin")
+    required_bins = ["minimc", "compiler", "interpreter"]
+    missing = []
+    for bin_name in required_bins:
+        if not os.path.isfile(os.path.join(bin_dir, bin_name)):
+            missing.append(bin_name)
+    return missing
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default=None, help="Path to config.toml")
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="Only run setup (build dependencies), skip main test functionality",
+    )
     parser.add_argument(
         "--skip-run",
         action="store_true",
@@ -146,7 +174,22 @@ if __name__ == "__main__":
         help="Skip hardened version when running tests",
     )
     parser.add_argument("--hard", action="store_true", help="Only run hardened version")
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+
+    force = "-f" in unknown or "--reinit" in unknown
+
+    if args.setup:
+        exit(run_setup(force=force))
+
+    missing_bins = get_missing_binaries()
+    if missing_bins:
+        print(f"\033[91mError: Binaries not found: {', '.join(missing_bins)}\033[0m")
+        if len(missing_bins) > 1:
+            print("Run 'test --setup' to compile the binaries")
+            exit(1)
+        print("Run 'test --setup' to compile the binary")
+        exit(1)
+
 
     if args.nohard and args.hard:
         print("Error: Cannot use both --nohard and --hard")
