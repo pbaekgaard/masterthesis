@@ -176,7 +176,7 @@ impl Lexer {
                 }
             }
         }
-        let num = num_string.parse::<i64>().unwrap();
+        let _num = num_string.parse::<i64>().unwrap();
         Token::new(
             num_string,
             TokenType::IntegerLiteral,

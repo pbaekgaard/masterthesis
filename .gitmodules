@@ -1,3 +1,6 @@
 [submodule "minimc"]
 	path = minimc
 	url = https://github.com/dannybpoulsen/minimc
+[submodule "whiley"]
+	path = whiley
+	url = https://github.com/dannybpoulsen/whiley

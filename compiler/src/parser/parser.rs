@@ -336,7 +336,7 @@ impl Parser {
                         Box::new(right),
                     )
                 } else {
-                    let val = tok.value.clone();
+                    let _val = tok.value.clone();
                     Expr::BooleanLiteral(tok.value.to_lowercase().parse::<bool>().unwrap())
                 }
             }

@@ -13,7 +13,7 @@ class ResultsDatabase:
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS test_results (
+    CREATE TABLE IF NOT EXISTS interpreter_results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id INTEGER NOT NULL,
         test TEXT NOT NULL,
@@ -38,10 +38,25 @@ class ResultsDatabase:
         FOREIGN KEY (run_id) REFERENCES runs(id)
     );
 
-    CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON test_results(run_id);
-    CREATE INDEX IF NOT EXISTS idx_test_results_test ON test_results(test);
-    CREATE INDEX IF NOT EXISTS idx_test_results_variant ON test_results(variant);
-    CREATE INDEX IF NOT EXISTS idx_test_results_passed ON test_results(passed);
+    CREATE TABLE IF NOT EXISTS symex_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        test TEXT NOT NULL,
+        variant TEXT NOT NULL,
+        stmt INTEGER NOT NULL,
+        faulty_bit INTEGER,
+        result INTEGER NOT NULL,
+        FOREIGN KEY (run_id) REFERENCES runs(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON interpreter_results(run_id);
+    CREATE INDEX IF NOT EXISTS idx_test_results_test ON interpreter_results(test);
+    CREATE INDEX IF NOT EXISTS idx_test_results_variant ON interpreter_results(variant);
+    CREATE INDEX IF NOT EXISTS idx_test_results_passed ON interpreter_results(passed);
+    
+    CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON symex_results(run_id);
+    CREATE INDEX IF NOT EXISTS idx_test_results_test ON symex_results(test);
+    CREATE INDEX IF NOT EXISTS idx_test_results_variant ON symex_results(variant);
+    CREATE INDEX IF NOT EXISTS idx_test_results_result ON symex_results(result);
     """
 
     def __init__(self, db_path):
@@ -73,8 +88,29 @@ class ResultsDatabase:
         )
         self._conn.commit()
         return cursor.lastrowid
+    def insert_symex_results_batch(self, run_id, results):
+        rows = []
 
-    def insert_results_batch(self, run_id, results):
+        for res in results:
+            rows.append((
+                run_id,
+                res["test"],
+                res["variant"],
+                res["stmt"],
+                res["faulty_bit"],
+                res["result"],
+            ))
+
+        self._conn.executemany(
+            """
+            INSERT INTO symex_results
+            (run_id, test, variant, stmt, faulty_bit, result)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+        self._conn.commit()
+    def insert_interpreter_results_batch(self, run_id, results):
         rows = []
         for res in results:
             parts = res["injection_point"].split(":")
@@ -133,7 +169,7 @@ class ResultsDatabase:
         
         self._conn.executemany(
             """
-            INSERT INTO test_results 
+            INSERT INTO interpreter_results 
             (run_id, test, variant, injection_point, fault_type, fault_pc, fault_reg, fault_bit,
             returncode, pc_before, pc_after, expected_exec_instr, actual_exec_instr, reg_old_value, reg_new_value, stdout, stderr, expected_output, matched_output_line, passed)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

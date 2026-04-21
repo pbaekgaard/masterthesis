@@ -14,99 +14,73 @@ _start:
     add r9, r9, #1
     cmp r9, #1
     bne countermeasure
-    add r9, r9, #1
-    cmp r9, #2
-    bne countermeasure
     sub sp, sp, #4
     mov r0, #0
     str r0, [sp]
     add r9, r9, #1
-    cmp r9, #3
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #4
+    cmp r9, #2
     bne countermeasure
     sub sp, sp, #4
     mov r0, #1
     str r0, [sp]
     add r9, r9, #1
-    cmp r9, #5
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #6
+    cmp r9, #3
     bne countermeasure
     sub sp, sp, #4
     mov r0, #2
     str r0, [sp]
     add r9, r9, #1
-    cmp r9, #7
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #8
+    cmp r9, #4
     bne countermeasure
     sub sp, sp, #4
     mov r0, #3
     str r0, [sp]
     add r9, r9, #1
-    cmp r9, #9
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #10
+    cmp r9, #5
     bne countermeasure
     sub sp, sp, #4
     mov r0, #4
     str r0, [sp]
     add r9, r9, #1
+    cmp r9, #6
+    bne countermeasure
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #7
+    bne countermeasure
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #8
+    bne countermeasure
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #9
+    bne countermeasure
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    add r9, r9, #1
+    cmp r9, #10
+    bne countermeasure
+    sub sp, sp, #4
+    mov r0, #0
+    str r0, [sp]
+    add r9, r9, #1
     cmp r9, #11
     bne countermeasure
+    sub sp, sp, #4
+    mov r0, #1
+    str r0, [sp]
     add r9, r9, #1
     cmp r9, #12
     bne countermeasure
-    sub sp, sp, #4
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #13
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #14
-    bne countermeasure
-    sub sp, sp, #4
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #15
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #16
-    bne countermeasure
-    sub sp, sp, #4
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #17
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #18
-    bne countermeasure
-    sub sp, sp, #4
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #19
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #20
-    bne countermeasure
-    mov r0, #0
-    str r0, [sp, #32]
-    add r9, r9, #1
-    cmp r9, #21
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #22
-    bne countermeasure
-    ldr r0, [sp, #36]
+    ldr r0, [sp, #44]
     mov r1, r0
     mov r0, #0
     cmp r1, r0
@@ -116,17 +90,32 @@ _start:
     cmp r0, #0
     beq else_0
     add r9, r9, #1
-    cmp r9, #23
+    cmp r9, #13
     bne countermeasure
-    sub sp, sp, #4
+    ldr r0, [sp, #20]
+    mov r1, r0
+    ldr r0, [sp, #36]
+    cmp r1, r0
+    mov r0, #0
+    it eq
+    moveq r0, #1
+    cmp r0, #0
+    beq else_1
+    add r9, r9, #1
+    cmp r9, #14
+    bne countermeasure
+    ldr r0, [sp, #4]
+    mov r1, r0
     mov r0, #1
-    str r0, [sp]
+    add r0, r1, r0
+    str r0, [sp, #4]
     add r9, r9, #1
-    cmp r9, #24
+    cmp r9, #15
     bne countermeasure
-    add r9, r9, #1
-    cmp r9, #25
-    bne countermeasure
+    mov r9, #13
+    b endif_1
+else_1:
+endif_1:
     ldr r0, [sp, #16]
     mov r1, r0
     ldr r0, [sp, #32]
@@ -135,37 +124,22 @@ _start:
     it ne
     movne r0, #1
     cmp r0, #0
-    beq else_1
+    beq else_2
     add r9, r9, #1
-    cmp r9, #26
+    cmp r9, #14
     bne countermeasure
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #27
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #28
-    bne countermeasure
-    mov r9, #25
-    b endif_1
-else_1:
-    add r9, r9, #1
-    cmp r9, #26
-    bne countermeasure
+    ldr r0, [sp, #4]
+    mov r1, r0
     mov r0, #1
-    str r0, [sp]
+    add r0, r1, r0
+    str r0, [sp, #4]
     add r9, r9, #1
-    cmp r9, #27
+    cmp r9, #15
     bne countermeasure
-    add r9, r9, #1
-    cmp r9, #28
-    bne countermeasure
-    mov r9, #25
-endif_1:
-    add r9, r9, #1
-    cmp r9, #26
-    bne countermeasure
+    mov r9, #13
+    b endif_2
+else_2:
+endif_2:
     ldr r0, [sp, #12]
     mov r1, r0
     ldr r0, [sp, #28]
@@ -174,37 +148,22 @@ endif_1:
     it ne
     movne r0, #1
     cmp r0, #0
-    beq else_2
+    beq else_3
     add r9, r9, #1
-    cmp r9, #27
+    cmp r9, #14
     bne countermeasure
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #28
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #29
-    bne countermeasure
-    mov r9, #26
-    b endif_2
-else_2:
-    add r9, r9, #1
-    cmp r9, #27
-    bne countermeasure
+    ldr r0, [sp, #4]
+    mov r1, r0
     mov r0, #1
-    str r0, [sp]
+    add r0, r1, r0
+    str r0, [sp, #4]
     add r9, r9, #1
-    cmp r9, #28
+    cmp r9, #15
     bne countermeasure
-    add r9, r9, #1
-    cmp r9, #29
-    bne countermeasure
-    mov r9, #26
-endif_2:
-    add r9, r9, #1
-    cmp r9, #27
-    bne countermeasure
+    mov r9, #13
+    b endif_3
+else_3:
+endif_3:
     ldr r0, [sp, #8]
     mov r1, r0
     ldr r0, [sp, #24]
@@ -213,79 +172,25 @@ endif_2:
     it ne
     movne r0, #1
     cmp r0, #0
-    beq else_3
+    beq else_4
     add r9, r9, #1
-    cmp r9, #28
-    bne countermeasure
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #29
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #30
-    bne countermeasure
-    mov r9, #27
-    b endif_3
-else_3:
-    add r9, r9, #1
-    cmp r9, #28
-    bne countermeasure
-    mov r0, #1
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #29
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #30
-    bne countermeasure
-    mov r9, #27
-endif_3:
-    add r9, r9, #1
-    cmp r9, #28
+    cmp r9, #14
     bne countermeasure
     ldr r0, [sp, #4]
     mov r1, r0
-    ldr r0, [sp, #20]
-    cmp r1, r0
-    mov r0, #0
-    it ne
-    movne r0, #1
-    cmp r0, #0
-    beq else_4
+    mov r0, #1
+    add r0, r1, r0
+    str r0, [sp, #4]
     add r9, r9, #1
-    cmp r9, #29
+    cmp r9, #15
     bne countermeasure
-    mov r0, #0
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #30
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #31
-    bne countermeasure
-    mov r9, #28
+    mov r9, #13
     b endif_4
 else_4:
-    add r9, r9, #1
-    cmp r9, #29
-    bne countermeasure
-    mov r0, #1
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #30
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #31
-    bne countermeasure
-    mov r9, #28
 endif_4:
-    add r9, r9, #1
-    cmp r9, #29
-    bne countermeasure
-    ldr r0, [sp, #0]
+    ldr r0, [sp, #4]
     mov r1, r0
-    mov r0, #1
+    mov r0, #4
     cmp r1, r0
     mov r0, #0
     it eq
@@ -293,74 +198,44 @@ endif_4:
     cmp r0, #0
     beq else_5
     add r9, r9, #1
-    cmp r9, #30
+    cmp r9, #14
     bne countermeasure
     mov r0, #3
-    str r0, [sp, #40]
+    str r0, [sp, #44]
     add r9, r9, #1
-    cmp r9, #31
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #32
+    cmp r9, #15
     bne countermeasure
     mov r0, #1
-    str r0, [sp, #36]
+    str r0, [sp, #40]
     add r9, r9, #1
-    cmp r9, #33
+    cmp r9, #16
     bne countermeasure
-    add r9, r9, #1
-    cmp r9, #34
-    bne countermeasure
-    mov r9, #29
+    mov r9, #13
     b endif_5
 else_5:
     add r9, r9, #1
-    cmp r9, #30
+    cmp r9, #14
     bne countermeasure
-    ldr r0, [sp, #40]
+    ldr r0, [sp, #44]
     mov r1, r0
     mov r0, #1
     sub r0, r1, r0
-    str r0, [sp, #40]
+    str r0, [sp, #44]
     add r9, r9, #1
-    cmp r9, #31
+    cmp r9, #15
     bne countermeasure
-    add r9, r9, #1
-    cmp r9, #32
-    bne countermeasure
-    mov r9, #29
+    mov r9, #13
 endif_5:
-    add r9, r9, #1
-    cmp r9, #30
-    bne countermeasure
-    add sp, sp, #4
-    mov r9, #22
+    mov r9, #12
     b endif_0
 else_0:
-    add r9, r9, #1
-    cmp r9, #23
-    bne countermeasure
-    sub sp, sp, #4
-    mov r0, #1
-    str r0, [sp]
-    add r9, r9, #1
-    cmp r9, #24
-    bne countermeasure
-    add r9, r9, #1
-    cmp r9, #25
-    bne countermeasure
-    add sp, sp, #4
-    mov r9, #22
 endif_0:
-    add r9, r9, #1
-    cmp r9, #23
-    bne countermeasure
     mov r0, #1
     ldr r1, =.Lstr0
     mov r2, #17
     mov r7, #4
     svc #0
-    ldr r0, [sp, #32]
+    ldr r0, [sp, #40]
     mov r4, r0
     ldr r1, =num_buf
     add r1, r1, #16
@@ -396,15 +271,12 @@ print_int_done_6:
     mov r2, #1
     mov r7, #4
     svc #0
-    add r9, r9, #1
-    cmp r9, #24
-    bne countermeasure
     mov r0, #1
     ldr r1, =.Lstr1
     mov r2, #7
     mov r7, #4
     svc #0
-    ldr r0, [sp, #36]
+    ldr r0, [sp, #44]
     mov r4, r0
     ldr r1, =num_buf
     add r1, r1, #16
@@ -440,15 +312,9 @@ print_int_done_7:
     mov r2, #1
     mov r7, #4
     svc #0
-    add r9, r9, #1
-    cmp r9, #25
-    bne countermeasure
-    ldr r0, [sp, #32]
+    ldr r0, [sp, #40]
     mov r7, #1
     svc #0
-    add r9, r9, #1
-    cmp r9, #26
-    bne countermeasure
 countermeasure:
     mov r0, #77
     mov r7, #1

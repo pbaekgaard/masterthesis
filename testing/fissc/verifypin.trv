@@ -12,30 +12,25 @@ func main() -> Integer {
 
   authenticated = 0;
 
-  if ptc > 0 then {
-    let pinsEqual : Integer = 1;
-    if userPin1 != cardPin1 then {
-      pinsEqual = 0;
-    }
+  let pinsEqual : Integer = 1;
+  if userPin1 == cardPin1 then {
+    pinsEqual = pinsEqual + 1;
+  }
 
-    if userPin2 != cardPin2 then {
-      pinsEqual = 0;
-    }
+  if userPin2 == cardPin2 then {
+    pinsEqual = pinsEqual + 1;
+  }
 
-    if userPin3 != cardPin3 then {
-      pinsEqual = 0;
-    }
+  if userPin3 == cardPin3 then {
+    pinsEqual = pinsEqual + 1;
+  }
 
-    if userPin4 != cardPin4 then {
-      pinsEqual = 0;
-    } 
+  if userPin4 == cardPin4 then {
+    pinsEqual = pinsEqual + 1;
+  } 
 
-    if pinsEqual == 1 then {
-      ptc = 3;
-      authenticated = 1;
-    } else {
-      ptc = ptc - 1;
-    }
+  if pinsEqual == 4 then {
+    authenticated = 1;
   }
   print("g_authenticated: ", authenticated);
   print("g_ptc: ", ptc);
