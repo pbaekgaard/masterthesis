@@ -118,6 +118,8 @@ class ResultsDatabase:
                 fault_type, fault_pc, fault_reg, fault_bit = ("pc", int(parts[1]), None, int(parts[2]))
             elif parts[0] == "reg":
                 fault_type, fault_pc, fault_reg, fault_bit = ("reg", int(parts[1]), int(parts[2]), int(parts[3]))
+            elif parts[0] == "cpsr":
+                fault_type, fault_pc, fault_reg, fault_bit = ("cpsr", int(parts[1]), int(parts[2]), int(parts[3]))
             else:
                 fault_type, fault_pc, fault_reg, fault_bit = (None, None, None, None)
             test_report = json.loads(res["test_report"])

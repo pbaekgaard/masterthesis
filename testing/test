@@ -21,8 +21,8 @@ class Experiment:
             self.base_dir, config.get("test_folder", "fissc")
         )
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
-        self.modeled_registers = config.get(
-            "modeled_registers",
+        self.injection_points = config.get(
+            "injection_points",
             [
                 "r0",
                 "r1",

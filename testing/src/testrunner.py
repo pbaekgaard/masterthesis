@@ -1,15 +1,10 @@
 import os
 import re
-import sys
 import subprocess
-import shutil
 import toml
-import csv
-from datetime import datetime
 import concurrent.futures
 import multiprocessing
 from tqdm import tqdm
-from src.database import ResultsDatabase
 
 
 def _fault_worker(args):
@@ -93,8 +88,8 @@ class TestRunner:
             self.base_dir, config.get("test_folder", "fissc")
         )
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
-        self.modeled_registers = config.get(
-            "modeled_registers",
+        self.injection_points = config.get(
+            "injection_points",
             [
                 "r0",
                 "r1",
@@ -291,18 +286,47 @@ class TestRunner:
         max_pc = self._get_program_max_pc(asm_path)
         injection_points = []
 
-        # pc faults: pc:<pc>:<bit>
-        for pc in range(1, max_pc):
-            for bit in range(
-                0, 31
-            ):  # TODO: Find ud af om den skal hedde 33 eller 32, ændrede til 32 selvom chatten mente 33
-                injection_points.append(f"pc:{pc}:{bit}")
-
         # reg faults: reg:<pc>:<reg>:<bit>
-        for pc in range(1, max_pc):
-            for reg in range(13):
-                for bit in range(0, 31):
-                    injection_points.append(f"reg:{pc}:{reg}:{bit}")
+        registers = []
+        cpsr_registers = []
+        pc_points = []
+
+        for point in self.injection_points:
+            if point.startswith('cpsr_'):
+                cpsr_registers.append(point[5:])
+            elif point.startswith('r') and point[1:].isdigit():
+                registers.append(point[1:])
+            elif point.startswith('pc=') and point[3] == "*":
+                print("YES")
+                pc_points.clear();
+                pc_points.append("ALL")
+            elif point.startswith('pc=') and point[3:].isdigit():
+                if len(pc_points) > 0 and pc_points[0] == "ALL":
+                    continue
+                pc_points.append(point[3:])
+
+
+        if len(pc_points) > 0:
+            if pc_points[0] == "ALL":
+                for pc in range(1, max_pc):
+                    for bit in range(0, 31):
+                        injection_points.append(f"pc:{pc}:{bit}")
+            else:
+                for pc in pc_points:
+                    for bit in range(0, 31):
+                        injection_points.append(f"pc:{pc}:{bit}")
+
+        if len(registers) > 0:
+            for pc in range(1, max_pc):
+                for reg in registers:
+                    for bit in range(0, 31):
+                        injection_points.append(f"reg:{pc}:{reg}:{bit}")
+
+        if len(cpsr_registers) > 0:
+            for pc in range(1, max_pc):
+                for reg in cpsr_registers:
+                    for bit in range(0, 31):
+                        injection_points.append(f"cpsr:{pc}:{reg}:{bit}")
 
         return injection_points
 

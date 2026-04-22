@@ -1,5 +1,4 @@
 func main() -> Integer {
-  let ptc : Integer = 3;
   let authenticated : Integer = 0;
   let cardPin1 : Integer = 1;
   let cardPin2 : Integer = 2;
@@ -9,10 +8,8 @@ func main() -> Integer {
   let userPin2 : Integer = 0;
   let userPin3 : Integer = 0;
   let userPin4 : Integer = 0;
+  let pinsEqual : Integer = 0;
 
-  authenticated = 0;
-
-  let pinsEqual : Integer = 1;
   if userPin1 == cardPin1 then {
     pinsEqual = pinsEqual + 1;
   }
@@ -32,8 +29,6 @@ func main() -> Integer {
   if pinsEqual == 4 then {
     authenticated = 1;
   }
-  print("g_authenticated: ", authenticated);
-  print("g_ptc: ", ptc);
 
   return authenticated;
 }
