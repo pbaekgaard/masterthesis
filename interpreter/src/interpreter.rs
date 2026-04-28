@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 use std::fs::File;
 use std::io::BufRead;
 use std::process::exit;
 use std::usize;
 
-use json::{ JsonValue, object };
+use json::{ object };
 
 use crate::memory::EmulatorMemory;
 
@@ -83,7 +83,7 @@ pub enum InjectionTarget {
         bit: u32,
     },
     Cpsr {
-        register: usize,
+        register: String,
         bit: u32,
     },
     None,
@@ -142,11 +142,13 @@ impl Interpreter {
         // Y = Register
         // Z = Bit to flip
         let mut register: usize = usize::MAX;
+        let mut cpsr_register = "";
         let mut parts = injection_point.split(':');
 
         // Get the first three parts
-        let fault_type = parts.next().ok_or("Missing PC value").unwrap();
+        let fault_type = parts.next().ok_or("Missing Fault Type").unwrap();
         let pc = parts.next().ok_or("Missing PC value").unwrap().parse::<i32>().unwrap();
+        println!("fault_type: {}", fault_type);
         if fault_type == "reg" {
             register = parts
                 .next()
@@ -154,6 +156,12 @@ impl Interpreter {
                 .unwrap()
                 .parse::<usize>()
                 .unwrap();
+        }
+        if fault_type == "cpsr" {
+            cpsr_register = parts
+                .next()
+                .ok_or("Missing Register value")
+                .unwrap()
         }
         let bit = parts.next().ok_or("Missing Bit value").unwrap().parse::<u32>().unwrap();
 
@@ -164,20 +172,29 @@ impl Interpreter {
         if register == usize::MAX && fault_type == "reg" {
             panic!("Register is usize::MAX");
         }
+        if fault_type == "cpsr" && !["n","z","c","v"].contains(&cpsr_register) {
+            panic!("CPSR Register not valid for fault injection!")
+        }
         let injection_target = if fault_type == "reg" {
             InjectionTarget::Register { register, bit }
-        } else {
+        } else if fault_type == "pc" {
             InjectionTarget::ProgramCounter { bit }
+        } else {
+            InjectionTarget::Cpsr { register: cpsr_register.to_string(), bit }
         };
         self.fault_spec.trigger_pc = pc;
         self.fault_spec.target = injection_target;
         if fault_type == "reg" {
             println!(
-                "Setup Injection Specification:\n   Type: reg\n Trigger PC: {pc}\n  Register: {register}\n  Bit: {bit}"
+                "Setup Injection Specification:\n   Type: reg\n   Trigger PC: {pc}\n   Register: {register}\n   Bit: {bit}"
+            );
+        } else if fault_type == "pc" {
+            println!(
+                "Setup Injection Specification:\n   Type: PC\n   Trigger PC: {pc}\n   Bit: {bit}"
             );
         } else {
             println!(
-                "Setup Injection Specification:\n   Type: PC\n  Trigger PC: {pc}\n  Bit: {bit}"
+                "Setup Injection Specification:\n   Type: CPSR\n   Trigger PC: {pc}\n   Register: {cpsr_register}\n   Bit: {bit}"
             );
         }
     }
