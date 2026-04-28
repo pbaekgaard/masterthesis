@@ -1,4 +1,5 @@
-use std::{collections::HashMap};
+use core::panic;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufRead;
 use std::process::exit;
@@ -83,8 +84,7 @@ pub enum InjectionTarget {
         bit: u32,
     },
     Cpsr {
-        register: String,
-        bit: u32,
+        cpsr_reg: String,
     },
     None,
 }
@@ -142,8 +142,9 @@ impl Interpreter {
         // Y = Register
         // Z = Bit to flip
         let mut register: usize = usize::MAX;
-        let mut cpsr_register = "";
+        let mut cpsr_reg: String = "".to_string();
         let mut parts = injection_point.split(':');
+        let mut bit : u32 = 0;
 
         // Get the first three parts
         let fault_type = parts.next().ok_or("Missing Fault Type").unwrap();
@@ -156,14 +157,16 @@ impl Interpreter {
                 .unwrap()
                 .parse::<usize>()
                 .unwrap();
-        }
-        if fault_type == "cpsr" {
-            cpsr_register = parts
+        } else if fault_type == "cpsr" {
+            cpsr_reg = parts
                 .next()
-                .ok_or("Missing Register value")
-                .unwrap()
+                .ok_or("Missing CPSR Register Value")
+                .unwrap().to_string();
         }
-        let bit = parts.next().ok_or("Missing Bit value").unwrap().parse::<u32>().unwrap();
+
+        if fault_type != "cpsr" {
+            bit = parts.next().ok_or("Missing Bit value").unwrap().parse::<u32>().unwrap();
+        }
 
         // CRITICAL: Check if there is a 5th part
         if parts.next().is_some() {
@@ -172,7 +175,7 @@ impl Interpreter {
         if register == usize::MAX && fault_type == "reg" {
             panic!("Register is usize::MAX");
         }
-        if fault_type == "cpsr" && !["n","z","c","v"].contains(&cpsr_register) {
+        if fault_type == "cpsr" && !matches!(cpsr_reg.as_str(), "n" | "z" | "c" | "v") {
             panic!("CPSR Register not valid for fault injection!")
         }
         let injection_target = if fault_type == "reg" {
@@ -180,7 +183,7 @@ impl Interpreter {
         } else if fault_type == "pc" {
             InjectionTarget::ProgramCounter { bit }
         } else {
-            InjectionTarget::Cpsr { register: cpsr_register.to_string(), bit }
+            InjectionTarget::Cpsr { cpsr_reg: cpsr_reg.to_string()}
         };
         self.fault_spec.trigger_pc = pc;
         self.fault_spec.target = injection_target;
@@ -188,13 +191,13 @@ impl Interpreter {
             println!(
                 "Setup Injection Specification:\n   Type: reg\n   Trigger PC: {pc}\n   Register: {register}\n   Bit: {bit}"
             );
-        } else if fault_type == "pc" {
+        } else if fault_type == "cpsr" {
             println!(
-                "Setup Injection Specification:\n   Type: PC\n   Trigger PC: {pc}\n   Bit: {bit}"
+                "Setup Injection Specification:\n   Type: cpsr\n   Trigger PC: {pc}\n   Register: {cpsr_reg}"
             );
         } else {
             println!(
-                "Setup Injection Specification:\n   Type: CPSR\n   Trigger PC: {pc}\n   Register: {cpsr_register}\n   Bit: {bit}"
+                "Setup Injection Specification:\n   Type: PC\n   Trigger PC: {pc}\n   Bit: {bit}"
             );
         }
     }
@@ -278,9 +281,6 @@ impl Interpreter {
             if i % 4 == 3 {
                 println!(" ║");
             }
-        }
-        if 32 % 4 != 0 {
-            println!("║");
         }
 
         println!("╟──────────────────────────────────────────────────────────────────╢");
@@ -993,25 +993,51 @@ impl Interpreter {
         println!("REGISTER FAULT TRIGGERED!");
     }
 
+    fn trigger_cpsr_fault(&mut self, cpsr_reg: String) {
+        if cpsr_reg == "n" {
+            self.cpsr.n = !self.cpsr.n;
+            println!("CPSR N FAULT TRIGGERED!");
+        }
+        else if cpsr_reg == "v" {
+            self.cpsr.v = !self.cpsr.v;
+            println!("CPSR V FAULT TRIGGERED!");
+        }
+        else if cpsr_reg == "z" {
+            self.cpsr.z = !self.cpsr.z;
+            println!("CPSR Z FAULT TRIGGERED!");
+        }
+        else if cpsr_reg == "c" {
+            self.cpsr.c = !self.cpsr.c;
+            println!("CPSR C FAULT TRIGGERED!");
+        }
+        else {
+            panic!("Error Inivalid CPSR fault")
+        }
+    }
+
     pub fn execute(&mut self) -> u32 {
         self.parse_data_section();
-        let start_block = self.get_start();
+        let asm_code = self.get_start();
         if self.debug {
-            eprintln!("DEBUG: start_block = {:?}", start_block);
+            eprintln!("DEBUG: start_block = {:?}", asm_code);
         }
         while self.pc < self.eof_pc {
-            let instruction = start_block.get(self.pc as usize).unwrap();
+            let instruction = asm_code.get(self.pc as usize).unwrap();
             if (self.pc as i32) == self.fault_spec.trigger_pc && !self.fault_spec.has_triggered {
                 match self.fault_spec.target {
                     InjectionTarget::Register { register, bit } => {
                         self.trigger_register_fault(register, bit);
                         self.fault_spec.has_triggered = true;
                     }
+                    InjectionTarget::Cpsr { ref cpsr_reg} => {
+                        self.trigger_cpsr_fault(cpsr_reg.into());
+                        self.fault_spec.has_triggered = true;
+                    }
                     InjectionTarget::ProgramCounter { bit } => {
                         self.test_report["pc_old_value"] = self.pc.clone().into();
                         self.pc = self.flip_bit_u32(self.pc, bit);
                         self.test_report["pc_new_value"] = self.pc.clone().into();
-                        let actual_exec_instr = start_block.get(self.pc as usize).unwrap();
+                        let actual_exec_instr = asm_code.get(self.pc as usize).unwrap();
                         self.test_report["expected_exec_instr"] = instruction.as_str().into();
                         self.test_report["actual_exec_instr"] = actual_exec_instr.as_str().into();
                         self.fault_spec.has_triggered = true;

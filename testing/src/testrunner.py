@@ -297,7 +297,6 @@ class TestRunner:
             elif point.startswith('r') and point[1:].isdigit():
                 registers.append(point[1:])
             elif point.startswith('pc=') and point[3] == "*":
-                print("YES")
                 pc_points.clear();
                 pc_points.append("ALL")
             elif point.startswith('pc=') and point[3:].isdigit():
@@ -325,8 +324,7 @@ class TestRunner:
         if len(cpsr_registers) > 0:
             for pc in range(1, max_pc):
                 for reg in cpsr_registers:
-                    for bit in range(0, 31):
-                        injection_points.append(f"cpsr:{pc}:{reg}:{bit}")
+                    injection_points.append(f"cpsr:{pc}:{reg}")
 
         return injection_points
 

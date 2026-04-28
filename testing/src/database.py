@@ -21,7 +21,7 @@ class ResultsDatabase:
         injection_point TEXT NOT NULL,
         fault_type TEXT,
         fault_pc INTEGER,
-        fault_reg INTEGER,
+        fault_reg TEXT,
         fault_bit INTEGER,
         returncode INTEGER NOT NULL,
         pc_before INTEGER,
@@ -119,7 +119,7 @@ class ResultsDatabase:
             elif parts[0] == "reg":
                 fault_type, fault_pc, fault_reg, fault_bit = ("reg", int(parts[1]), int(parts[2]), int(parts[3]))
             elif parts[0] == "cpsr":
-                fault_type, fault_pc, fault_reg, fault_bit = ("cpsr", int(parts[1]), int(parts[2]), int(parts[3]))
+                fault_type, fault_pc, fault_reg, fault_bit = ("cpsr", int(parts[1]), parts[2], None)
             else:
                 fault_type, fault_pc, fault_reg, fault_bit = (None, None, None, None)
             test_report = json.loads(res["test_report"])
