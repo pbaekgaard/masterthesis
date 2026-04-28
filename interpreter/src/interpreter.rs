@@ -1,9 +1,5 @@
-<<<<<<< HEAD
-use std::{collections::HashMap};
-=======
 use core::panic;
 use std::collections::HashMap;
->>>>>>> afd236d (added cpsr faults to interpreter)
 use std::fs::File;
 use std::io::BufRead;
 use std::process::exit;
@@ -88,12 +84,7 @@ pub enum InjectionTarget {
         bit: u32,
     },
     Cpsr {
-<<<<<<< HEAD
-        register: String,
-        bit: u32,
-=======
         cpsr_reg: String,
->>>>>>> afd236d (added cpsr faults to interpreter)
     },
     None,
 }
@@ -151,11 +142,7 @@ impl Interpreter {
         // Y = Register
         // Z = Bit to flip
         let mut register: usize = usize::MAX;
-<<<<<<< HEAD
-        let mut cpsr_register = "";
-=======
         let mut cpsr_reg: String = "".to_string();
->>>>>>> afd236d (added cpsr faults to interpreter)
         let mut parts = injection_point.split(':');
         let mut bit : u32 = 0;
 
@@ -180,13 +167,6 @@ impl Interpreter {
         if fault_type != "cpsr" {
             bit = parts.next().ok_or("Missing Bit value").unwrap().parse::<u32>().unwrap();
         }
-        if fault_type == "cpsr" {
-            cpsr_register = parts
-                .next()
-                .ok_or("Missing Register value")
-                .unwrap()
-        }
-        let bit = parts.next().ok_or("Missing Bit value").unwrap().parse::<u32>().unwrap();
 
         // CRITICAL: Check if there is a 5th part
         if parts.next().is_some() {
@@ -195,7 +175,7 @@ impl Interpreter {
         if register == usize::MAX && fault_type == "reg" {
             panic!("Register is usize::MAX");
         }
-        if fault_type == "cpsr" && !["n","z","c","v"].contains(&cpsr_register) {
+        if fault_type == "cpsr" && !matches!(cpsr_reg.as_str(), "n" | "z" | "c" | "v") {
             panic!("CPSR Register not valid for fault injection!")
         }
         let injection_target = if fault_type == "reg" {
