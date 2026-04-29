@@ -2,7 +2,7 @@
 
 # 1. Check if a filename was provided
 if [ -z "$1" ]; then
-    echo "Usage: $0 <filename.asm>"
+    echo "Usage: $0 <filename.s>"
     exit 1
 fi
 

@@ -38,8 +38,8 @@ fn main() {
         .write(true)
         .create(true)
         .truncate(true)
-        .open(format!("{}.asm", &args.output))
-        .expect(&format!("wrongdog output path {}.asm", args.output));
+        .open(format!("{}.s", &args.output))
+        .expect(&format!("wrongdog output path {}.s", args.output));
     
     let wh_output = File::options()
         .read(true)

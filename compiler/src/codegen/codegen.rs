@@ -615,8 +615,8 @@ mod tests {
             .write(true)
             .create(true)
             .truncate(true)
-            .open("temp/tests/test_can_generate_init.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_init.asm");
+            .open("temp/tests/test_can_generate_init.s")
+            .expect("Failed to create file: /temp/tests/test_can_generate_init.s");
         let wh_output_file = File::options()
             .read(true)
             .write(true)
@@ -661,8 +661,8 @@ mod tests {
             .write(true)
             .create(true)
             .truncate(true)
-            .open("temp/tests/test_can_generate_return.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_return.asm");
+            .open("temp/tests/test_can_generate_return.s")
+            .expect("Failed to create file: /temp/tests/test_can_generate_return.s");
         let wh_output_file = File::options()
             .read(true)
             .write(true)
@@ -712,8 +712,8 @@ mod tests {
             .write(true)
             .create(true)
             .truncate(true)
-            .open("temp/tests/test_can_generate_let.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_let.asm");
+            .open("temp/tests/test_can_generate_let.s")
+            .expect("Failed to create file: /temp/tests/test_can_generate_let.s");
         let wh_output_file = File::options()
             .read(true)
             .write(true)
@@ -765,8 +765,8 @@ mod tests {
             .write(true)
             .create(true)
             .truncate(true)
-            .open("temp/tests/test_can_generate_if_else.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_if_else.asm");
+            .open("temp/tests/test_can_generate_if_else.s")
+            .expect("Failed to create file: /temp/tests/test_can_generate_if_else.s");
         let wh_output_file = File::options()
             .read(true)
             .write(true)
@@ -835,8 +835,8 @@ mod tests {
             .write(true)
             .create(true)
             .truncate(true)
-            .open("temp/tests/test_can_generate_while.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_while.asm");
+            .open("temp/tests/test_can_generate_while.s")
+            .expect("Failed to create file: /temp/tests/test_can_generate_while.s");
         let wh_output_file = File::options()
             .read(true)
             .write(true)
@@ -906,8 +906,8 @@ mod tests {
             .write(true)
             .create(true)
             .truncate(true)
-            .open("temp/tests/test_can_generate_two_whiles.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_two_whiles.asm");
+            .open("temp/tests/test_can_generate_two_whiles.s")
+            .expect("Failed to create file: /temp/tests/test_can_generate_two_whiles.s");
         let wh_output_file = File::options()
             .read(true)
             .write(true)
@@ -1000,8 +1000,8 @@ mod tests {
             .write(true)
             .create(true)
             .truncate(true)
-            .open("temp/tests/test_can_generate_nested_while.asm")
-            .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.asm");
+            .open("temp/tests/test_can_generate_nested_while.s")
+            .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.s");
         let wh_output_file = File::options()
             .read(true)
             .write(true)
@@ -1103,7 +1103,7 @@ mod tests {
             let ast: AST = parser.parse_program();
 
             let file_stem = trv_path.file_stem().unwrap().to_str().unwrap();
-            let output_asm_path = format!("temp/tests/{}.asm", file_stem);
+            let output_asm_path = format!("temp/tests/{}.s", file_stem);
             let output_wh_path = format!("temp/tests/{}.wh", file_stem);
             let output_file = File::options()
                 .read(true)

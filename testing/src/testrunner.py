@@ -216,7 +216,7 @@ class TestRunner:
             cmd.append("--hard")
 
         result = subprocess.run(cmd, cwd=compiler_dir, capture_output=True, text=True)
-        asm_path = asm_path + ".asm"
+        asm_path = asm_path + ".s"
         return result.returncode == 0, asm_path, result.stdout, result.stderr
 
     def interpret_test(self, asm_path, injection_point=None, debug=False):
