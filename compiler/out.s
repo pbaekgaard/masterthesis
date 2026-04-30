@@ -125,12 +125,42 @@ endif_4:
 .size _start, .-_start
 _metadata:
     .word 0x10000000 @ 0
+    .word 0xa+1
+    .word 0xb+4
+    .word 0x00000001 @ authenticated
     .word 0x10000000 @ 1
+    .word 0xa+4
+    .word 0xb+7
+    .word 0x00000001 @ cardPin1
     .word 0x10000000 @ 2
+    .word 0xa+7
+    .word 0xb+10
+    .word 0x00000001 @ cardPin2
     .word 0x10000000 @ 3
+    .word 0xa+10
+    .word 0xb+13
+    .word 0x00000001 @ cardPin3
     .word 0x10000000 @ 4
+    .word 0xa+13
+    .word 0xb+16
+    .word 0x00000001 @ cardPin4
     .word 0x10000000 @ 5
+    .word 0xa+16
+    .word 0xb+19
+    .word 0x00000001 @ userPin1
     .word 0x10000000 @ 6
+    .word 0xa+19
+    .word 0xb+22
+    .word 0x00000001 @ userPin2
     .word 0x10000000 @ 7
+    .word 0xa+22
+    .word 0xb+25
+    .word 0x00000001 @ userPin3
     .word 0x10000000 @ 8
+    .word 0xa+25
+    .word 0xb+28
+    .word 0x00000001 @ userPin4
     .word 0x10000000 @ 9
+    .word 0xa+28
+    .word 0xb+31
+    .word 0x00000001 @ pinsEqual

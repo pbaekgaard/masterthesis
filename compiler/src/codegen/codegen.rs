@@ -474,13 +474,17 @@ ui32 flip_mask;
                 self.write_line("sub sp, sp, #4", 1, true);
                 self.emit_expr(expr);
                 self.write_line("str r0, [sp]", 1, true);
-                self.locals.insert(name, self.stack_offset);
+                self.locals.insert(name.clone(), self.stack_offset);
                 if self.hard {
                     self.emit_step_check();
                 }
                 let pc_after = self.pc;
 
+
                 self.metadata.push(format!(r#".word 0x10000000 @ {curr_stmt}"#));
+                self.metadata.push(format!(r#".word 0xa+{pc_before}"#));
+                self.metadata.push(format!(r#".word 0xb+{pc_after}"#));
+                self.metadata.push(format!(r#".word 0x00000001 @ {name}"#));
             }
             _ => panic!("Not a let statement format sorry "),
         }
