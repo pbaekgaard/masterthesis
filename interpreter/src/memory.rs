@@ -11,7 +11,7 @@ pub struct EmulatorMemory {
 impl EmulatorMemory {
     pub fn new() -> Self {
         Self {
-            stack: vec![0; STACK_SIZE],
+            stack: vec![0; u32::MAX as usize],
             heap: vec![0; HEAP_SIZE],
             heap_alloc_index: 0,
             stack_pointer: STACK_SIZE,

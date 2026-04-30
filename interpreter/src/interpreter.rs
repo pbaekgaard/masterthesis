@@ -110,6 +110,7 @@ pub struct Interpreter {
     max_time: std::time::Duration,
     fault_spec: InjectionSpec,
     test_report: json::JsonValue,
+    asm_code: Vec<String>,
 }
 
 impl Interpreter {
@@ -133,6 +134,7 @@ impl Interpreter {
                 has_triggered: false,
             },
             test_report: object! { title: "test_report" },
+            asm_code: vec![]
         }
     }
 
@@ -989,7 +991,7 @@ impl Interpreter {
         let old_val = self.registers[register];
         self.test_report["reg_old_value"] = old_val.into();
         self.registers[register] = self.flip_bit(old_val, bit);
-        self.test_report["reg_new_value"] = self.registers[register].clone().into();
+        self.test_report["reg_new_value"] = self.registers[register].into();
         println!("REGISTER FAULT TRIGGERED!");
     }
 
@@ -1015,36 +1017,40 @@ impl Interpreter {
         }
     }
 
+    fn trigger_pc_fault(&mut self, instruction: String, bit: u32) {
+        self.test_report["pc_old_value"] = self.pc.into();
+        self.pc = self.flip_bit_u32(self.pc, bit);
+        self.test_report["pc_new_value"] = self.pc.into();
+        eprintln!("DEBUG: pc = {}, asm_len = {}", self.pc, self.asm_code.len());
+        let actual_exec_instr = self.asm_code.get(self.pc as usize).unwrap();
+        self.test_report["expected_exec_instr"] = instruction.as_str().into();
+        self.test_report["actual_exec_instr"] = actual_exec_instr.as_str().into();
+    }
+
     pub fn execute(&mut self) -> u32 {
         self.parse_data_section();
-        let asm_code = self.get_start();
+        self.asm_code = self.get_start();
         if self.debug {
-            eprintln!("DEBUG: start_block = {:?}", asm_code);
+            eprintln!("DEBUG: start_block = {:?}", self.asm_code);
         }
         while self.pc < self.eof_pc {
-            let instruction = asm_code.get(self.pc as usize).unwrap();
+            let instruction = {self.asm_code.get(self.pc as usize).unwrap().clone()};
+            println!("pc: {}, Instruction: {}", self.pc, instruction);
             if (self.pc as i32) == self.fault_spec.trigger_pc && !self.fault_spec.has_triggered {
                 match self.fault_spec.target {
                     InjectionTarget::Register { register, bit } => {
                         self.trigger_register_fault(register, bit);
-                        self.fault_spec.has_triggered = true;
                     }
                     InjectionTarget::Cpsr { ref cpsr_reg} => {
                         self.trigger_cpsr_fault(cpsr_reg.into());
-                        self.fault_spec.has_triggered = true;
                     }
                     InjectionTarget::ProgramCounter { bit } => {
-                        self.test_report["pc_old_value"] = self.pc.clone().into();
-                        self.pc = self.flip_bit_u32(self.pc, bit);
-                        self.test_report["pc_new_value"] = self.pc.clone().into();
-                        let actual_exec_instr = asm_code.get(self.pc as usize).unwrap();
-                        self.test_report["expected_exec_instr"] = instruction.as_str().into();
-                        self.test_report["actual_exec_instr"] = actual_exec_instr.as_str().into();
-                        self.fault_spec.has_triggered = true;
+                        self.trigger_pc_fault(instruction, bit);
                         continue;
                     }
                     _ => panic!("Injection type not implemented yet."),
                 }
+                self.fault_spec.has_triggered = true;
             }
 
             if self.debug {
@@ -1063,29 +1069,29 @@ impl Interpreter {
             }
 
             match instruction {
-                f if f.starts_with("mov") => self.exec_mov(instruction.clone()),
+                f if f.starts_with("mov") => self.exec_mov(f),
                 f if f.starts_with("svc") => {
-                    if let Some(exit_code) = self.exec_svc(instruction.clone()) {
+                    if let Some(exit_code) = self.exec_svc(f) {
                         if self.test_mode {
                             println!("{}", self.test_report.dump());
                         }
                         return (exit_code as u32) & 0xff;
                     }
                 }
-                f if f.starts_with("sub") => self.exec_sub(instruction.clone()),
+                f if f.starts_with("sub") => self.exec_sub(f),
                 // Important: check "strb" before "str" since "strb".starts_with("str") is true.
-                f if f.starts_with("strb") => self.exec_strb(instruction.clone()),
-                f if f.starts_with("str") => self.exec_str(instruction.clone()),
-                f if f.starts_with("ldr") => self.exec_ldr(instruction.clone()),
-                f if f.starts_with("cmp") => self.exec_cmp(instruction.clone()),
-                f if f.starts_with("it") => self.exec_itx(instruction.clone()),
+                f if f.starts_with("strb") => self.exec_strb(f),
+                f if f.starts_with("str") => self.exec_str(f),
+                f if f.starts_with("ldr") => self.exec_ldr(f),
+                f if f.starts_with("cmp") => self.exec_cmp(f),
+                f if f.starts_with("it") => self.exec_itx(f),
                 f if f.starts_with("b") => {
-                    self.exec_b(instruction.clone());
+                    self.exec_b(f);
                     continue;
                 }
-                f if f.starts_with("add") => self.exec_add(instruction.clone()),
-                f if f.starts_with("mul") => self.exec_mul(instruction.clone()),
-                f if f.starts_with("sdiv") => self.exec_sdiv(instruction.clone()),
+                f if f.starts_with("add") => self.exec_add(f),
+                f if f.starts_with("mul") => self.exec_mul(f),
+                f if f.starts_with("sdiv") => self.exec_sdiv(f),
                 f if f.contains(":") => {}
                 invalid => panic!("Invalid instruction: {invalid}"),
             }
