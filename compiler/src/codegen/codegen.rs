@@ -2,6 +2,17 @@ use crate::parser::{ AST, parser::{ BinOp, Block, Expr, Function, Stmt } };
 use core::panic;
 use std::{ collections::HashMap, fs::File, io::Write };
 
+trait VecExt<T: PartialEq> {
+    fn push_unique(&mut self, item: T);
+}
+impl<T: PartialEq> VecExt<T> for Vec<T> {
+    fn push_unique(&mut self, item: T) {
+        if !self.contains(&item) {
+            self.push(item);
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CodeGenerator {
     pub file: File,
@@ -19,6 +30,7 @@ pub struct CodeGenerator {
     wh_indent: usize,
     metadata: Vec<String>,
     pc: usize,
+    metadata_current_registers: Vec<String>,
 }
 
 impl CodeGenerator {
@@ -39,6 +51,7 @@ impl CodeGenerator {
             metadata: Vec::new(),
             pc: 0,
             stmt: 0,
+            metadata_current_registers: Vec::new(),
         }
     }
     pub fn generate(&mut self, ast: AST, is_hard: bool) {
@@ -49,7 +62,18 @@ impl CodeGenerator {
         }
         self.emit_print_data();
         self.insert_metadata();
+
+        self.wh_write_line(format!("stmt = (? as ui32);").as_str(), 0);
+        self.wh_write_line(format!("bit_shift = (? as ui32);").as_str(), 0);
+        self.wh_write_line(format!("assume (bit_shift <= (31 as ui32));").as_str(), 0);
+        self.wh_write_line(format!("assume (bit_shift >= (0 as ui32));").as_str(), 0);
+        self.wh_write_line(format!("assume (stmt >= (0 as ui32));").as_str(), 0);
+        self.wh_write_line(format!("assume (stmt <= ({} as ui32));",self.stmt-1).as_str(), 0);
+        self.wh_write_line(format!("flip_mask = ((1 as ui32) << bit_shift);").as_str(), 0);
+
         self.wh_write_line("\nres = main(stmt, flip_mask);", 0);
+        self.wh_write_line(format!("assert(res == (0 as ui32));").as_str(), 0);
+
     }
 
     fn gen_init(&mut self) {
@@ -64,10 +88,12 @@ impl CodeGenerator {
 
     fn write_line(&mut self, string: &str, indents: usize, incr_pc: bool) {
         let indent_str = "    ".repeat(indents);
-        
+
         // writeln! automatically appends \n
         let _ = writeln!(self.file, "{}{}", indent_str, string);
-        if incr_pc {self.pc += 1;}
+        if incr_pc {
+            self.pc += 1;
+        }
     }
 
     fn wh_write_line(&mut self, string: &str, indents: usize) {
@@ -154,7 +180,6 @@ ui32 flip_mask;
         }
         self.step_counter += 1;
 
-
         if self.in_loop {
             self.write_line("add r9, r9, #1", 1, true);
             self.write_line("cmp r9, r10", 1, true);
@@ -166,7 +191,10 @@ ui32 flip_mask;
             self.write_line("bne countermeasure", 1, true);
 
             self.wh_write_line("step_counter++;", self.wh_indent);
-            self.wh_write_line(&format!("if (step_counter != ({} as ui32)) {{", self.step_counter), self.wh_indent);
+            self.wh_write_line(
+                &format!("if (step_counter != ({} as ui32)) {{", self.step_counter),
+                self.wh_indent
+            );
             self.wh_indent += 1;
             self.wh_write_line("return (77 as ui32);", self.wh_indent);
             self.wh_indent -= 1;
@@ -201,7 +229,7 @@ ui32 flip_mask;
         }
     }
 
-    fn wh_emit_if_start(&mut self, condition : Expr) {
+    fn wh_emit_if_start(&mut self, condition: Expr) {
         let expr = self.wh_build_expr_str(condition);
         self.wh_write_line(&format!("if ( {expr}) {{"), self.wh_indent);
         self.wh_indent += 1;
@@ -228,7 +256,10 @@ ui32 flip_mask;
                 if self.hard {
                     self.step_counter = saved;
                     self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
-                    self.wh_write_line(&format!("step_counter = ({} as ui32);", self.step_counter), self.wh_indent);
+                    self.wh_write_line(
+                        &format!("step_counter = ({} as ui32);", self.step_counter),
+                        self.wh_indent
+                    );
                 }
                 self.write_line(&format!("b endif_{}", label_id), 1, true);
 
@@ -249,7 +280,10 @@ ui32 flip_mask;
                     if self.hard {
                         self.step_counter = saved;
                         self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
-                        self.wh_write_line(&format!("step_counter = ({} as ui32);", self.step_counter), self.wh_indent);
+                        self.wh_write_line(
+                            &format!("step_counter = ({} as ui32);", self.step_counter),
+                            self.wh_indent
+                        );
                     }
                     self.wh_indent -= 1;
                     self.wh_write_line("}", self.wh_indent);
@@ -380,7 +414,10 @@ ui32 flip_mask;
     }
 
     fn wh_emit_return(&mut self, return_str: &str) {
-        self.wh_write_line(("return (".to_string() +return_str + " as ui32);").as_str(), self.wh_indent);
+        self.wh_write_line(
+            ("return (".to_string() + return_str + " as ui32);").as_str(),
+            self.wh_indent
+        );
     }
 
     fn emit_return(&mut self, return_stmt: Stmt, _is_main: bool) {
@@ -398,17 +435,34 @@ ui32 flip_mask;
     fn emit_assign(&mut self, assign_stmt: Stmt) {
         match assign_stmt.clone() {
             Stmt::AssignStatement(name, expr) => {
+                self.metadata_current_registers.clear();
+                self.metadata_current_registers.push_unique("r0".to_string());
+                let curr_stmt = self.stmt;
+                let pc_before = self.pc;
                 self.emit_expr(expr);
                 let offset = self.locals.get(&name).expect("Undefined variable");
                 if self.stack_offset - offset == 0 {
                     self.write_line("str r0, [sp]", 1, true);
                 } else {
-                    self.write_line(&format!("str r0, [sp, #{}]", self.stack_offset - offset), 1, true);
+                    self.write_line(
+                        &format!("str r0, [sp, #{}]", self.stack_offset - offset),
+                        1,
+                        true
+                    );
                 }
                 self.wh_emit_assign(assign_stmt);
                 if self.hard {
                     self.emit_step_check();
                 }
+                let pc_after = self.pc - 1;
+
+                self.metadata.push(format!(r#".word 0x10000000 @ {curr_stmt}"#));
+                self.metadata.push(format!(r#".word 0xa+{pc_before}"#));
+                self.metadata.push(format!(r#".word 0xb+{pc_after}"#));
+                let register_string = format!("[{}]", self.metadata_current_registers.join(","));
+                self.metadata.push(format!(r#".word 0x0 @ {register_string}"#));
+                self.metadata_current_registers.clear();
+                self.metadata.push(format!(r#".word 0x00000001 @ {name}"#));
             }
             _ => panic!("Not a valid assignment"),
         }
@@ -420,19 +474,22 @@ ui32 flip_mask;
                 if expr_str == "".to_string() {
                     return;
                 }
-                self.wh_write_line(&format!("{identifyer} = {expr_str};"), self.wh_indent);
+                let assign_line = format!("{identifyer} = {expr_str}");
+                self.wh_write_line(&format!("{assign_line};"), self.wh_indent);
+
+                self.wh_instrument_assign(assign_line.as_str());
             }
             _ => panic!("Not an assign stmt (wh)"),
         }
     }
-    fn insert_metadata(&mut self){
+    fn insert_metadata(&mut self) {
         self.write_line("_metadata:", 0, true);
         for met in self.metadata.clone() {
             self.write_line(met.as_str(), 1, true);
         }
-    } 
+    }
     fn insert_at_line(&mut self, line_num: usize, new_content: &str) -> std::io::Result<()> {
-        use std::io::{Read, Write, Seek, SeekFrom};
+        use std::io::{ Read, Write, Seek, SeekFrom };
 
         // 1. Read existing content
         let mut content = String::new();
@@ -441,7 +498,10 @@ ui32 flip_mask;
 
         // 2. Split into lines
         // Note: lines() omits the trailing newline; we'll add it back during join
-        let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let mut lines: Vec<String> = content
+            .lines()
+            .map(|s| s.to_string())
+            .collect();
 
         // 3. Insert the line
         // If line_num is 2 (1-based), user likely means index 1
@@ -454,10 +514,10 @@ ui32 flip_mask;
         }
 
         // 4. Overwrite the file
-        self.wh_file.set_len(0)?; 
+        self.wh_file.set_len(0)?;
         self.wh_file.seek(SeekFrom::Start(0))?;
         self.wh_file.write_all(lines.join("\n").as_bytes())?;
-        
+
         // Add a final newline if you want the file to end with one
         self.wh_file.write_all(b"\n")?;
 
@@ -469,6 +529,8 @@ ui32 flip_mask;
         self.wh_emit_let(let_stmt.clone());
         match let_stmt {
             Stmt::Let(name, _type_name, expr) => {
+                self.metadata_current_registers.clear();
+                self.metadata_current_registers.push("r0".to_string());
                 self.stack_offset += 4;
                 let pc_before = self.pc;
                 self.write_line("sub sp, sp, #4", 1, true);
@@ -478,12 +540,14 @@ ui32 flip_mask;
                 if self.hard {
                     self.emit_step_check();
                 }
-                let pc_after = self.pc;
-
+                let pc_after = self.pc - 1;
 
                 self.metadata.push(format!(r#".word 0x10000000 @ {curr_stmt}"#));
                 self.metadata.push(format!(r#".word 0xa+{pc_before}"#));
                 self.metadata.push(format!(r#".word 0xb+{pc_after}"#));
+                let register_string = format!("[{}]", self.metadata_current_registers.join(","));
+                self.metadata.push(format!(r#".word 0x0 @ {register_string}"#));
+                self.metadata_current_registers.clear();
                 self.metadata.push(format!(r#".word 0x00000001 @ {name}"#));
             }
             _ => panic!("Not a let statement format sorry "),
@@ -493,24 +557,28 @@ ui32 flip_mask;
         match let_stmt {
             Stmt::Let(name, _type_name, expr) => {
                 let indent_str = "    ".repeat(1);
-                let combined = indent_str + "ui32 " + name.as_str() + ";"; 
+                let combined = indent_str + "ui32 " + name.as_str() + ";";
                 self.insert_at_line(self.next_assignment_location, combined.as_str());
                 self.next_assignment_location += 1;
                 let val = self.wh_build_expr_str(expr);
                 let assign_line = name + " = " + val.as_str();
 
-                self.wh_write_line(format!("{};",assign_line.as_str()).as_str(), self.wh_indent);
-                self.wh_write_line(format!("if (stmt == ({} as ui32)) {{",self.stmt).as_str(), self.wh_indent);
-                self.wh_indent += 1;
-                self.wh_write_line(format!("{} ^ flip_mask;",assign_line.as_str()).as_str(), self.wh_indent);
-                self.wh_indent -= 1;
-                self.wh_write_line("}", self.wh_indent);
-                self.stmt += 1;
-
-
+                self.wh_write_line(format!("{};", assign_line.as_str()).as_str(), self.wh_indent);
+                self.wh_instrument_assign(assign_line.as_str());
             }
             _ => panic!("Not a let statement format sorry (wh emit)"),
         }
+    }
+    fn wh_instrument_assign(&mut self, assign_line: &str) {
+        self.wh_write_line(
+            format!("if (stmt == ({} as ui32)) {{", self.stmt).as_str(),
+            self.wh_indent
+        );
+        self.wh_indent += 1;
+        self.wh_write_line(format!("{} ^ flip_mask;", assign_line).as_str(), self.wh_indent);
+        self.wh_indent -= 1;
+        self.wh_write_line("}", self.wh_indent);
+        self.stmt += 1;
     }
     fn wh_build_expr_str(&self, expr: Expr) -> String {
         // IntegerLiteral(i64),
@@ -581,10 +649,11 @@ ui32 flip_mask;
             Expr::BinaryOp(left, op, right) => {
                 self.emit_expr(*left);
                 self.write_line("mov r1, r0", 1, true); // store left
+                self.metadata_current_registers.push_unique("r1".to_string());
                 self.emit_expr(*right);
 
                 match op {
-                    BinOp::Add => self.write_line("add r0, r1, r0", 1,true),
+                    BinOp::Add => self.write_line("add r0, r1, r0", 1, true),
                     BinOp::Sub => self.write_line("sub r0, r1, r0", 1, true),
                     BinOp::Mul => self.write_line("mul r0, r1, r0", 1, true),
                     BinOp::Div => self.write_line("sdiv r0, r1, r0", 1, true),

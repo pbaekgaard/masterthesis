@@ -378,7 +378,10 @@ class TestRunner:
         self.compile_results = results
         return results
 
-    def run_tests(self, limit=None, run_variants="both"):
+    def run_tests(self, limit=None, run_variants="both", minimc_res=None):
+        exhaustive = True
+        if minimc_res:
+            exhaustive = False
 
         if self.compile_results is None:
             self.compile()

@@ -25,7 +25,7 @@ class SymexRunner:
 
         for wh_file in wh_files:
             print(f"Running MiniMC on {wh_file}")
-            cmd = [self.minimc_path, wh_file, "mcall"]
+            cmd = [self.minimc_path, wh_file, "mc", "--mc.symbolic", "--mc.all", "--mc.concretize"]
 
             result = subprocess.run(
                 cmd,
@@ -48,7 +48,7 @@ class SymexRunner:
                         "test": wh_file.replace(".hard.wh", "").replace(".wh", ""),
                         "variant": variant,
                         "stmt": v.get("stmt"),
-                        "faulty_bit": v.get("bit_shift") + 1,
+                        "faulty_bit": v.get("bit_shift"),
                         "result": v.get("res"),
                     }
                 )
@@ -76,13 +76,26 @@ def parse_violation(block):
     matches = re.findall(r"prgm:(\w+)\s+([^\n]+)", block)
 
     for key, value in matches:
+        print(f"key: {key}, value: {value}")
+        # key: mem, value: <0 I8>
+        # key: res, value: <0x1 I32>
+        # key: stmt, value: <0x1 I32>
+        # key: flip_mask, value: <0x1 I32>
+        # key: bit_shift, value: <0 I32>
         value = value.strip()
 
-        # try int conversion if possible
-        try:
-            value = int(value)
-        except ValueError:
-            pass
+        inner = re.match(r"<(\S+)\s+\w+>", value)
+        if inner:
+            raw = inner.group(1)
+            try:
+                value = int(raw, 0)
+            except ValueError:
+                pass
+        else:
+            try:
+                value = int(value)
+            except ValueError:
+                pass
 
         result[key] = value
 

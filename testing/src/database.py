@@ -13,7 +13,7 @@ class ResultsDatabase:
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS interpreter_results (
+    CREATE TABLE IF NOT EXISTS exhaustive_interpreter_results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id INTEGER NOT NULL,
         test TEXT NOT NULL,
@@ -38,6 +38,32 @@ class ResultsDatabase:
         FOREIGN KEY (run_id) REFERENCES runs(id)
     );
 
+    CREATE TABLE IF NOT EXISTS guided_interpreter_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        test TEXT NOT NULL,
+        variant TEXT NOT NULL,
+        injection_point TEXT NOT NULL,
+        fault_type TEXT,
+        fault_pc INTEGER,
+        fault_reg TEXT,
+        fault_bit INTEGER,
+        returncode INTEGER NOT NULL,
+        pc_before INTEGER,
+        pc_after INTEGER,
+        expected_exec_instr TEXT,
+        actual_exec_instr TEXT,
+        reg_old_value INTEGER,
+        reg_new_value INTEGER,
+        stdout TEXT,
+        stderr TEXT,
+        expected_output TEXT NOT NULL,
+        matched_output_line TEXT,
+        passed INTEGER NOT NULL,
+        FOREIGN KEY (run_id) REFERENCES runs(id)
+    );
+
+
     CREATE TABLE IF NOT EXISTS symex_results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id INTEGER NOT NULL,
@@ -48,10 +74,15 @@ class ResultsDatabase:
         result INTEGER NOT NULL,
         FOREIGN KEY (run_id) REFERENCES runs(id)
     );
-    CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON interpreter_results(run_id);
-    CREATE INDEX IF NOT EXISTS idx_test_results_test ON interpreter_results(test);
-    CREATE INDEX IF NOT EXISTS idx_test_results_variant ON interpreter_results(variant);
-    CREATE INDEX IF NOT EXISTS idx_test_results_passed ON interpreter_results(passed);
+    CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON exhaustive_interpreter_results(run_id);
+    CREATE INDEX IF NOT EXISTS idx_test_results_test ON exhaustive_interpreter_results(test);
+    CREATE INDEX IF NOT EXISTS idx_test_results_variant ON exhaustive_interpreter_results(variant);
+    CREATE INDEX IF NOT EXISTS idx_test_results_passed ON exhaustive_interpreter_results(passed);
+
+    CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON guided_interpreter_results(run_id);
+    CREATE INDEX IF NOT EXISTS idx_test_results_test ON guided_interpreter_results(test);
+    CREATE INDEX IF NOT EXISTS idx_test_results_variant ON guided_interpreter_results(variant);
+    CREATE INDEX IF NOT EXISTS idx_test_results_passed ON guided_interpreter_results(passed);
     
     CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON symex_results(run_id);
     CREATE INDEX IF NOT EXISTS idx_test_results_test ON symex_results(test);
@@ -110,7 +141,7 @@ class ResultsDatabase:
             rows,
         )
         self._conn.commit()
-    def insert_interpreter_results_batch(self, run_id, results):
+    def insert_interpreter_results_batch(self, run_id, results, guided=False):
         rows = []
         for res in results:
             parts = res["injection_point"].split(":")
@@ -169,9 +200,12 @@ class ResultsDatabase:
                 int(res["passed"]),
             ))
         
+        table = "exhaustive_interpreter_results"
+        if guided:
+            table = "guided_interpreter_results"
         self._conn.executemany(
-            """
-            INSERT INTO interpreter_results 
+            f"""
+            INSERT INTO {table} 
             (run_id, test, variant, injection_point, fault_type, fault_pc, fault_reg, fault_bit,
             returncode, pc_before, pc_after, expected_exec_instr, actual_exec_instr, reg_old_value, reg_new_value, stdout, stderr, expected_output, matched_output_line, passed)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
