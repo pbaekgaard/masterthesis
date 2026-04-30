@@ -991,7 +991,7 @@ impl Interpreter {
         let old_val = self.registers[register];
         self.test_report["reg_old_value"] = old_val.into();
         self.registers[register] = self.flip_bit(old_val, bit);
-        self.test_report["reg_new_value"] = self.registers[register].clone().into();
+        self.test_report["reg_new_value"] = self.registers[register].into();
         println!("REGISTER FAULT TRIGGERED!");
     }
 
@@ -1035,6 +1035,7 @@ impl Interpreter {
         }
         while self.pc < self.eof_pc {
             let instruction = {self.asm_code.get(self.pc as usize).unwrap().clone()};
+            println!("pc: {}, Instruction: {}", self.pc, instruction);
             if (self.pc as i32) == self.fault_spec.trigger_pc && !self.fault_spec.has_triggered {
                 match self.fault_spec.target {
                     InjectionTarget::Register { register, bit } => {
