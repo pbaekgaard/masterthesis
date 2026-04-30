@@ -68,7 +68,7 @@ impl CodeGenerator {
         self.wh_write_line(format!("assume (bit_shift <= (31 as ui32));").as_str(), 0);
         self.wh_write_line(format!("assume (bit_shift >= (0 as ui32));").as_str(), 0);
         self.wh_write_line(format!("assume (stmt >= (0 as ui32));").as_str(), 0);
-        self.wh_write_line(format!("assume (stmt <= ({} as ui32));",self.stmt-1).as_str(), 0);
+        self.wh_write_line(format!("assume (stmt <= ({} as ui32));",self.stmt).as_str(), 0);
         self.wh_write_line(format!("flip_mask = ((1 as ui32) << bit_shift);").as_str(), 0);
 
         self.wh_write_line("\nres = main(stmt, flip_mask);", 0);
@@ -168,6 +168,7 @@ ui32 flip_mask;
     fn emit_countermeasure(&mut self) {
         self.write_line("countermeasure:", 0, true);
 
+        self.emit_print([Expr::StringLiteral("COUNTERMEASURE".to_string())].into());
         // exit(77)
         self.write_line("mov r0, #77", 1, true);
         self.write_line("mov r7, #1", 1, true);

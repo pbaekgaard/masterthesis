@@ -122,56 +122,98 @@ def build_rust_task(tracker, project_dir, bin_out_name, target_bin_name, force):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--reinit", action="store_true", help="Force rebuild")
+    parser.add_argument("--targets", type=str, default="all", help="Comma-separated build targets")
     args = parser.parse_args()
+
+    targets = [t.strip() for t in args.targets.split(",")]
+    if "all" in targets:
+        targets = ["minimc", "compiler", "interpreter"]
+
+    for t in targets:
+        if t not in ("minimc", "compiler", "interpreter"):
+            print(f"\033[91mError: Unknown target '{t}'. Valid: minimc, compiler, interpreter\033[0m")
+            sys.exit(1)
 
     force = args.reinit
 
     if force:
-        shutil.rmtree(BIN_DIR, ignore_errors=True)
-        shutil.rmtree(os.path.join(COMPILER_DIR, "target"), ignore_errors=True)
-        shutil.rmtree(os.path.join(INTERPRETER_DIR, "target"), ignore_errors=True)
-        shutil.rmtree(os.path.join(MINIMC_DIR, "build"), ignore_errors=True)
+        if "compiler" in targets:
+            shutil.rmtree(os.path.join(COMPILER_DIR, "target"), ignore_errors=True)
+        if "interpreter" in targets:
+            shutil.rmtree(os.path.join(INTERPRETER_DIR, "target"), ignore_errors=True)
+        if "minimc" in targets:
+            shutil.rmtree(os.path.join(MINIMC_DIR, "build"), ignore_errors=True)
+        for t in targets:
+            bin_out_name = {"compiler": "compiler", "interpreter": "interpreter", "minimc": "minimc"}[t]
+            bin_path = os.path.join(BIN_DIR, bin_out_name)
+            if os.path.exists(bin_path):
+                os.remove(bin_path)
 
     os.makedirs(BIN_DIR, exist_ok=True)
 
     tracker = ProgressTracker()
 
-    print("\033[1mInitializing Parallel Build...\033[0m")
-    print()
-    print()
-    print()
+    is_parallel = len(targets) > 1
 
-    threads = []
+    if is_parallel:
+        print("\033[1mInitializing Parallel Build...\033[0m")
+        print()
+        print()
+        print()
 
-    t = threading.Thread(target=build_minimc_task, args=(tracker, force))
-    t.start()
-    threads.append(t)
+        threads = []
+        for target in targets:
+            if target == "minimc":
+                t = threading.Thread(target=build_minimc_task, args=(tracker, force))
+                threads.append(t)
+            elif target == "compiler":
+                t = threading.Thread(target=build_rust_task, args=(tracker, COMPILER_DIR, "compiler", "trivic", force))
+                threads.append(t)
+            elif target == "interpreter":
+                t = threading.Thread(target=build_rust_task, args=(tracker, INTERPRETER_DIR, "interpreter", "thumb2_interpreter", force))
+                threads.append(t)
 
-    t = threading.Thread(target=build_rust_task, args=(tracker, COMPILER_DIR, "compiler", "trivic", force))
-    t.start()
-    threads.append(t)
+        for t in threads:
+            t.start()
 
-    t = threading.Thread(target=build_rust_task, args=(tracker, INTERPRETER_DIR, "interpreter", "thumb2_interpreter", force))
-    t.start()
-    threads.append(t)
+        while any(t.is_alive() for t in threads):
+            if "minimc" in targets:
+                draw_line(tracker, 3, "mini", "MiniMC")
+            if "compiler" in targets:
+                draw_line(tracker, 2, "comp", "Compiler")
+            if "interpreter" in targets:
+                draw_line(tracker, 1, "int", "Interpreter")
+            import time
+            time.sleep(0.1)
 
-    while any(t.is_alive() for t in threads):
-        draw_line(tracker, 3, "mini", "MiniMC")
-        draw_line(tracker, 2, "comp", "Compiler")
-        draw_line(tracker, 1, "int", "Interpreter")
-        import time
-        time.sleep(0.1)
+        tracker.stop()
 
-    tracker.stop()
+        if "minimc" in targets:
+            draw_line(tracker, 3, "mini", "MiniMC")
+        if "compiler" in targets:
+            draw_line(tracker, 2, "comp", "Compiler")
+        if "interpreter" in targets:
+            draw_line(tracker, 1, "int", "Interpreter")
 
-    draw_line(tracker, 3, "mini", "MiniMC")
-    draw_line(tracker, 2, "comp", "Compiler")
-    draw_line(tracker, 1, "int", "Interpreter")
+        for t in threads:
+            t.join()
 
-    for t in threads:
-        t.join()
+        print("\n\n\033[32m✔ All tasks completed successfully!\033[0m")
+    else:
+        target = targets[0]
+        if target == "minimc":
+            print("\033[1mBuilding MiniMC...\033[0m")
+            build_minimc_task(tracker, force)
+            print("\n\033[32m✔ MiniMC build completed!\033[0m")
+        elif target == "compiler":
+            print("\033[1mBuilding Compiler...\033[0m")
+            build_rust_task(tracker, COMPILER_DIR, "compiler", "trivic", force)
+            print("\n\033[32m✔ Compiler build completed!\033[0m")
+        elif target == "interpreter":
+            print("\033[1mBuilding Interpreter...\033[0m")
+            build_rust_task(tracker, INTERPRETER_DIR, "interpreter", "thumb2_interpreter", force)
+            print("\n\033[32m✔ Interpreter build completed!\033[0m")
 
-    print("\n\n\033[32m✔ All tasks completed successfully!\033[0m")
     print(f"Binaries are available in: {BIN_DIR}")
 
 

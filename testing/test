@@ -5,6 +5,7 @@ from datetime import datetime
 from src.database import ResultsDatabase
 from src.testrunner import TestRunner
 from src.symexrunner import SymexRunner
+from src.plotenator import Plotter
 from rich.console import Console
 
 class Experiment:
@@ -68,7 +69,7 @@ class Experiment:
         print("\nRunning symex...")
         symex_runner = SymexRunner(config_path=self.args.config)
         symex_runner.artifacts_folder = self.runner.compiled_folder
-        symex_results = symex_runner.run()
+        symex_results = symex_runner.run(self.run_variants)
 
         self.db.insert_symex_results_batch(self.run_id, symex_results)
 
@@ -77,18 +78,19 @@ class Experiment:
             exhaustive_fault_results = self.runner.run_tests(
                 limit=self.args.limit, run_variants=run_variants
             )
-            guided_fault_results = self.runner.run_tests(
-                limit=self.args.limit, run_variants=run_variants, symex_results
-            )
+            guided_fault_results = self.runner.run_tests(limit=self.args.limit, run_variants=run_variants, minimc_res=symex_results)
         else:
             print(f"\nSkipping test run (--skip-run)")
 
         self.db.insert_interpreter_results_batch(self.run_id, exhaustive_fault_results)
         self.db.insert_interpreter_results_batch(self.run_id, guided_fault_results, True)
 
+        plotter = Plotter(self.db);
+        print("Running plots:")
+        plotter.create_plots();
 
         self.db.close()
-
+        
         zip_base = os.path.join(self.artifacts_folder, self.run_folder_name)
         shutil.make_archive(
             zip_base, "zip", self.artifacts_folder, self.run_folder_name
@@ -137,11 +139,11 @@ class Experiment:
         return max_num + 1
 
 
-def run_setup(force=False):
+def run_setup(target="all", force=False):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     setup_module = os.path.join(script_dir, "src", "setup.py")
 
-    cmd = [sys.executable, setup_module]
+    cmd = [sys.executable, setup_module, "--target", target]
     if force:
         cmd.append("-f")
 
@@ -165,8 +167,12 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default=None, help="Path to config.toml")
     parser.add_argument(
         "--setup",
-        action="store_true",
-        help="Only run setup (build dependencies), skip main test functionality",
+        type=str,
+        nargs="?",
+        const="all",
+        default=None,
+        metavar="TARGETS",
+        help="Only run setup (build dependencies), then quit. Comma-separated: compiler, interpreter, minimc, or all",
     )
     parser.add_argument(
         "--skip-run",
@@ -190,7 +196,7 @@ if __name__ == "__main__":
     force = "-f" in unknown or "--reinit" in unknown
 
     if args.setup:
-        exit(run_setup(force=force))
+        exit(run_setup(target=args.setup, force=force))
 
     missing_bins = get_missing_binaries()
     if missing_bins:

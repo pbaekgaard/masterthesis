@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from datetime import datetime
+import pandas as pd
 
 
 class ResultsDatabase:
@@ -141,6 +142,10 @@ class ResultsDatabase:
             rows,
         )
         self._conn.commit()
+
+    def query_df(self, query):
+        return pd.read_sql_query(query, self._conn)
+        
     def insert_interpreter_results_batch(self, run_id, results, guided=False):
         rows = []
         for res in results:

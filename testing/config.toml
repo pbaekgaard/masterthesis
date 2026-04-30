@@ -1,8 +1,8 @@
 test_folder = "pinny"
 
 injection_points = [
-  # "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
-  # "r8", "r9", "r10", "r11", "r12", 
+  "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
+  "r8", "r9", "r10", "r11", "r12", "pc=*",
   "cpsr_n"
 ]
 
@@ -10,7 +10,9 @@ injection_points = [
 default = "returncode"
 
 [pass_mode.returncode]
-expected = 0
+passed = 0
+failed = 1
+paniced = 2
 
 [pass_mode.stdout]
 expected_pass = "g_authenticated: 0"

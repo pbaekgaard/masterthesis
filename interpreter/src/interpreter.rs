@@ -151,7 +151,6 @@ impl Interpreter {
         // Get the first three parts
         let fault_type = parts.next().ok_or("Missing Fault Type").unwrap();
         let pc = parts.next().ok_or("Missing PC value").unwrap().parse::<i32>().unwrap();
-        println!("fault_type: {}", fault_type);
         if fault_type == "reg" {
             register = parts
                 .next()
@@ -992,6 +991,7 @@ impl Interpreter {
         self.test_report["reg_old_value"] = old_val.into();
         self.registers[register] = self.flip_bit(old_val, bit);
         self.test_report["reg_new_value"] = self.registers[register].into();
+        self.fault_spec.has_triggered = true;
         println!("REGISTER FAULT TRIGGERED!");
     }
 
@@ -1015,16 +1015,17 @@ impl Interpreter {
         else {
             panic!("Error Inivalid CPSR fault")
         }
+        self.fault_spec.has_triggered = true;
     }
 
     fn trigger_pc_fault(&mut self, instruction: String, bit: u32) {
         self.test_report["pc_old_value"] = self.pc.into();
         self.pc = self.flip_bit_u32(self.pc, bit);
         self.test_report["pc_new_value"] = self.pc.into();
-        eprintln!("DEBUG: pc = {}, asm_len = {}", self.pc, self.asm_code.len());
         let actual_exec_instr = self.asm_code.get(self.pc as usize).unwrap();
         self.test_report["expected_exec_instr"] = instruction.as_str().into();
         self.test_report["actual_exec_instr"] = actual_exec_instr.as_str().into();
+        self.fault_spec.has_triggered = true;
     }
 
     pub fn execute(&mut self) -> u32 {
@@ -1035,7 +1036,6 @@ impl Interpreter {
         }
         while self.pc < self.eof_pc {
             let instruction = {self.asm_code.get(self.pc as usize).unwrap().clone()};
-            println!("pc: {}, Instruction: {}", self.pc, instruction);
             if (self.pc as i32) == self.fault_spec.trigger_pc && !self.fault_spec.has_triggered {
                 match self.fault_spec.target {
                     InjectionTarget::Register { register, bit } => {

@@ -6,6 +6,48 @@ import concurrent.futures
 import multiprocessing
 from tqdm import tqdm
 
+def _get_countermeasure_location_range(asm_path: str):
+    with open(asm_path, "r") as f:
+        lines = f.readlines()
+
+    start_pc = None
+    end_pc = None
+    current_pc = 0
+    found_start = False
+    
+    # We define what an 'instruction' looks like to ignore labels/comments
+    # Usually starts with whitespace followed by an opcode (mov, svc, etc.)
+    for line in lines:
+        clean_line = line.strip()
+        
+        # 1. Find the entry point
+        if "_start:" in clean_line:
+            found_start = True
+            current_pc += 1
+            continue
+            
+        if not found_start:
+            continue
+
+        # 2. Check for the label we are looking for
+        if "countermeasure:" in clean_line:
+            start_pc = current_pc
+
+        if start_pc is not None:
+            if ".size _start, .-_start" in clean_line:
+                end_pc = current_pc -2
+
+
+
+        current_pc += 1
+
+
+
+    return start_pc, end_pc
+
+# Usage
+# start, end = _get_countermeasure_location_range("code.s")
+# print(f"Countermeasure range: {start} to {end}")
 
 def _fault_worker(args):
     asm_path, injection_point, pass_mode_config = args
@@ -17,7 +59,8 @@ def _fault_worker(args):
 
     result = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
 
-    passed = _check_passed(result, pass_mode_config)
+    (cm_start, cm_end) = _get_countermeasure_location_range(asm_path)
+    passed = _check_passed(result, pass_mode_config, cm_start, cm_end, injection_point)
 
     matched_output_line = None
     if pass_mode_config.get("mode") == "stdout":
@@ -58,20 +101,42 @@ def _extract_test_report(stdout: str):
         return match.group(0)
     return '{"title": "test_report"}'
     
-def _check_passed(result, pass_mode_config):
+def _check_passed(result, pass_mode_config, cm_start, cm_end, injection_point):
     mode = pass_mode_config.get("mode", "returncode")
     expected_pass = pass_mode_config.get("expected_pass", None)
     expected_fail = pass_mode_config.get("expected_fail", None)
 
-    if mode == "returncode":
-        return result.returncode == 0
+    if "COUNTERMEASURE" in result.stdout:
+        return 77
+    elif "Detected Infinite Loop" in result.stdout:
+        return 3
+    if mode == "returncode" and result.returncode == 0:
+        return 1
+    elif mode == "returncode" and "panic" in result.stderr:
+        return 2
+    elif mode == "returncode" and result.returncode != 0:
+        if cm_start is not None and cm_end is not None and injection_point is not None:
+            parts = injection_point.split(":")
+            if parts[0] == "pc":
+                pc_value = int(parts[1])
+                bit_value = int(parts[2])
+                mask = 1 << bit_value
+                flipped_pc = pc_value ^ mask
+                if(flipped_pc in range(cm_start, cm_end+1)):
+                    return 78
+                return 0
+            return 0
+        return 0
     elif mode == "stdout":
         if expected_pass and expected_pass in result.stdout:
-            return True
+            return 1
         elif expected_fail and expected_fail in result.stdout and result.returncode == 1:
-            return False
-        return True
+            return 0
+        return 1
     else:
+        print(f"STDOUT: {result.stdout}")
+        print(f"STDERR: {result.stderr}")
+        print(f"RETURNCODE: {result.returncode}")
         raise ValueError(f"Unknown pass mode: {mode}")
 
 
@@ -110,6 +175,7 @@ class TestRunner:
         self.pass_mode_configs = config.get("pass_mode", {})
         self.tests = self._discover_tests()
         self.compile_results = None
+        self.current_file : File = None
 
     def _discover_tests(self):
         tests = []
@@ -159,16 +225,16 @@ class TestRunner:
                 mode_config = self.pass_mode_configs.get(mode, {})
                 return {
                     "mode": mode,
-                    "expected_pass": pass_mode.get("expected_pass", mode_config.get("expected_pass", 0)),
-                    "expected_fail": pass_mode.get("expected_fail", mode_config.get("expected_fail", None)),
+                    "expected_pass": pass_mode.get("passed", 0) if mode == "returncode" else pass_mode.get("expected_pass"),
+                    "expected_fail": pass_mode.get("failed", 1) if mode == "returncode" else pass_mode.get("expected_fail"),
                 }
 
         mode = self.default_pass_mode
         mode_config = self.pass_mode_configs.get(mode, {})
         return {
             "mode": mode,
-            "expected_pass": mode_config.get("expected_pass", 0),
-            "expected_fail": mode_config.get("expected_fail", None),
+            "expected_pass": mode_config.get("passed", 0) if mode == "returncode" else mode_config.get("expected_pass"),
+            "expected_fail": mode_config.get("failed", 1) if mode == "returncode" else mode_config.get("expected_fail"),
         }
 
     def check_bin(self):
@@ -270,10 +336,6 @@ class TestRunner:
                     in_start = True
                 continue
 
-            # skip labels after _start
-            if line.endswith(":"):
-                continue
-
             if line.startswith("."):
                 continue
 
@@ -328,8 +390,57 @@ class TestRunner:
 
         return injection_points
 
-    def _run_fault_campaign(self, test_name, variant, asm_path, pass_mode_config, limit=None):
-        injection_points = self._generate_injection_points(asm_path)
+    def stmt_to_pc_range(self, asm_path, stmt: int):
+        with open(asm_path, 'r') as f:
+            lines = f.readlines()
+        for i, line in enumerate(lines):
+            if f'.word 0x10000000 @ {stmt}' in line:
+                a_val = int(lines[i + 1].split('+')[1].split()[0])
+                b_val = int(lines[i + 2].split('+')[1].split()[0])
+                return a_val, b_val
+        return None
+
+    def stmt_to_regs(self, asm_path, stmt: int):
+        with open(asm_path, 'r') as f:
+            lines = f.readlines()
+        for i, line in enumerate(lines):
+            if f'.word 0x10000000 @ {stmt}' in line:
+                return re.findall(r'r(\d+)', lines[i + 3])
+        return None
+
+
+    def _symex_to_injection_points(self, variant, asm_path, minimc_res):
+        injection_points = []
+        for fault in minimc_res:
+            if fault['variant'].lower() != variant:
+                continue
+            stmt = fault['stmt']
+            (start_pc, end_pc) = self.stmt_to_pc_range(asm_path, stmt)
+            registers = self.stmt_to_regs(asm_path, stmt)
+            bit = fault['faulty_bit']
+            for reg in registers:
+                for pc in range(start_pc, end_pc+1):
+                    ip = f"reg:{pc}:{reg}:{bit}"
+                    injection_points.append(ip)
+            for pc in range(start_pc, end_pc+1):
+                for bit in range(0, 31):
+                    ip = f"pc:{pc}:{bit}"
+                    injection_points.append(ip)
+                for cpsr in ["n","v","z","c"]:
+                    ip = f"cpsr:{pc}:{cpsr}"
+        return injection_points
+
+
+    def _run_fault_campaign(self, test_name, variant, asm_path, pass_mode_config, limit=None, minimc_res=None):
+        exhaustive = True
+        if minimc_res:
+            exhaustive = False
+
+        injection_points : list[str] = []
+        if exhaustive:
+            injection_points = self._generate_injection_points(asm_path)
+        else:
+            injection_points = self._symex_to_injection_points(variant, asm_path, minimc_res)
 
         if limit is not None and len(injection_points) > limit:
             injection_points = injection_points[:limit]
@@ -379,10 +490,6 @@ class TestRunner:
         return results
 
     def run_tests(self, limit=None, run_variants="both", minimc_res=None):
-        exhaustive = True
-        if minimc_res:
-            exhaustive = False
-
         if self.compile_results is None:
             self.compile()
 
@@ -426,6 +533,7 @@ class TestRunner:
                     asm_path=asm_path,
                     pass_mode_config=test["pass_mode"],
                     limit=limit,
+                    minimc_res=minimc_res
                 )
 
                 all_fault_results.extend(fault_results)
