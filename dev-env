@@ -1,0 +1,2 @@
+export PATH="$PATH:./compiler/bin/"
+export PATH="$PATH:./testing/bin/"

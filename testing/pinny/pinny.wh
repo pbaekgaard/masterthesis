@@ -1,5 +1,4 @@
 ui32 res;
-ui32 res2;
 ui32 stmt;
 ui32 bit_shift;
 ui32 flip_mask;

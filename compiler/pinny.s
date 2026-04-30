@@ -5,6 +5,10 @@
 .global _start
 .type _start, %function
 
+_metadata:
+    .word 0x000005
+    .word 0x000010
+    .word 0x000002 @ authenticated > 0
 _start:
     sub sp, sp, #4
     mov r0, #0
@@ -123,14 +127,3 @@ endif_4:
     svc #0
 
 .size _start, .-_start
-_metadata:
-    .word 0x10000000 @ 0
-    .word 0x10000000 @ 1
-    .word 0x10000000 @ 2
-    .word 0x10000000 @ 3
-    .word 0x10000000 @ 4
-    .word 0x10000000 @ 5
-    .word 0x10000000 @ 6
-    .word 0x10000000 @ 7
-    .word 0x10000000 @ 8
-    .word 0x10000000 @ 9
