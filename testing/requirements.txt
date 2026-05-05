@@ -1,3 +1,5 @@
 toml
 rich
 tqdm
+pandas
+matplotlib

@@ -1,6 +1,5 @@
 const STACK_SIZE: usize = 1024 * 1024;
 const HEAP_SIZE: usize = 1024 * 1024;
-
 pub struct EmulatorMemory {
     pub stack: Vec<u8>,
     pub heap: Vec<u8>,
@@ -16,34 +15,6 @@ impl EmulatorMemory {
             heap_alloc_index: 0,
             stack_pointer: STACK_SIZE,
         }
-    }
-
-    pub fn push32(&mut self, value: u32) {
-        let bytes = value.to_le_bytes();
-        self.stack[self.stack_pointer..self.stack_pointer + 4].copy_from_slice(&bytes);
-    }
-
-    pub fn pop32(&mut self) -> u32 {
-        let bytes = [
-            self.stack[self.stack_pointer],
-            self.stack[self.stack_pointer + 1],
-            self.stack[self.stack_pointer + 2],
-            self.stack[self.stack_pointer + 3],
-        ];
-        u32::from_le_bytes(bytes)
-    }
-
-    pub fn push16(&mut self, value: u16) {
-        let bytes = value.to_le_bytes();
-        self.stack[self.stack_pointer..self.stack_pointer + 2].copy_from_slice(&bytes);
-    }
-
-    pub fn pop16(&mut self) -> u16 {
-        let bytes = [
-            self.stack[self.stack_pointer],
-            self.stack[self.stack_pointer + 1],
-        ];
-        u16::from_le_bytes(bytes)
     }
 
     pub fn alloc(&mut self, size: usize) -> Result<usize, String> {

@@ -20,3 +20,6 @@
 /testing/[0-9]*-*/
 /testing/hardened.asm
 /testing/out.asm
+/testing/out.s
+/compiler/out.s
+/compiler/out.wh

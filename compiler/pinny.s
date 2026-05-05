@@ -5,6 +5,10 @@
 .global _start
 .type _start, %function
 
+_metadata:
+    .word 0x000005
+    .word 0x000010
+    .word 0x000002 @ authenticated > 0
 _start:
     sub sp, sp, #4
     mov r0, #0
