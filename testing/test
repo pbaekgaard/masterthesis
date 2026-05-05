@@ -1,12 +1,14 @@
 #!/bin/python3
 
 import argparse, os, toml, shutil, subprocess, sys
+import matplotlib.pyplot as plt
 from datetime import datetime
 from src.database import ResultsDatabase
 from src.testrunner import TestRunner
 from src.symexrunner import SymexRunner
 from src.plotenator import Plotter
 from rich.console import Console
+
 
 class Experiment:
     def __init__(self, args, run_variants, config_path=None):
@@ -85,9 +87,31 @@ class Experiment:
         self.db.insert_interpreter_results_batch(self.run_id, exhaustive_fault_results)
         self.db.insert_interpreter_results_batch(self.run_id, guided_fault_results, True)
 
-        plotter = Plotter(self.db);
-        print("Running plots:")
-        plotter.create_plots();
+        plotter = Plotter(self.db)
+        plots = plotter.create_plots()
+
+        print("Running plots...")
+
+        plots_dir = os.path.join(self.run_folder, "plots")
+        os.makedirs(plots_dir, exist_ok=True)
+
+
+        def save_and_show(name, fig):
+            path = os.path.join(plots_dir, f"{name}.svg")
+            fig.savefig(path, format="svg", bbox_inches="tight")
+
+            plt.figure(fig.number)
+            plt.show()
+            plt.close(fig)
+
+
+        # only these remain as plots
+        save_and_show("exhaustive", plots["exhaustive"])
+        save_and_show("guided", plots["guided"])
+
+        # NEW: symex exported as CSV instead of plot
+        symex_csv_path = os.path.join(plots_dir, "symex_results.csv")
+        plotter.export_symex_csv(symex_csv_path)
 
         self.db.close()
         
