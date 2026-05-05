@@ -745,6 +745,7 @@ mod tests {
             .global _start
             .type _start, %function
 
+            _metadata:
             "##
             }
         ).to_string();
@@ -783,19 +784,20 @@ mod tests {
         let expected = (
             indoc::indoc! {
                 r##"
-            .syntax unified
-            .thumb
+                .syntax unified
+                .thumb
 
-            .section .text
-            .global _start
-            .type _start, %function
+                .section .text
+                .global _start
+                .type _start, %function
 
-            _start:
-                mov r0, #69
-                mov r7, #1
-                svc #0
+                _start:
+                    mov r0, #69
+                    mov r7, #1
+                    svc #0
 
-            .size _start, .-_start
+                .size _start, .-_start
+                _metadata:
             "##
             }
         ).to_string();
@@ -850,6 +852,12 @@ mod tests {
                     svc #0
 
                 .size _start, .-_start
+                _metadata:
+                    .word 0x10000000 @ 0
+                    .word 0xa+1
+                    .word 0xb+3
+                    .word 0x0 @ [r0]
+                    .word 0x00000001 @ num
             "##
             }
         ).to_string();
@@ -919,7 +927,23 @@ mod tests {
                     svc #0
 
                 .size _start, .-_start
-            "##
+                _metadata:
+                    .word 0x10000000 @ 0
+                    .word 0xa+1
+                    .word 0xb+3
+                    .word 0x0 @ [r0]
+                    .word 0x00000001 @ num
+                    .word 0x10000000 @ 1
+                    .word 0xa+13
+                    .word 0xb+14
+                    .word 0x0 @ [r0]
+                    .word 0x00000001 @ num
+                    .word 0x10000000 @ 2
+                    .word 0xa+17
+                    .word 0xb+18
+                    .word 0x0 @ [r0]
+                    .word 0x00000001 @ num
+                "##
             }
         ).to_string();
         assert_eq!(expected, buf)
@@ -957,39 +981,50 @@ mod tests {
         let expected = (
             indoc::indoc! {
                 r##"
-                .syntax unified
-                .thumb
+            .syntax unified
+            .thumb
 
-                .section .text
-                .global _start
-                .type _start, %function
+            .section .text
+            .global _start
+            .type _start, %function
 
-                _start:
-                    sub sp, sp, #4
-                    mov r0, #9
-                    str r0, [sp]
-                while_0:
-                    ldr r0, [sp, #0]
-                    mov r1, r0
-                    mov r0, #12
-                    cmp r1, r0
-                    mov r0, #0
-                    it lt
-                    movlt r0, #1
-                    cmp r0, #0
-                    beq end_while_0
-                    ldr r0, [sp, #0]
-                    mov r1, r0
-                    mov r0, #1
-                    add r0, r1, r0
-                    str r0, [sp]
-                    b while_0
-                end_while_0:
-                    ldr r0, [sp, #0]
-                    mov r7, #1
-                    svc #0
+            _start:
+                sub sp, sp, #4
+                mov r0, #9
+                str r0, [sp]
+            while_0:
+                ldr r0, [sp, #0]
+                mov r1, r0
+                mov r0, #12
+                cmp r1, r0
+                mov r0, #0
+                it lt
+                movlt r0, #1
+                cmp r0, #0
+                beq end_while_0
+                ldr r0, [sp, #0]
+                mov r1, r0
+                mov r0, #1
+                add r0, r1, r0
+                str r0, [sp]
+                b while_0
+            end_while_0:
+                ldr r0, [sp, #0]
+                mov r7, #1
+                svc #0
 
-                .size _start, .-_start
+            .size _start, .-_start
+            _metadata:
+                .word 0x10000000 @ 0
+                .word 0xa+1
+                .word 0xb+3
+                .word 0x0 @ [r0]
+                .word 0x00000001 @ num
+                .word 0x10000000 @ 1
+                .word 0xa+14
+                .word 0xb+18
+                .word 0x0 @ [r0,r1]
+                .word 0x00000001 @ num
             "##
             }
         ).to_string();
@@ -1084,7 +1119,28 @@ mod tests {
                     svc #0
 
                 .size _start, .-_start
-            "##
+                _metadata:
+                    .word 0x10000000 @ 0
+                    .word 0xa+1
+                    .word 0xb+3
+                    .word 0x0 @ [r0]
+                    .word 0x00000001 @ a
+                    .word 0x10000000 @ 1
+                    .word 0xa+4
+                    .word 0xb+6
+                    .word 0x0 @ [r0]
+                    .word 0x00000001 @ b
+                    .word 0x10000000 @ 2
+                    .word 0xa+17
+                    .word 0xb+21
+                    .word 0x0 @ [r0,r1]
+                    .word 0x00000001 @ a
+                    .word 0x10000000 @ 3
+                    .word 0xa+34
+                    .word 0xb+38
+                    .word 0x0 @ [r0,r1]
+                    .word 0x00000001 @ b
+                "##
             }
         ).to_string();
         assert_eq!(expected, buf)
@@ -1176,6 +1232,27 @@ mod tests {
                     svc #0
 
                 .size _start, .-_start
+                _metadata:
+                    .word 0x10000000 @ 0
+                    .word 0xa+1
+                    .word 0xb+3
+                    .word 0x0 @ [r0]
+                    .word 0x00000001 @ a
+                    .word 0x10000000 @ 1
+                    .word 0xa+14
+                    .word 0xb+16
+                    .word 0x0 @ [r0]
+                    .word 0x00000001 @ b
+                    .word 0x10000000 @ 2
+                    .word 0xa+27
+                    .word 0xb+31
+                    .word 0x0 @ [r0,r1]
+                    .word 0x00000001 @ b
+                    .word 0x10000000 @ 3
+                    .word 0xa+34
+                    .word 0xb+38
+                    .word 0x0 @ [r0,r1]
+                    .word 0x00000001 @ a
             "##
             }
         ).to_string();
@@ -1236,11 +1313,11 @@ mod tests {
                 .parse::<i32>()
                 .expect("Failed to parse exit code");
 
-            let result = std::process::Command::new("./run_asm").arg(&output_asm_path).output();
+            let result = std::process::Command::new("./bin/run_asm").arg(&output_asm_path).output();
 
             let actual_exit_code = match result {
                 Ok(output) => output.status.code().unwrap_or(-1),
-                Err(_) => -1,
+                Err(e) => panic!("{}",e),
             };
 
             std::fs::remove_file(&output_asm_path).ok();
