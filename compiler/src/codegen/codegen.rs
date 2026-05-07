@@ -1,6 +1,6 @@
 use crate::parser::{ AST, parser::{ BinOp, Block, Expr, Function, Stmt } };
 use core::panic;
-use std::{ collections::HashMap, fs::File, io::Write };
+use std::{ cmp::max_by, collections::HashMap, fs::File, io::Write };
 
 trait VecExt<T: PartialEq> {
     fn push_unique(&mut self, item: T);
@@ -254,32 +254,25 @@ ui32 flip_mask;
                 self.emit_step_check();
                 self.emit_block(block, false);
 
-                if self.hard {
-                    self.step_counter = saved;
-                    self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
-                    self.wh_write_line(
-                        &format!("step_counter = ({} as ui32);", self.step_counter),
-                        self.wh_indent
-                    );
-                }
+                let saved_then = self.step_counter;
+
                 self.write_line(&format!("b endif_{}", label_id), 1, true);
 
                 // ELSE branch
                 self.write_line(&format!("else_{}:", label_id), 0, true);
 
-                if self.hard {
-                    self.step_counter = saved;
-                }
                 self.wh_indent -= 1;
                 self.wh_write_line("}", self.wh_indent);
 
                 if let Some(else_block) = option {
-                    self.emit_step_check();
+                    if self.hard {
+                        self.step_counter = saved;
+                    }
                     self.wh_write_line("else {", self.wh_indent);
                     self.wh_indent += 1;
                     self.emit_block(else_block, false);
                     if self.hard {
-                        self.step_counter = saved;
+                        self.step_counter = std::cmp::max(self.step_counter, saved_then);
                         self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
                         self.wh_write_line(
                             &format!("step_counter = ({} as ui32);", self.step_counter),
