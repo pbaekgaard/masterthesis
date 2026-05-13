@@ -126,7 +126,7 @@ class Experiment:
 
         self.db.close()
         
-        zip_base = os.path.join(self.artifacts_folder, self.run_folder_name)
+        zip_base = os.path.join(self.artifacts_folder, self.run_name)
         shutil.make_archive(
             zip_base, "zip", self.artifacts_folder, self.run_folder_name
         )
@@ -137,7 +137,8 @@ class Experiment:
     def setup(self):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_num = self._get_next_run_number()
-        self.run_folder_name = f"{run_num}-{timestamp}"
+        self.run_name = f"{run_num}-{timestamp}"
+        self.run_folder_name = f"test_results"
         self.run_folder = os.path.join(self.artifacts_folder, self.run_folder_name)
         self.run_tests_folder = os.path.join(self.run_folder, "tests")
         self.runner.compiled_folder = os.path.join(
