@@ -201,18 +201,28 @@ def main():
         print("\n\n\033[32m✔ All tasks completed successfully!\033[0m")
     else:
         target = targets[0]
+        name_map = {"comp": "compiler", "int": "interpreter", "mini": "minimc"}
+        label_map = {"mini": "MiniMC", "comp": "Compiler", "int": "Interpreter"}
+        name = {"minimc": "mini", "compiler": "comp", "interpreter": "int"}[target]
+
+        print(f"\033[1mBuilding {label_map[name]}...\033[0m")
+        print()
+
         if target == "minimc":
-            print("\033[1mBuilding MiniMC...\033[0m")
-            build_minimc_task(tracker, force)
-            print("\n\033[32m✔ MiniMC build completed!\033[0m")
+            t = threading.Thread(target=build_minimc_task, args=(tracker, force))
         elif target == "compiler":
-            print("\033[1mBuilding Compiler...\033[0m")
-            build_rust_task(tracker, COMPILER_DIR, "compiler", "trivic", force)
-            print("\n\033[32m✔ Compiler build completed!\033[0m")
+            t = threading.Thread(target=build_rust_task, args=(tracker, COMPILER_DIR, "compiler", "trivic", force))
         elif target == "interpreter":
-            print("\033[1mBuilding Interpreter...\033[0m")
-            build_rust_task(tracker, INTERPRETER_DIR, "interpreter", "thumb2_interpreter", force)
-            print("\n\033[32m✔ Interpreter build completed!\033[0m")
+            t = threading.Thread(target=build_rust_task, args=(tracker, INTERPRETER_DIR, "interpreter", "thumb2_interpreter", force))
+
+        t.start()
+        while t.is_alive():
+            draw_line(tracker, 1, name, label_map[name])
+            import time
+            time.sleep(0.1)
+        t.join()
+        draw_line(tracker, 1, name, label_map[name])
+        print(f"\n\033[32m\u2714 {label_map[name]} build completed!\033[0m")
 
     print(f"Binaries are available in: {BIN_DIR}")
 
