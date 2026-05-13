@@ -94,7 +94,7 @@ def _fault_worker(args):
     }
 
 def _extract_test_report(stdout: str):
-    keyword = '"title":\s*"test_report"'
+    keyword = r'"title":\s*"test_report"'
     pattern = rf'\{{[^{{}}]*{keyword}[^{{}}]*\}}'
     match = re.search(pattern, stdout,flags=re.MULTILINE)
     if match: 
