@@ -243,7 +243,9 @@ impl Parser {
             }
             _ => None,
         };
-        let _ = self.expect(TokenType::RightBrace);
+        if option.is_some() {
+            let _ = self.expect(TokenType::RightBrace);
+        }
         Stmt::If {
             condition,
             block,

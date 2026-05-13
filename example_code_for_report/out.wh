@@ -1,0 +1,37 @@
+ui32 res;
+ui32 stmt;
+ui32 bit_shift;
+ui32 flip_mask;
+
+fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
+    ui32 value;
+    value = (0 as ui32);
+    if (stmt == (0 as ui32)) {
+        value = (0 as ui32) ^ flip_mask;
+    }
+    if ( value == (1 as ui32)) {
+        value = (44 as ui32);
+        if (stmt == (1 as ui32)) {
+            value = (44 as ui32) ^ flip_mask;
+        }
+    }
+    else {
+        if ( value == (0 as ui32)) {
+            value = (33 as ui32);
+            if (stmt == (2 as ui32)) {
+                value = (33 as ui32) ^ flip_mask;
+            }
+        }
+        return (value as ui32);
+    }
+}
+stmt = (? as ui32);
+bit_shift = (? as ui32);
+assume (bit_shift <= (31 as ui32));
+assume (bit_shift >= (0 as ui32));
+assume (stmt >= (0 as ui32));
+assume (stmt <= (3 as ui32));
+flip_mask = ((1 as ui32) << bit_shift);
+
+res = main(stmt, flip_mask);
+assert(res == (0 as ui32));
