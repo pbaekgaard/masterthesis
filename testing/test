@@ -91,7 +91,6 @@ class Experiment:
         plotter = Plotter(self.db)
         plots = plotter.create_plots()
 
-        print("Running plots...")
 
         plots_dir = os.path.join(self.run_folder, "plots")
         os.makedirs(plots_dir, exist_ok=True)
@@ -102,25 +101,17 @@ class Experiment:
             path = os.path.join(plots_dir, f"{name}.svg")
             fig.savefig(path, format="svg", bbox_inches="tight")
 
-        def show_plot(fig):
-            """Handles the rendering and cleanup of the figure."""
-            plt.figure(fig.number)
-            plt.show()
-            plt.close(fig)
-
-
-
         # only these remain as plots
         if self.plot_mode == "save" or self.plot_mode == "both":
             save_plot("exhaustive", plots["exhaustive"])
             save_plot("guided", plots["guided"])
 
         if self.plot_mode == "show" or self.plot_mode == "both":
-            show_plot(plots["exhaustive"])
-            show_plot(plots["guided"])
+            plt.show()
+            for fig in plots.values():
+                plt.close(fig)
 
-
-        # NEW: symex exported as CSV instead of plot
+        # symex exported as CSV instead of plot
         symex_csv_path = os.path.join(plots_dir, "symex_results.csv")
         plotter.export_symex_csv(symex_csv_path)
 

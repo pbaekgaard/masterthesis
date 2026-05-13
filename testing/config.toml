@@ -1,5 +1,5 @@
 test_folder = "pinny"
-plotmode = "save" # show, save or both
+plotmode = "both" # show, save or both
 
 injection_points = [
   "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",

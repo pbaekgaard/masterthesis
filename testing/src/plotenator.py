@@ -16,8 +16,22 @@ class Plotter:
     def plot_exhaustive(self):
         df = self.db.query_df("SELECT * FROM exhaustive_interpreter_results")
 
+        # Group by variant and passed
         grouped = df.groupby(["variant", "passed"]).size().unstack(fill_value=0)
 
+        # Map the numeric passed values to descriptive labels
+        passed_labels = {
+            0: "Faulty",
+            1: "Normal Execution",
+            2: "Panicked!",
+            77: "Countermeasure Activated",
+            78: "Faulty Jump to Countermeasure"
+        }
+
+        # Rename the columns
+        grouped = grouped.rename(columns=passed_labels)
+
+        # Plot
         fig, ax = plt.subplots()
         grouped.plot(kind="bar", stacked=False, ax=ax)
 
@@ -25,7 +39,7 @@ class Plotter:
         ax.set_ylabel("Count (log scale)")
         ax.set_xlabel("Variant")
         ax.set_yscale("log")
-        ax.legend(title="Passed value")
+        ax.legend(title="Outcome")
 
         self._style_axes(ax)
         
@@ -36,7 +50,19 @@ class Plotter:
 
         grouped = df.groupby(["variant", "passed"]).size().unstack(fill_value=0)
 
+        # Map the numeric passed values to descriptive labels
+        passed_labels = {
+            0: "Faulty",
+            1: "Normal Execution",
+            2: "Panicked!",
+            77: "Countermeasure Activated",
+            78: "Faulty Jump to Countermeasure"
+        }
+
+        grouped = grouped.rename(columns=passed_labels)
+
         fig, ax = plt.subplots()
+
         grouped.plot(kind="bar", stacked=False, ax=ax)
 
         ax.set_title("Guided Interpreter - Outcome Distribution")
