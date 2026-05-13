@@ -1,0 +1,13 @@
+func main() -> Integer {
+  let num : Integer = 14;
+  if num > 10 {
+    if num > 13 {
+      num = 13;
+    } else {
+      num = 11;
+    }
+  } else {
+    num = 12;
+  }
+  return num;
+}
