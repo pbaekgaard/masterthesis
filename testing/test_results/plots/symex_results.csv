@@ -1,0 +1,17 @@
+id,run_id,test,variant,stmt,faulty_bit,result
+1,2,pinny,Hard,9,2,77
+2,2,pinny,Hard,8,2,77
+3,2,pinny,Hard,6,1,77
+4,2,pinny,Hard,4,2,77
+5,2,pinny,Hard,2,1,77
+6,2,pinny,Hard,0,0,1
+7,2,pinny,Normal,9,2,1
+8,2,pinny,Normal,0,0,1
+9,3,pinny,Hard,9,2,77
+10,3,pinny,Hard,8,2,77
+11,3,pinny,Hard,6,1,77
+12,3,pinny,Hard,4,2,77
+13,3,pinny,Hard,2,1,77
+14,3,pinny,Hard,0,0,1
+15,3,pinny,Normal,9,2,1
+16,3,pinny,Normal,0,0,1

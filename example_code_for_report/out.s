@@ -36,11 +36,10 @@ else_0:
     b endif_1
 else_1:
 endif_1:
+endif_0:
     ldr r0, [sp, #0]
     mov r7, #1
     svc #0
-endif_0:
-    add sp, sp, #4
 
 .size _start, .-_start
 _metadata:

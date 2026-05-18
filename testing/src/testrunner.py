@@ -370,17 +370,17 @@ class TestRunner:
         if len(pc_points) > 0:
             if pc_points[0] == "ALL":
                 for pc in range(1, max_pc):
-                    for bit in range(0, 31):
+                    for bit in range(0, 32):
                         injection_points.append(f"pc:{pc}:{bit}")
             else:
                 for pc in pc_points:
-                    for bit in range(0, 31):
+                    for bit in range(0, 32):
                         injection_points.append(f"pc:{pc}:{bit}")
 
         if len(registers) > 0:
             for pc in range(1, max_pc):
                 for reg in registers:
-                    for bit in range(0, 31):
+                    for bit in range(0, 32):
                         injection_points.append(f"reg:{pc}:{reg}:{bit}")
 
         if len(cpsr_registers) > 0:
@@ -423,7 +423,7 @@ class TestRunner:
                     ip = f"reg:{pc}:{reg}:{bit}"
                     injection_points.append(ip)
             for pc in range(start_pc, end_pc+1):
-                for bit in range(0, 31):
+                for bit in range(0, 32):
                     ip = f"pc:{pc}:{bit}"
                     injection_points.append(ip)
                 for cpsr in ["n","v","z","c"]:

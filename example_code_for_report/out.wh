@@ -22,8 +22,8 @@ fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
                 value = (33 as ui32) ^ flip_mask;
             }
         }
-        return (value as ui32);
     }
+    return (value as ui32);
 }
 stmt = (? as ui32);
 bit_shift = (? as ui32);
@@ -34,4 +34,4 @@ assume (stmt <= (3 as ui32));
 flip_mask = ((1 as ui32) << bit_shift);
 
 res = main(stmt, flip_mask);
-assert(res == (0 as ui32));
+assert(res == (33 as ui32));
