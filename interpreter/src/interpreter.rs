@@ -962,19 +962,23 @@ impl Interpreter {
             }
         }
 
+        let mut is_sp = false;
         if base_reg_name == "sp" {
+            is_sp = true;
             base_addr = self.memory.get_sp();
         } else if let Some(reg_num) = base_reg_name.strip_prefix('r') {
             let reg_idx: usize = reg_num.parse().expect("Failed to parse register index");
             base_addr = self.get_reg(reg_idx) as usize;
         }
 
-        let effective_addr = ((base_addr as i32) + offset) as usize;
+        let effective_addr = (base_addr as i32 + offset) as usize;
 
-        if effective_addr < self.memory.heap.len() {
-            self.memory.heap[effective_addr] = value;
-        } else if effective_addr < self.memory.stack.len() {
+        if !is_sp{
+            self.memory.write_heap(effective_addr, value);
+            self.set_reg(base_addr, value as i32);
+        } else {
             self.memory.stack[effective_addr] = value;
+            self.memory.write_stack32(effective_addr, value as u32);
         }
     }
 
