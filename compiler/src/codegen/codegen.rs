@@ -68,7 +68,7 @@ impl CodeGenerator {
         self.wh_write_line(format!("assume (bit_shift <= (31 as ui32));").as_str(), 0);
         self.wh_write_line(format!("assume (bit_shift >= (0 as ui32));").as_str(), 0);
         self.wh_write_line(format!("assume (stmt >= (0 as ui32));").as_str(), 0);
-        self.wh_write_line(format!("assume (stmt <= ({} as ui32));",self.stmt).as_str(), 0);
+        self.wh_write_line(format!("assume (stmt <= ({} as ui32));",self.stmt-1).as_str(), 0);
         self.wh_write_line(format!("flip_mask = ((1 as ui32) << bit_shift);").as_str(), 0);
 
         self.wh_write_line("\nres = main(stmt, flip_mask);", 0);

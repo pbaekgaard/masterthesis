@@ -51,6 +51,152 @@ class Experiment:
         self.tests = self.runner._discover_tests()
         self.compile_results = None
 
+    def _build_stmt_to_trv_mapping(self, wh_path, trv_path):
+        """Build a mapping from stmt numbers to .trv file lines."""
+        import re
+        stmt_to_expr = {}
+        
+        if not os.path.exists(wh_path) or not os.path.exists(trv_path):
+            return stmt_to_expr
+        
+        with open(wh_path, 'r') as f:
+            wh_lines = f.readlines()
+        
+        for i, line in enumerate(wh_lines):
+            match = re.search(r'if\s*\(stmt\s*==\s*\((\d+)\s+as\s+ui32\)\)', line)
+            if match:
+                stmt_num = int(match.group(1))
+                if i > 0:
+                    prev_line = wh_lines[i-1].strip().rstrip(';')
+                    expr_match = re.match(r'(\w+)\s*=\s*(.+)', prev_line)
+                    if expr_match:
+                        var_name = expr_match.group(1)
+                        rhs = expr_match.group(2).strip()
+                        rhs_normalized = re.sub(r'\s*\(?\d+\s+as\s+ui32\)?', lambda m: re.search(r'\d+', m.group()).group(), rhs)
+                        stmt_to_expr[stmt_num] = (var_name, rhs_normalized)
+        
+        with open(trv_path, 'r') as f:
+            trv_lines = f.readlines()
+        
+        stmt_to_trv_line = {}
+        used_trv_lines = set()
+        
+        for stmt_num, (var_name, rhs_normalized) in stmt_to_expr.items():
+            best_match = None
+            for line_idx, trv_line in enumerate(trv_lines):
+                if line_idx in used_trv_lines:
+                    continue
+                stripped = trv_line.strip().rstrip(';')
+                
+                trv_expr_match = re.match(r'(?:let\s+)?(\w+)\s*(?::\s*\w+\s*)?=\s*(.+)', stripped)
+                if trv_expr_match:
+                    trv_var = trv_expr_match.group(1)
+                    trv_rhs = trv_expr_match.group(2).strip()
+                    
+                    if trv_var == var_name:
+                        if rhs_normalized == trv_rhs:
+                            best_match = (line_idx + 1, stripped)
+                            break
+                        elif best_match is None and re.search(re.escape(var_name), trv_rhs):
+                            best_match = (line_idx + 1, stripped)
+            
+            if best_match:
+                stmt_to_trv_line[stmt_num] = best_match
+                used_trv_lines.add(best_match[0] - 1)
+        
+        return stmt_to_trv_line
+
+    def _run_edited_tests(self, edited_trv_path, test_name):
+        """Compile and run symex + fault injection on an edited .trv file."""
+        edited_folder = os.path.join(self.run_folder, "edited_test_files")
+        os.makedirs(edited_folder, exist_ok=True)
+        
+        print(f"\n{'='*60}")
+        print(f"RE-RUNNING ANALYSIS ON EDITED FILE: {os.path.basename(edited_trv_path)}")
+        print(f"{'='*60}")
+        
+        edited_test_name = os.path.splitext(os.path.basename(edited_trv_path))[0]
+        
+        edited_test = {
+            "name": edited_test_name,
+            "path": edited_trv_path,
+            "expected_output": "",
+            "pass_mode": {"mode": "returncode", "expected_pass": 0, "expected_fail": 1},
+        }
+        
+        orig_tests = self.runner.tests
+        orig_compile_results = self.runner.compile_results
+        orig_compiled_folder = self.runner.compiled_folder
+        
+        self.runner.tests = [edited_test]
+        self.runner.compile_results = None
+        self.runner.compiled_folder = edited_folder
+        
+        print(f"\nCompiling edited test...")
+        compile_results = self.runner.compile()
+        for res in compile_results:
+            if res["normal"] and res["normal"]["success"]:
+                print(f"  Compiled successfully: {res['normal']['asm_path']}")
+            else:
+                print(f"  Compilation failed!")
+                if res["normal"] and res["normal"]["stderr"]:
+                    print(f"    stderr: {res['normal']['stderr']}")
+                self.runner.tests = orig_tests
+                self.runner.compile_results = orig_compile_results
+                self.runner.compiled_folder = orig_compiled_folder
+                return
+        
+        print(f"\nRunning symex on edited file...")
+        symex_runner = SymexRunner(config_path=self.args.config)
+        symex_runner.artifacts_folder = edited_folder
+        edited_symex_results = symex_runner.run("normal")
+        
+        self.db.insert_symex_results_batch(self.run_id, edited_symex_results, edited=True)
+        print(edited_symex_results)
+        
+        print(f"\nRunning Interpreter Guided on edited file...")
+        guided_results = self.runner.run_tests(limit=self.args.limit, run_variants="normal", minimc_res=edited_symex_results)
+        
+        print(f"\nRunning Interpreter Exhaustively on edited file...")
+        self.runner.compile_results = None
+        exhaustive_results = self.runner.run_tests(limit=self.args.limit, run_variants="normal")
+        
+        self.db.insert_interpreter_results_batch(self.run_id, exhaustive_results, edited=True)
+        self.db.insert_interpreter_results_batch(self.run_id, guided_results, True, edited=True)
+        
+        print(f"\nDisplaying errors found by symex on edited file (normal variant only)...")
+        print(f"{'='*60}")
+        if edited_symex_results:
+            normal_results = [r for r in edited_symex_results if r.get("variant") == "Normal"]
+            if normal_results:
+                results_by_test = {}
+                for result in normal_results:
+                    tname = result["test"]
+                    if tname not in results_by_test:
+                        results_by_test[tname] = []
+                    results_by_test[tname].append(result)
+                
+                for tname, results in results_by_test.items():
+                    print(f"\nTest: {tname}")
+                    print("-" * 40)
+                    for result in results:
+                        stmt = result.get("stmt")
+                        faulty_bit = result.get("faulty_bit")
+                        variant = result.get("variant")
+                        res_val = result.get("result")
+                        print(f"  Stmt {stmt}: Faulty bit: {faulty_bit}, Variant: {variant}, Result: {res_val}")
+            else:
+                print("  No errors found by symex for normal variant.")
+        else:
+            print("  No errors found by symex.")
+        print(f"{'='*60}")
+        
+        self.runner.tests = orig_tests
+        self.runner.compile_results = orig_compile_results
+        self.runner.compiled_folder = orig_compiled_folder
+        
+        return edited_symex_results, guided_results, exhaustive_results
+
     def run(self):
 
         # check that the compiler and interpreter is present:
@@ -77,16 +223,138 @@ class Experiment:
         self.db.insert_symex_results_batch(self.run_id, symex_results)
 
         if not self.args.skip_run:
-            print(f"\nRunning interpreter ...")
+            print(f"\nRunning Interpreter Guided...")
+            guided_fault_results = self.runner.run_tests(limit=self.args.limit, run_variants=run_variants, minimc_res=symex_results)
+            print(f"\nRunning Interpreter Exhaustively...")
             exhaustive_fault_results = self.runner.run_tests(
                 limit=self.args.limit, run_variants=run_variants
             )
-            guided_fault_results = self.runner.run_tests(limit=self.args.limit, run_variants=run_variants, minimc_res=symex_results)
+            self.db.insert_interpreter_results_batch(self.run_id, exhaustive_fault_results)
+            self.db.insert_interpreter_results_batch(self.run_id, guided_fault_results, True)
         else:
             print(f"\nSkipping test run (--skip-run)")
 
-        self.db.insert_interpreter_results_batch(self.run_id, exhaustive_fault_results)
-        self.db.insert_interpreter_results_batch(self.run_id, guided_fault_results, True)
+
+        # Display errors found by symex for normal variant only
+        print(f"\n{'='*60}")
+        print("ERRORS FOUND BY SYMEX (Symbolic Execution) - Normal Variant Only")
+        print(f"{'='*60}")
+        trv_files_to_edit = set()
+        if symex_results:
+            normal_results = [r for r in symex_results if r.get("variant") == "Normal"]
+            if normal_results:
+                results_by_test = {}
+                for result in normal_results:
+                    test_name = result["test"]
+                    if test_name not in results_by_test:
+                        results_by_test[test_name] = []
+                    results_by_test[test_name].append(result)
+                
+                for test_name, results in results_by_test.items():
+                    print(f"\nTest: {test_name}")
+                    print("-" * 40)
+                    
+                    trv_path = None
+                    wh_path = None
+                    for test in self.tests:
+                        if test["name"] == test_name:
+                            trv_path = test["path"]
+                            break
+                    
+                    if trv_path:
+                        test_base = os.path.splitext(os.path.basename(trv_path))[0]
+                        wh_path = os.path.join(self.runner.compiled_folder, f"{test_base}.wh")
+                        artifact_trv = os.path.join(self.run_tests_folder, f"{test_base}.trv")
+                        if os.path.exists(artifact_trv):
+                            trv_files_to_edit.add(artifact_trv)
+                    
+                    stmt_mapping = self._build_stmt_to_trv_mapping(wh_path, trv_path) if trv_path and wh_path else {}
+                    
+                    if trv_path and os.path.exists(trv_path):
+                        for result in results:
+                            stmt = result.get("stmt")
+                            faulty_bit = result.get("faulty_bit")
+                            variant = result.get("variant")
+                            res_val = result.get("result")
+                            
+                            if stmt in stmt_mapping:
+                                line_number, line_content = stmt_mapping[stmt]
+                                print(f"  Stmt {stmt} (line {line_number}): {line_content}")
+                                print(f"    -> Faulty bit: {faulty_bit}, Variant: {variant}, Result: {res_val}")
+                            else:
+                                print(f"  Stmt {stmt}: (could not map to source) Faulty bit: {faulty_bit}, Variant: {variant}, Result: {res_val}")
+                    else:
+                        print(f"  .trv file not found for test {test_name}")
+                        for result in results:
+                            stmt = result.get("stmt")
+                            faulty_bit = result.get("faulty_bit")
+                            variant = result.get("variant")
+                            res_val = result.get("result")
+                            print(f"  Stmt {stmt}: Faulty bit: {faulty_bit}, Variant: {variant}, Result: {res_val}")
+            else:
+                print("  No errors found by symex for normal variant.")
+        else:
+            print("  No errors found by symex.")
+        print(f"{'='*60}")
+        
+        if trv_files_to_edit:
+            editor = os.environ.get("EDITOR", "nano")
+            
+            known_terminals = {"foot", "alacritty", "kitty", "gnome-terminal", "xterm", "konsole", "ghostty"}
+            term_cmd = None
+            for t in known_terminals:
+                if shutil.which(t):
+                    term_cmd = t
+                    break
+            
+            edited_files = []
+            for trv_file in sorted(trv_files_to_edit):
+                edited_path = trv_file.replace(".trv", ".edited.trv")
+                shutil.copy2(trv_file, edited_path)
+                edited_files.append(edited_path)
+            
+            while True:
+                editor_procs = []
+                for edited_file in edited_files:
+                    print(f"\nOpening {edited_file} in {editor} (new terminal window)...")
+                    if term_cmd:
+                        if term_cmd == "gnome-terminal":
+                            p = subprocess.Popen(["gnome-terminal", "--wait", "--", editor, edited_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        elif term_cmd == "xterm":
+                            p = subprocess.Popen(["xterm", "-e", editor, edited_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        elif term_cmd == "konsole":
+                            p = subprocess.Popen(["konsole", "-e", editor, edited_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        elif term_cmd in ("alacritty", "kitty", "foot", "ghostty"):
+                            p = subprocess.Popen([term_cmd, "-e", editor, edited_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        editor_procs.append(p)
+                    else:
+                        print(f"  Warning: No terminal emulator found, opening in current terminal")
+                        subprocess.run([editor, edited_file])
+                
+                for p in editor_procs:
+                    p.wait()
+                
+                while True:
+                    try:
+                        response = input("\nHave you made the edits you wanted? (y/n): ").strip().lower()
+                        if response in ("y", "n"):
+                            break
+                    except EOFError:
+                        response = "y"
+                        break
+                
+                if response == "y":
+                    break
+            
+            print(f"\n{'='*60}")
+            print("Compiling and re-running analysis on edited files...")
+            print(f"{'='*60}")
+            
+            for edited_file in edited_files:
+                test_base = os.path.splitext(os.path.basename(edited_file))[0].replace(".edited", "")
+                self._run_edited_tests(edited_file, test_base)
+
+
 
         plotter = Plotter(self.db)
         plots = plotter.create_plots()
@@ -103,10 +371,20 @@ class Experiment:
 
         # only these remain as plots
         if self.plot_mode == "save" or self.plot_mode == "both":
+            print("Saving Plots...")
             save_plot("exhaustive", plots["exhaustive"])
+            save_plot("exhaustive_edited", plots["exhaustive_edited"])
             save_plot("guided", plots["guided"])
+            save_plot("guided_edited", plots["guided_edited"])
+            save_plot("exhaustive_fault_types_normal", plots["exhaustive_fault_types_normal"])
+            save_plot("exhaustive_fault_types_hard", plots["exhaustive_fault_types_hard"])
+            save_plot("exhaustive_fault_types_normal_edited", plots["exhaustive_fault_types_normal_edited"])
+            save_plot("guided_fault_types_normal", plots["guided_fault_types_normal"])
+            save_plot("guided_fault_types_hard", plots["guided_fault_types_hard"])
+            save_plot("guided_fault_types_normal_edited", plots["guided_fault_types_normal_edited"])
 
         if self.plot_mode == "show" or self.plot_mode == "both":
+            print("Showing Plots...")
             plt.show()
             for fig in plots.values():
                 plt.close(fig)

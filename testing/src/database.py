@@ -36,6 +36,7 @@ class ResultsDatabase:
         expected_output TEXT NOT NULL,
         matched_output_line TEXT,
         passed INTEGER NOT NULL,
+        edited INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (run_id) REFERENCES runs(id)
     );
 
@@ -61,6 +62,7 @@ class ResultsDatabase:
         expected_output TEXT NOT NULL,
         matched_output_line TEXT,
         passed INTEGER NOT NULL,
+        edited INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (run_id) REFERENCES runs(id)
     );
 
@@ -73,22 +75,26 @@ class ResultsDatabase:
         stmt INTEGER NOT NULL,
         faulty_bit INTEGER,
         result INTEGER NOT NULL,
+        edited INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (run_id) REFERENCES runs(id)
     );
     CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON exhaustive_interpreter_results(run_id);
     CREATE INDEX IF NOT EXISTS idx_test_results_test ON exhaustive_interpreter_results(test);
     CREATE INDEX IF NOT EXISTS idx_test_results_variant ON exhaustive_interpreter_results(variant);
     CREATE INDEX IF NOT EXISTS idx_test_results_passed ON exhaustive_interpreter_results(passed);
+    CREATE INDEX IF NOT EXISTS idx_test_results_edited ON exhaustive_interpreter_results(edited);
 
     CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON guided_interpreter_results(run_id);
     CREATE INDEX IF NOT EXISTS idx_test_results_test ON guided_interpreter_results(test);
     CREATE INDEX IF NOT EXISTS idx_test_results_variant ON guided_interpreter_results(variant);
     CREATE INDEX IF NOT EXISTS idx_test_results_passed ON guided_interpreter_results(passed);
+    CREATE INDEX IF NOT EXISTS idx_test_results_edited ON guided_interpreter_results(edited);
     
     CREATE INDEX IF NOT EXISTS idx_test_results_run_id ON symex_results(run_id);
     CREATE INDEX IF NOT EXISTS idx_test_results_test ON symex_results(test);
     CREATE INDEX IF NOT EXISTS idx_test_results_variant ON symex_results(variant);
     CREATE INDEX IF NOT EXISTS idx_test_results_result ON symex_results(result);
+    CREATE INDEX IF NOT EXISTS idx_test_results_edited ON symex_results(edited);
     """
 
     def __init__(self, db_path):
@@ -99,6 +105,22 @@ class ResultsDatabase:
     def _init_db(self):
         self._conn = sqlite3.connect(self.db_path)
         self._conn.executescript(self.SCHEMA)
+        
+        cursor = self._conn.execute("PRAGMA table_info(symex_results)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "edited" not in columns:
+            self._conn.execute("ALTER TABLE symex_results ADD COLUMN edited INTEGER NOT NULL DEFAULT 0")
+        
+        cursor = self._conn.execute("PRAGMA table_info(exhaustive_interpreter_results)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "edited" not in columns:
+            self._conn.execute("ALTER TABLE exhaustive_interpreter_results ADD COLUMN edited INTEGER NOT NULL DEFAULT 0")
+        
+        cursor = self._conn.execute("PRAGMA table_info(guided_interpreter_results)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "edited" not in columns:
+            self._conn.execute("ALTER TABLE guided_interpreter_results ADD COLUMN edited INTEGER NOT NULL DEFAULT 0")
+        
         self._conn.commit()
 
     def close(self):
@@ -120,8 +142,9 @@ class ResultsDatabase:
         )
         self._conn.commit()
         return cursor.lastrowid
-    def insert_symex_results_batch(self, run_id, results):
+    def insert_symex_results_batch(self, run_id, results, edited=False):
         rows = []
+        edited_flag = 1 if edited else 0
 
         for res in results:
             rows.append((
@@ -131,13 +154,14 @@ class ResultsDatabase:
                 res["stmt"],
                 res["faulty_bit"],
                 res["result"],
+                edited_flag,
             ))
 
         self._conn.executemany(
             """
             INSERT INTO symex_results
-            (run_id, test, variant, stmt, faulty_bit, result)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (run_id, test, variant, stmt, faulty_bit, result, edited)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -146,8 +170,9 @@ class ResultsDatabase:
     def query_df(self, query):
         return pd.read_sql_query(query, self._conn)
         
-    def insert_interpreter_results_batch(self, run_id, results, guided=False):
+    def insert_interpreter_results_batch(self, run_id, results, guided=False, edited=False):
         rows = []
+        edited_flag = 1 if edited else 0
         for res in results:
             parts = res["injection_point"].split(":")
             if parts[0] == "pc":
@@ -203,6 +228,7 @@ class ResultsDatabase:
                 res["expected_output"],
                 res.get("matched_output_line"),
                 int(res["passed"]),
+                edited_flag,
             ))
         
         table = "exhaustive_interpreter_results"
@@ -212,8 +238,8 @@ class ResultsDatabase:
             f"""
             INSERT INTO {table} 
             (run_id, test, variant, injection_point, fault_type, fault_pc, fault_reg, fault_bit,
-            returncode, pc_before, pc_after, expected_exec_instr, actual_exec_instr, reg_old_value, reg_new_value, stdout, stderr, expected_output, matched_output_line, passed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            returncode, pc_before, pc_after, expected_exec_instr, actual_exec_instr, reg_old_value, reg_new_value, stdout, stderr, expected_output, matched_output_line, passed, edited)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )

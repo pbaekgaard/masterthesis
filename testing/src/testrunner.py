@@ -392,6 +392,7 @@ class TestRunner:
 
     def stmt_to_pc_range(self, asm_path, stmt: int):
         with open(asm_path, 'r') as f:
+            print(f"Looking for STMT={stmt} in file: {asm_path}")
             lines = f.readlines()
         for i, line in enumerate(lines):
             if f'.word 0x10000000 @ {stmt}' in line:
@@ -422,12 +423,6 @@ class TestRunner:
                 for pc in range(start_pc, end_pc+1):
                     ip = f"reg:{pc}:{reg}:{bit}"
                     injection_points.append(ip)
-            for pc in range(start_pc, end_pc+1):
-                for bit in range(0, 32):
-                    ip = f"pc:{pc}:{bit}"
-                    injection_points.append(ip)
-                for cpsr in ["n","v","z","c"]:
-                    ip = f"cpsr:{pc}:{cpsr}"
         return injection_points
 
 
@@ -468,7 +463,7 @@ class TestRunner:
 
         return results
 
-    def compile(self):
+    def compile(self, hard=False):
         results = []
         for test in self.tests:
             test_result = {"name": test["name"], "normal": None, "hard": None}
