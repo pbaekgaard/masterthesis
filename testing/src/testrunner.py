@@ -106,13 +106,13 @@ def _check_passed(result, pass_mode_config, cm_start, cm_end, injection_point):
     expected_pass = pass_mode_config.get("expected_pass", None)
     expected_fail = pass_mode_config.get("expected_fail", None)
 
-    if "COUNTERMEASURE" in result.stdout:
+    if "COUNTERMEASURE" in result.stdout or result.returncode == 77:
         return 77
     elif "Detected Infinite Loop" in result.stdout:
         return 3
     if mode == "returncode" and result.returncode == 0:
         return 1
-    elif mode == "returncode" and "panic" in result.stderr:
+    elif "panic" in result.stderr:
         return 2
     elif mode == "returncode" and result.returncode != 0:
         if cm_start is not None and cm_end is not None and injection_point is not None:
@@ -175,7 +175,6 @@ class TestRunner:
         self.pass_mode_configs = config.get("pass_mode", {})
         self.tests = self._discover_tests()
         self.compile_results = None
-        self.current_file : File = None
 
     def _discover_tests(self):
         tests = []
@@ -352,8 +351,14 @@ class TestRunner:
         registers = []
         cpsr_registers = []
         pc_points = []
+        do_all = False
+
+        if len(self.injection_points) == 0:
+            do_all = True
 
         for point in self.injection_points:
+            if do_all:
+                break
             if point.startswith('cpsr_'):
                 cpsr_registers.append(point[5:])
             elif point.startswith('r') and point[1:].isdigit():
@@ -367,8 +372,8 @@ class TestRunner:
                 pc_points.append(point[3:])
 
 
-        if len(pc_points) > 0:
-            if pc_points[0] == "ALL":
+        if len(pc_points) > 0 or do_all:
+            if do_all or pc_points[0] == "ALL":
                 for pc in range(1, max_pc):
                     for bit in range(0, 32):
                         injection_points.append(f"pc:{pc}:{bit}")
@@ -377,16 +382,27 @@ class TestRunner:
                     for bit in range(0, 32):
                         injection_points.append(f"pc:{pc}:{bit}")
 
-        if len(registers) > 0:
-            for pc in range(1, max_pc):
-                for reg in registers:
-                    for bit in range(0, 32):
-                        injection_points.append(f"reg:{pc}:{reg}:{bit}")
+        if len(registers) > 0 or do_all:
+            if do_all:
+                for pc in range(1, max_pc):
+                    for reg in range(0, 13):
+                        for bit in range(0, 32):
+                            injection_points.append(f"reg:{pc}:{reg}:{bit}")
+            else:
+                for pc in range(1, max_pc):
+                    for reg in registers:
+                        for bit in range(0, 32):
+                            injection_points.append(f"reg:{pc}:{reg}:{bit}")
 
-        if len(cpsr_registers) > 0:
-            for pc in range(1, max_pc):
-                for reg in cpsr_registers:
-                    injection_points.append(f"cpsr:{pc}:{reg}")
+        if len(cpsr_registers) > 0 or do_all:
+            if do_all:
+                for pc in range(1, max_pc):
+                    for reg in ["n","z","c", "v"]:
+                        injection_points.append(f"cpsr:{pc}:{reg}")
+            else:
+                for pc in range(1, max_pc):
+                    for reg in cpsr_registers:
+                        injection_points.append(f"cpsr:{pc}:{reg}")
 
         return injection_points
 
@@ -463,7 +479,7 @@ class TestRunner:
 
         return results
 
-    def compile(self, hard=False):
+    def compile(self, nohard=False):
         results = []
         for test in self.tests:
             test_result = {"name": test["name"], "normal": None, "hard": None}

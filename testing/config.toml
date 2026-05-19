@@ -1,11 +1,7 @@
 test_folder = "pinny"
 plotmode = "both" # show, save or both
 
-injection_points = [
-  "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
-  "r8", "r9", "r10", "r11", "r12", "pc=*",
-  "cpsr_n"
-]
+injection_points = []
 
 [pass_mode]
 default = "returncode"
