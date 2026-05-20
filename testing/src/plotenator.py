@@ -4,7 +4,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import textwrap
 
-OUTCOME_COLORS = ["#ff2a2c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#C9A227", "#a65628"]
+OUTCOME_COLOR_MAP = {
+    "Normal Execution": "#4daf4a",
+    "Faulty": "#ff2a2c",
+    "Panicked": "#984ea3",
+    "Infinite Loop": "#ff7f00",
+    "Countermeasure Activated": "#377eb8",
+    "Faulty Jump to Countermeasure": "#377eb8",
+    "Other": "#C9A227",
+}
+OUTCOME_COLORS = list(OUTCOME_COLOR_MAP.values())
 FAULT_TYPE_COLORS = ["#a6cee3", "#ff4411", "#b2df8a"]
 
 class Plotter:
@@ -62,7 +71,8 @@ class Plotter:
         grouped = grouped[col_order]
 
         fig, ax = plt.subplots()
-        grouped.plot(kind="bar", stacked=False, ax=ax, color=OUTCOME_COLORS[:len(grouped.columns)], legend=False)
+        colors = [OUTCOME_COLOR_MAP.get(col, "#a65628") for col in grouped.columns]
+        grouped.plot(kind="bar", stacked=False, ax=ax, color=colors, legend=False)
 
         for container in ax.containers:
             ax.bar_label(
@@ -124,7 +134,8 @@ class Plotter:
 
         fig, ax = plt.subplots()
 
-        grouped.plot(kind="bar", stacked=False, ax=ax, color=OUTCOME_COLORS[:len(grouped.columns)], legend=False)
+        colors = [OUTCOME_COLOR_MAP.get(col, "#a65628") for col in grouped.columns]
+        grouped.plot(kind="bar", stacked=False, ax=ax, color=colors, legend=False)
 
         for container in ax.containers:
             ax.bar_label(
