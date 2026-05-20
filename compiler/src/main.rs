@@ -25,6 +25,9 @@ struct Args {
     
     #[arg(long)]
     hard: bool,
+
+    #[arg(long)]
+    normal: bool,
 }
 
 fn main() {
@@ -54,7 +57,9 @@ fn main() {
     let mut parser: Parser = Parser::new(_tokens);
     let _ast: AST = parser.parse_program();
     let mut codegen: CodeGenerator = CodeGenerator::new(output,wh_output);
+    let mut hard = false;
     codegen.generate(_ast, args.hard);
+
     
 
     println!("Lexing and parsing completed successfully.");
