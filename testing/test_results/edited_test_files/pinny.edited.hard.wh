@@ -1,0 +1,267 @@
+ui32 res;
+ui32 stmt;
+ui32 bit_shift;
+ui32 flip_mask;
+
+fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
+    ui32 authenticated;
+    ui32 authenticated_dup;
+    ui32 cardPin1;
+    ui32 cardPin1_dup;
+    ui32 cardPin2;
+    ui32 cardPin2_dup;
+    ui32 cardPin3;
+    ui32 cardPin3_dup;
+    ui32 cardPin4;
+    ui32 cardPin4_dup;
+    ui32 userPin1;
+    ui32 userPin1_dup;
+    ui32 userPin2;
+    ui32 userPin2_dup;
+    ui32 userPin3;
+    ui32 userPin3_dup;
+    ui32 userPin4;
+    ui32 userPin4_dup;
+    ui32 pinsEqual;
+    ui32 pinsEqual_dup;
+    ui32 step_counter;
+    step_counter = (0 as ui32);
+    authenticated = (0 as ui32);
+    authenticated_dup = (0 as ui32);
+    if (stmt == (0 as ui32)) {
+        authenticated = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (1 as ui32)) {
+        return (77 as ui32);
+    }
+    if (authenticated != authenticated_dup) {
+        return (77 as ui32);
+    }
+    if ( authenticated != (0 as ui32)) {
+        step_counter++;
+        if (step_counter != (2 as ui32)) {
+            return (77 as ui32);
+        }
+        return ((77 as ui32) as ui32);
+    }
+    cardPin1 = (1 as ui32);
+    cardPin1_dup = (1 as ui32);
+    if (stmt == (1 as ui32)) {
+        cardPin1 = (1 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (3 as ui32)) {
+        return (77 as ui32);
+    }
+    cardPin2 = (2 as ui32);
+    cardPin2_dup = (2 as ui32);
+    if (stmt == (2 as ui32)) {
+        cardPin2 = (2 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (4 as ui32)) {
+        return (77 as ui32);
+    }
+    cardPin3 = (3 as ui32);
+    cardPin3_dup = (3 as ui32);
+    if (stmt == (3 as ui32)) {
+        cardPin3 = (3 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (5 as ui32)) {
+        return (77 as ui32);
+    }
+    cardPin4 = (4 as ui32);
+    cardPin4_dup = (4 as ui32);
+    if (stmt == (4 as ui32)) {
+        cardPin4 = (4 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (6 as ui32)) {
+        return (77 as ui32);
+    }
+    userPin1 = (0 as ui32);
+    userPin1_dup = (0 as ui32);
+    if (stmt == (5 as ui32)) {
+        userPin1 = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (7 as ui32)) {
+        return (77 as ui32);
+    }
+    userPin2 = (0 as ui32);
+    userPin2_dup = (0 as ui32);
+    if (stmt == (6 as ui32)) {
+        userPin2 = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (8 as ui32)) {
+        return (77 as ui32);
+    }
+    userPin3 = (0 as ui32);
+    userPin3_dup = (0 as ui32);
+    if (stmt == (7 as ui32)) {
+        userPin3 = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (9 as ui32)) {
+        return (77 as ui32);
+    }
+    userPin4 = (0 as ui32);
+    userPin4_dup = (0 as ui32);
+    if (stmt == (8 as ui32)) {
+        userPin4 = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (10 as ui32)) {
+        return (77 as ui32);
+    }
+    pinsEqual = (0 as ui32);
+    pinsEqual_dup = (0 as ui32);
+    if (stmt == (9 as ui32)) {
+        pinsEqual = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (11 as ui32)) {
+        return (77 as ui32);
+    }
+    if (pinsEqual != pinsEqual_dup) {
+        return (77 as ui32);
+    }
+    if ( pinsEqual != (0 as ui32)) {
+        step_counter++;
+        if (step_counter != (12 as ui32)) {
+            return (77 as ui32);
+        }
+        return ((77 as ui32) as ui32);
+    }
+    if (userPin1 != userPin1_dup) {
+        return (77 as ui32);
+    }
+    if (cardPin1 != cardPin1_dup) {
+        return (77 as ui32);
+    }
+    if ( userPin1 == cardPin1) {
+        step_counter++;
+        if (step_counter != (13 as ui32)) {
+            return (77 as ui32);
+        }
+        if (pinsEqual != pinsEqual_dup) {
+            return (77 as ui32);
+        }
+        pinsEqual = pinsEqual + (1 as ui32);
+        pinsEqual_dup = pinsEqual + (1 as ui32);
+        if (stmt == (10 as ui32)) {
+            pinsEqual = pinsEqual + (1 as ui32) ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (14 as ui32)) {
+            return (77 as ui32);
+        }
+    }
+    if (userPin2 != userPin2_dup) {
+        return (77 as ui32);
+    }
+    if (cardPin2 != cardPin2_dup) {
+        return (77 as ui32);
+    }
+    if ( userPin2 == cardPin2) {
+        step_counter++;
+        if (step_counter != (15 as ui32)) {
+            return (77 as ui32);
+        }
+        if (pinsEqual != pinsEqual_dup) {
+            return (77 as ui32);
+        }
+        pinsEqual = pinsEqual + (1 as ui32);
+        pinsEqual_dup = pinsEqual + (1 as ui32);
+        if (stmt == (11 as ui32)) {
+            pinsEqual = pinsEqual + (1 as ui32) ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (16 as ui32)) {
+            return (77 as ui32);
+        }
+    }
+    if (userPin3 != userPin3_dup) {
+        return (77 as ui32);
+    }
+    if (cardPin3 != cardPin3_dup) {
+        return (77 as ui32);
+    }
+    if ( userPin3 == cardPin3) {
+        step_counter++;
+        if (step_counter != (17 as ui32)) {
+            return (77 as ui32);
+        }
+        if (pinsEqual != pinsEqual_dup) {
+            return (77 as ui32);
+        }
+        pinsEqual = pinsEqual + (1 as ui32);
+        pinsEqual_dup = pinsEqual + (1 as ui32);
+        if (stmt == (12 as ui32)) {
+            pinsEqual = pinsEqual + (1 as ui32) ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (18 as ui32)) {
+            return (77 as ui32);
+        }
+    }
+    if (userPin4 != userPin4_dup) {
+        return (77 as ui32);
+    }
+    if (cardPin4 != cardPin4_dup) {
+        return (77 as ui32);
+    }
+    if ( userPin4 == cardPin4) {
+        step_counter++;
+        if (step_counter != (19 as ui32)) {
+            return (77 as ui32);
+        }
+        if (pinsEqual != pinsEqual_dup) {
+            return (77 as ui32);
+        }
+        pinsEqual = pinsEqual + (1 as ui32);
+        pinsEqual_dup = pinsEqual + (1 as ui32);
+        if (stmt == (13 as ui32)) {
+            pinsEqual = pinsEqual + (1 as ui32) ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (20 as ui32)) {
+            return (77 as ui32);
+        }
+    }
+    if (pinsEqual != pinsEqual_dup) {
+        return (77 as ui32);
+    }
+    if ( pinsEqual == (4 as ui32)) {
+        step_counter++;
+        if (step_counter != (21 as ui32)) {
+            return (77 as ui32);
+        }
+        authenticated = (1 as ui32);
+        authenticated_dup = (1 as ui32);
+        if (stmt == (14 as ui32)) {
+            authenticated = (1 as ui32) ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (22 as ui32)) {
+            return (77 as ui32);
+        }
+    }
+    if (authenticated != authenticated_dup) {
+        return (77 as ui32);
+    }
+    return (authenticated as ui32);
+}
+stmt = (? as ui32);
+bit_shift = (? as ui32);
+assume (bit_shift <= (31 as ui32));
+assume (bit_shift >= (0 as ui32));
+assume (stmt >= (0 as ui32));
+assume (stmt <= (14 as ui32));
+flip_mask = ((1 as ui32) << bit_shift);
+
+res = main(stmt, flip_mask);
+assert(res == (0 as ui32));

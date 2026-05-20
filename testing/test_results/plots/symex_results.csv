@@ -1,0 +1,15 @@
+Variant,Stmt,Faulty Bit,Result
+Hard,9,0,77
+Hard,8,0,77
+Hard,7,0,77
+Hard,6,0,77
+Hard,5,0,77
+Hard,4,0,77
+Hard,3,0,77
+Hard,2,0,77
+Hard,1,0,77
+Hard,0,0,77
+Normal,9,2,1
+Normal,0,0,1
+Manual Hard,9,0,77
+Manual Hard,0,0,77
