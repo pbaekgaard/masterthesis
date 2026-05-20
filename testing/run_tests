@@ -300,7 +300,7 @@ class Experiment:
         if trv_files_to_edit:
             editor = os.environ.get("EDITOR", "nano")
             
-            known_terminals = {"foot", "alacritty", "kitty", "gnome-terminal", "xterm", "konsole", "ghostty"}
+            known_terminals = ["foot", "alacritty", "kitty", "gnome-terminal", "xterm", "konsole", "ghostty"]
             term_cmd = None
             for t in known_terminals:
                 if shutil.which(t):

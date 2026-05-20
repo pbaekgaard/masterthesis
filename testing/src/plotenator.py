@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import textwrap
 
-OUTCOME_COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628"]
+OUTCOME_COLORS = ["#ff2a2c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#C9A227", "#a65628"]
 FAULT_TYPE_COLORS = ["#a6cee3", "#ff4411", "#b2df8a"]
 
 class Plotter:
@@ -62,18 +62,26 @@ class Plotter:
         grouped = grouped[col_order]
 
         fig, ax = plt.subplots()
-        grouped.plot(kind="bar", stacked=False, ax=ax, color=OUTCOME_COLORS[:len(grouped.columns)])
+        grouped.plot(kind="bar", stacked=False, ax=ax, color=OUTCOME_COLORS[:len(grouped.columns)], legend=False)
 
         for container in ax.containers:
-            ax.bar_label(container, labels=[f'{int(v.get_height())}' if v.get_height() > 0 else '' for v in container], padding=3, fontsize=8, rotation=90)
+            ax.bar_label(
+                container,
+                labels=[
+                    f'{int(v.get_height())}' if v.get_height() > 0 else ''
+                    for v in container
+                ],
+                label_type='center',
+                fontsize=8,
+                rotation=90,
+                color='black',
+                fontweight='bold'
+            )
 
         ax.set_title(f"Exhaustive Interpreter - Outcome Distribution{suffix}")
-        ax.set_ylabel("Count (log scale)")
         ax.set_xlabel(None)
-        ax.set_yscale("log")
-        ymin, ymax = ax.get_ylim()
-        ax.set_ylim(ymin, ymax * 3.0)
-        ax.legend(title="Outcome")
+        self._apply_scale(ax)
+        self._add_horizontal_legend(fig, ax, "Outcome")
 
         self._style_axes(ax)
         
@@ -116,18 +124,26 @@ class Plotter:
 
         fig, ax = plt.subplots()
 
-        grouped.plot(kind="bar", stacked=False, ax=ax, color=OUTCOME_COLORS[:len(grouped.columns)])
+        grouped.plot(kind="bar", stacked=False, ax=ax, color=OUTCOME_COLORS[:len(grouped.columns)], legend=False)
 
         for container in ax.containers:
-            ax.bar_label(container, labels=[f'{int(v.get_height())}' if v.get_height() > 0 else '' for v in container], padding=3, fontsize=8, rotation=90)
+            ax.bar_label(
+                container,
+                labels=[
+                    f'{int(v.get_height())}' if v.get_height() > 0 else ''
+                    for v in container
+                ],
+                label_type='center',
+                fontsize=8,
+                rotation=90,
+                color='black',
+                fontweight='bold'
+            )
 
         ax.set_title(f"Guided Interpreter - Outcome Distribution{suffix}")
-        ax.set_ylabel("Count (log scale)")
         ax.set_xlabel(None)
-        ax.set_yscale("log")
-        ymin, ymax = ax.get_ylim()
-        ax.set_ylim(ymin, ymax * 3.0)
-        ax.legend(title="Outcome")
+        self._apply_scale(ax)
+        self._add_horizontal_legend(fig, ax, "Outcome")
 
         self._style_axes(ax)
         
@@ -149,8 +165,55 @@ class Plotter:
         # 2. Re-apply the wrapped strings back to the axis
         ax.set_xticklabels(wrapped_labels, ha='center')
 
+    def _apply_scale(self, ax: Axes, ratio_threshold=10):
+        heights = []
+        for container in ax.containers:
+            for patch in container:
+                h = patch.get_height()
+                if h > 0:
+                    heights.append(h)
+        if not heights:
+            ax.set_ylabel("Count")
+            return
+        ratio = max(heights) / min(heights)
+        if ratio > ratio_threshold:
+            ax.set_yscale("log")
+            ax.set_ylabel("Count (log scale)")
+            ymin, ymax = ax.get_ylim()
+        else:
+            ax.set_ylabel("Count")
+            ymin, ymax = ax.get_ylim()
+
+    def _add_horizontal_legend(self, fig, ax, title, wrap_width=14):
+        handles, labels = ax.get_legend_handles_labels()
+        wrapped = [textwrap.fill(l, width=wrap_width) for l in labels]
+        leg = fig.legend(
+            handles, wrapped,
+            title=title,
+            loc='lower center',
+            bbox_to_anchor=(0.5, 0.05),
+            ncol=min(len(handles), 4),
+            fontsize=8,
+            title_fontsize=9,
+            frameon=True,
+        )
+        leg.get_title().set_fontweight('bold')
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=0.25)
+
     def export_symex_csv(self, output_path):
         df = self.db.query_df("SELECT * FROM symex_results")
+        column_mapping = {
+            'run_id': 'ID',
+            'variant': 'Variant',
+            'stmt': 'Stmt',
+            'faulty_bit': 'Faulty Bit',
+            'result': 'Result',
+        }
+        df = df.rename(columns=column_mapping)
+        df.loc[df['edited'] == 1, 'Variant'] = 'Manual Hard'
+        desired_columns = ['Variant', 'Stmt', 'Faulty Bit', 'Result']
+        df = df[[col for col in desired_columns if col in df.columns]]
         df.to_csv(output_path, index=False)
 
     def plot_fault_types(self, edited=False, table="exhaustive", variant="normal"):
@@ -202,20 +265,28 @@ class Plotter:
         grouped = grouped[ordered_cols]
 
         fig, ax = plt.subplots()
-        grouped.plot(kind="bar", stacked=False, ax=ax, color=FAULT_TYPE_COLORS[:len(grouped.columns)])
+        grouped.plot(kind="bar", stacked=False, ax=ax, color=FAULT_TYPE_COLORS[:len(grouped.columns)], legend=False)
 
         for container in ax.containers:
-            ax.bar_label(container, labels=[f'{int(v.get_height())}' if v.get_height() > 0 else '' for v in container], padding=3, fontsize=8, rotation=90)
+            ax.bar_label(
+                container,
+                labels=[
+                    f'{int(v.get_height())}' if v.get_height() > 0 else ''
+                    for v in container
+                ],
+                label_type='center',
+                fontsize=8,
+                rotation=90,
+                color='black',
+                fontweight='bold'
+            )
 
         interpreter_name = "Exhaustive" if table == "exhaustive" else "Guided"
         display_label = variant.title()
         ax.set_title(f"{interpreter_name} - Fault Type Distribution - {display_label}{suffix}")
-        ax.set_ylabel("Count (log scale)")
         ax.set_xlabel(None)
-        ax.set_yscale("log")
-        ymin, ymax = ax.get_ylim()
-        ax.set_ylim(ymin, ymax * 3.0)
-        ax.legend(title="Fault Type")
+        self._apply_scale(ax)
+        self._add_horizontal_legend(fig, ax, "Fault Type")
 
         self._style_axes(ax)
         
