@@ -1,6 +1,6 @@
 use crate::parser::{ AST, parser::{ BinOp, Block, Expr, Function, Stmt } };
 use core::panic;
-use std::{ cmp::max_by, collections::HashMap, fs::File, io::Write };
+use std::{ collections::HashMap, fs::File, io::Write };
 
 trait VecExt<T: PartialEq> {
     fn push_unique(&mut self, item: T);
@@ -18,6 +18,7 @@ pub struct CodeGenerator {
     pub file: File,
     pub wh_file: File,
     locals: HashMap<String, i32>,
+    dup_pairs: HashMap<String, String>,
     stack_offset: i32,
     label_count: usize,
     hard: bool,
@@ -39,6 +40,7 @@ impl CodeGenerator {
             file,
             wh_file,
             locals: HashMap::new(),
+            dup_pairs: HashMap::new(),
             stack_offset: 0,
             label_count: 0,
             hard: false,
@@ -137,6 +139,7 @@ ui32 flip_mask;
     fn emit_block(&mut self, block: Block, is_main: bool) {
         let initial_offset = self.stack_offset;
         let initial_locals = self.locals.clone();
+        let initial_dup_pairs = self.dup_pairs.clone();
 
         let mut has_return = false;
         for stmt in block.statements {
@@ -164,6 +167,7 @@ ui32 flip_mask;
 
         self.stack_offset = initial_offset;
         self.locals = initial_locals;
+        self.dup_pairs = initial_dup_pairs;
     }
     fn emit_countermeasure(&mut self) {
         self.write_line("countermeasure:", 0, true);
@@ -231,6 +235,7 @@ ui32 flip_mask;
     }
 
     fn wh_emit_if_start(&mut self, condition: Expr) {
+        self.wh_emit_dup_checks_for_expr(&condition);
         let expr = self.wh_build_expr_str(condition);
         self.wh_write_line(&format!("if ( {expr}) {{"), self.wh_indent);
         self.wh_indent += 1;
@@ -417,6 +422,7 @@ ui32 flip_mask;
     fn emit_return(&mut self, return_stmt: Stmt, _is_main: bool) {
         match return_stmt {
             Stmt::Return(expr) => {
+                self.wh_emit_dup_checks_for_expr(&expr);
                 let return_string = self.wh_build_expr_str(expr.clone());
                 self.wh_emit_return(&return_string);
                 self.emit_expr(expr);
@@ -444,6 +450,19 @@ ui32 flip_mask;
                         true
                     );
                 }
+                if self.hard && self.dup_pairs.contains_key(&name) {
+                    let dup_name = self.dup_pairs.get(&name).unwrap();
+                    let dup_offset = self.locals.get(dup_name).expect("Undefined dup variable");
+                    if self.stack_offset - dup_offset == 0 {
+                        self.write_line("str r0, [sp]", 1, true);
+                    } else {
+                        self.write_line(
+                            &format!("str r0, [sp, #{}]", self.stack_offset - dup_offset),
+                            1,
+                            true
+                        );
+                    }
+                }
                 self.wh_emit_assign(assign_stmt);
                 if self.hard {
                     self.emit_step_check();
@@ -457,6 +476,10 @@ ui32 flip_mask;
                 self.metadata.push(format!(r#".word 0x0 @ {register_string}"#));
                 self.metadata_current_registers.clear();
                 self.metadata.push(format!(r#".word 0x00000001 @ {name}"#));
+                if self.hard && self.dup_pairs.contains_key(&name) {
+                    let dup_name = self.dup_pairs.get(&name).unwrap();
+                    self.metadata.push(format!(r#".word 0x00000001 @ {dup_name}"#));
+                }
             }
             _ => panic!("Not a valid assignment"),
         }
@@ -464,12 +487,19 @@ ui32 flip_mask;
     fn wh_emit_assign(&mut self, assign_stmt: Stmt) {
         match assign_stmt {
             Stmt::AssignStatement(identifyer, expr) => {
+                self.wh_emit_dup_checks_for_expr(&expr);
                 let expr_str = self.wh_build_expr_str(expr);
                 if expr_str == "".to_string() {
                     return;
                 }
                 let assign_line = format!("{identifyer} = {expr_str}");
                 self.wh_write_line(&format!("{assign_line};"), self.wh_indent);
+
+                if self.hard && self.dup_pairs.contains_key(&identifyer) {
+                    let dup_name = self.dup_pairs.get(&identifyer).unwrap();
+                    let assign_dup_line = format!("{dup_name} = {expr_str}");
+                    self.wh_write_line(&format!("{assign_dup_line};"), self.wh_indent);
+                }
 
                 self.wh_instrument_assign(assign_line.as_str());
             }
@@ -523,6 +553,7 @@ ui32 flip_mask;
         self.wh_emit_let(let_stmt.clone());
         match let_stmt {
             Stmt::Let(name, _type_name, expr) => {
+                let dup_name = format!("{}_dup", name);
                 self.metadata_current_registers.clear();
                 self.metadata_current_registers.push("r0".to_string());
                 self.stack_offset += 4;
@@ -531,9 +562,17 @@ ui32 flip_mask;
                 self.emit_expr(expr);
                 self.write_line("str r0, [sp]", 1, true);
                 self.locals.insert(name.clone(), self.stack_offset);
+
                 if self.hard {
+                    self.stack_offset += 4;
+                    self.write_line("sub sp, sp, #4", 1, true);
+                    self.write_line("str r0, [sp]", 1, true);
+                    self.locals.insert(dup_name.clone(), self.stack_offset);
+                    self.dup_pairs.insert(name.clone(), dup_name.clone());
+                    self.dup_pairs.insert(dup_name.clone(), name.clone());
                     self.emit_step_check();
                 }
+
                 let pc_after = self.pc - 1;
 
                 self.metadata.push(format!(r#".word 0x10000000 @ {curr_stmt}"#));
@@ -543,6 +582,9 @@ ui32 flip_mask;
                 self.metadata.push(format!(r#".word 0x0 @ {register_string}"#));
                 self.metadata_current_registers.clear();
                 self.metadata.push(format!(r#".word 0x00000001 @ {name}"#));
+                if self.hard {
+                    self.metadata.push(format!(r#".word 0x00000001 @ {dup_name}"#));
+                }
             }
             _ => panic!("Not a let statement format sorry "),
         }
@@ -551,13 +593,30 @@ ui32 flip_mask;
         match let_stmt {
             Stmt::Let(name, _type_name, expr) => {
                 let indent_str = "    ".repeat(1);
-                let combined = indent_str + "ui32 " + name.as_str() + ";";
+                let combined = indent_str.clone() + "ui32 " + name.as_str() + ";";
                 self.insert_at_line(self.next_assignment_location, combined.as_str());
                 self.next_assignment_location += 1;
+
+                if self.hard {
+                    let dup_name = format!("{}_dup", name);
+                    let combined_dup = indent_str.clone() + "ui32 " + dup_name.as_str() + ";";
+                    self.insert_at_line(self.next_assignment_location, combined_dup.as_str());
+                    self.next_assignment_location += 1;
+                    self.dup_pairs.insert(name.clone(), dup_name.clone());
+                    self.dup_pairs.insert(dup_name, name.clone());
+                }
+
                 let val = self.wh_build_expr_str(expr);
-                let assign_line = name + " = " + val.as_str();
+                let assign_line = name.clone() + " = " + val.as_str();
 
                 self.wh_write_line(format!("{};", assign_line.as_str()).as_str(), self.wh_indent);
+
+                if self.hard {
+                    let dup_name = format!("{}_dup", name);
+                    let assign_dup_line = dup_name + " = " + val.as_str();
+                    self.wh_write_line(format!("{};", assign_dup_line.as_str()).as_str(), self.wh_indent);
+                }
+
                 self.wh_instrument_assign(assign_line.as_str());
             }
             _ => panic!("Not a let statement format sorry (wh emit)"),
@@ -573,6 +632,31 @@ ui32 flip_mask;
         self.wh_indent -= 1;
         self.wh_write_line("}", self.wh_indent);
         self.stmt += 1;
+    }
+    fn wh_emit_dup_check(&mut self, name: &str) {
+        if self.hard && self.dup_pairs.contains_key(name) {
+            let dup_name = self.dup_pairs.get(name).unwrap().clone();
+            self.wh_write_line(&format!("if ({name} != {dup_name}) {{"), self.wh_indent);
+            self.wh_indent += 1;
+            self.wh_write_line("return (77 as ui32);", self.wh_indent);
+            self.wh_indent -= 1;
+            self.wh_write_line("}", self.wh_indent);
+        }
+    }
+    fn wh_emit_dup_checks_for_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Identifier(name) => {
+                self.wh_emit_dup_check(name);
+            }
+            Expr::BinaryOp(left, _, right) => {
+                self.wh_emit_dup_checks_for_expr(left);
+                self.wh_emit_dup_checks_for_expr(right);
+            }
+            Expr::UnaryOp(_, inner) => {
+                self.wh_emit_dup_checks_for_expr(inner);
+            }
+            _ => {}
+        }
     }
     fn wh_build_expr_str(&self, expr: Expr) -> String {
         // IntegerLiteral(i64),
@@ -630,6 +714,13 @@ ui32 flip_mask;
             Expr::Identifier(name) => {
                 let offset = self.locals.get(&name).expect("Undefined variable");
                 self.write_line(&format!("ldr r0, [sp, #{}]", self.stack_offset - offset), 1, true);
+                if self.hard && self.dup_pairs.contains_key(&name) {
+                    let dup_name = self.dup_pairs.get(&name).unwrap();
+                    let dup_offset = self.locals.get(dup_name).expect("Undefined dup variable");
+                    self.write_line(&format!("ldr r2, [sp, #{}]", self.stack_offset - dup_offset), 1, true);
+                    self.write_line("cmp r0, r2", 1, true);
+                    self.write_line("bne countermeasure", 1, true);
+                }
             }
             Expr::BinaryOp(_, _, _) => {
                 self.emit_bin_op(expr);
