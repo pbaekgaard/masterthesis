@@ -1,0 +1,300 @@
+ui32 res;
+ui32 stmt;
+ui32 bit_shift;
+ui32 flip_mask;
+
+fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
+    ui32 p;
+    ui32 q;
+    ui32 n;
+    ui32 e;
+    ui32 m;
+    ui32 p_minus_1;
+    ui32 q_minus_1;
+    ui32 ep;
+    ui32 eq;
+    ui32 c1;
+    ui32 base1;
+    ui32 exp1;
+    ui32 fault_triggered;
+    ui32 c2;
+    ui32 base2;
+    ui32 exp2;
+    ui32 qinv;
+    ui32 t;
+    ui32 newt;
+    ui32 r;
+    ui32 newr;
+    ui32 quotient;
+    ui32 tmp;
+    ui32 h;
+    ui32 diff;
+    ui32 c;
+    p = (61 as ui32);
+    if (stmt == (0 as ui32)) {
+        p = (61 as ui32) ^ flip_mask;
+    }
+    q = (53 as ui32);
+    if (stmt == (1 as ui32)) {
+        q = (53 as ui32) ^ flip_mask;
+    }
+    n = (3233 as ui32);
+    if (stmt == (2 as ui32)) {
+        n = (3233 as ui32) ^ flip_mask;
+    }
+    e = (17 as ui32);
+    if (stmt == (3 as ui32)) {
+        e = (17 as ui32) ^ flip_mask;
+    }
+    m = (65 as ui32);
+    if (stmt == (4 as ui32)) {
+        m = (65 as ui32) ^ flip_mask;
+    }
+    p_minus_1 = (0 as ui32);
+    if (stmt == (5 as ui32)) {
+        p_minus_1 = (0 as ui32) ^ flip_mask;
+    }
+    q_minus_1 = (0 as ui32);
+    if (stmt == (6 as ui32)) {
+        q_minus_1 = (0 as ui32) ^ flip_mask;
+    }
+    ep = (0 as ui32);
+    if (stmt == (7 as ui32)) {
+        ep = (0 as ui32) ^ flip_mask;
+    }
+    eq = (0 as ui32);
+    if (stmt == (8 as ui32)) {
+        eq = (0 as ui32) ^ flip_mask;
+    }
+    p_minus_1 = p - (1 as ui32);
+    if (stmt == (9 as ui32)) {
+        p_minus_1 = p - (1 as ui32) ^ flip_mask;
+    }
+    q_minus_1 = q - (1 as ui32);
+    if (stmt == (10 as ui32)) {
+        q_minus_1 = q - (1 as ui32) ^ flip_mask;
+    }
+    ep = e - e / p_minus_1 * p_minus_1;
+    if (stmt == (11 as ui32)) {
+        ep = e - e / p_minus_1 * p_minus_1 ^ flip_mask;
+    }
+    eq = e - e / q_minus_1 * q_minus_1;
+    if (stmt == (12 as ui32)) {
+        eq = e - e / q_minus_1 * q_minus_1 ^ flip_mask;
+    }
+    c1 = (0 as ui32);
+    if (stmt == (13 as ui32)) {
+        c1 = (0 as ui32) ^ flip_mask;
+    }
+    base1 = (0 as ui32);
+    if (stmt == (14 as ui32)) {
+        base1 = (0 as ui32) ^ flip_mask;
+    }
+    exp1 = (0 as ui32);
+    if (stmt == (15 as ui32)) {
+        exp1 = (0 as ui32) ^ flip_mask;
+    }
+    c1 = (1 as ui32);
+    if (stmt == (16 as ui32)) {
+        c1 = (1 as ui32) ^ flip_mask;
+    }
+    base1 = m - m / p * p;
+    if (stmt == (17 as ui32)) {
+        base1 = m - m / p * p ^ flip_mask;
+    }
+    exp1 = ep;
+    if (stmt == (18 as ui32)) {
+        exp1 = ep ^ flip_mask;
+    }
+    if ( exp1 - exp1 / (2 as ui32) * (2 as ui32) == (1 as ui32)) {
+        c1 = c1 * base1 - c1 * base1 / p * p;
+        if (stmt == (19 as ui32)) {
+            c1 = c1 * base1 - c1 * base1 / p * p ^ flip_mask;
+        }
+    }
+    exp1 = exp1 / (2 as ui32);
+    if (stmt == (20 as ui32)) {
+        exp1 = exp1 / (2 as ui32) ^ flip_mask;
+    }
+    base1 = base1 * base1 - base1 * base1 / p * p;
+    if (stmt == (21 as ui32)) {
+        base1 = base1 * base1 - base1 * base1 / p * p ^ flip_mask;
+    }
+    fault_triggered = (0 as ui32);
+    if (stmt == (22 as ui32)) {
+        fault_triggered = (0 as ui32) ^ flip_mask;
+    }
+    if ( fault_triggered == (0 as ui32)) {
+        c1 = c1 + (1 as ui32);
+        if (stmt == (23 as ui32)) {
+            c1 = c1 + (1 as ui32) ^ flip_mask;
+        }
+        fault_triggered = (1 as ui32);
+        if (stmt == (24 as ui32)) {
+            fault_triggered = (1 as ui32) ^ flip_mask;
+        }
+    }
+    c2 = (0 as ui32);
+    if (stmt == (25 as ui32)) {
+        c2 = (0 as ui32) ^ flip_mask;
+    }
+    base2 = (0 as ui32);
+    if (stmt == (26 as ui32)) {
+        base2 = (0 as ui32) ^ flip_mask;
+    }
+    exp2 = (0 as ui32);
+    if (stmt == (27 as ui32)) {
+        exp2 = (0 as ui32) ^ flip_mask;
+    }
+    c2 = (1 as ui32);
+    if (stmt == (28 as ui32)) {
+        c2 = (1 as ui32) ^ flip_mask;
+    }
+    base2 = m - m / q * q;
+    if (stmt == (29 as ui32)) {
+        base2 = m - m / q * q ^ flip_mask;
+    }
+    exp2 = eq;
+    if (stmt == (30 as ui32)) {
+        exp2 = eq ^ flip_mask;
+    }
+    if ( exp2 - exp2 / (2 as ui32) * (2 as ui32) == (1 as ui32)) {
+        c2 = c2 * base2 - c2 * base2 / q * q;
+        if (stmt == (31 as ui32)) {
+            c2 = c2 * base2 - c2 * base2 / q * q ^ flip_mask;
+        }
+    }
+    exp2 = exp2 / (2 as ui32);
+    if (stmt == (32 as ui32)) {
+        exp2 = exp2 / (2 as ui32) ^ flip_mask;
+    }
+    base2 = base2 * base2 - base2 * base2 / q * q;
+    if (stmt == (33 as ui32)) {
+        base2 = base2 * base2 - base2 * base2 / q * q ^ flip_mask;
+    }
+    qinv = (0 as ui32);
+    if (stmt == (34 as ui32)) {
+        qinv = (0 as ui32) ^ flip_mask;
+    }
+    t = (0 as ui32);
+    if (stmt == (35 as ui32)) {
+        t = (0 as ui32) ^ flip_mask;
+    }
+    newt = (0 as ui32);
+    if (stmt == (36 as ui32)) {
+        newt = (0 as ui32) ^ flip_mask;
+    }
+    r = (0 as ui32);
+    if (stmt == (37 as ui32)) {
+        r = (0 as ui32) ^ flip_mask;
+    }
+    newr = (0 as ui32);
+    if (stmt == (38 as ui32)) {
+        newr = (0 as ui32) ^ flip_mask;
+    }
+    quotient = (0 as ui32);
+    if (stmt == (39 as ui32)) {
+        quotient = (0 as ui32) ^ flip_mask;
+    }
+    tmp = (0 as ui32);
+    if (stmt == (40 as ui32)) {
+        tmp = (0 as ui32) ^ flip_mask;
+    }
+    t = (0 as ui32);
+    if (stmt == (41 as ui32)) {
+        t = (0 as ui32) ^ flip_mask;
+    }
+    newt = (1 as ui32);
+    if (stmt == (42 as ui32)) {
+        newt = (1 as ui32) ^ flip_mask;
+    }
+    r = p;
+    if (stmt == (43 as ui32)) {
+        r = p ^ flip_mask;
+    }
+    newr = q;
+    if (stmt == (44 as ui32)) {
+        newr = q ^ flip_mask;
+    }
+    quotient = r / newr;
+    if (stmt == (45 as ui32)) {
+        quotient = r / newr ^ flip_mask;
+    }
+    tmp = t - quotient * newt;
+    if (stmt == (46 as ui32)) {
+        tmp = t - quotient * newt ^ flip_mask;
+    }
+    t = newt;
+    if (stmt == (47 as ui32)) {
+        t = newt ^ flip_mask;
+    }
+    newt = tmp;
+    if (stmt == (48 as ui32)) {
+        newt = tmp ^ flip_mask;
+    }
+    tmp = r - quotient * newr;
+    if (stmt == (49 as ui32)) {
+        tmp = r - quotient * newr ^ flip_mask;
+    }
+    r = newr;
+    if (stmt == (50 as ui32)) {
+        r = newr ^ flip_mask;
+    }
+    newr = tmp;
+    if (stmt == (51 as ui32)) {
+        newr = tmp ^ flip_mask;
+    }
+    if ( t < (0 as ui32)) {
+        qinv = t + p;
+        if (stmt == (52 as ui32)) {
+            qinv = t + p ^ flip_mask;
+        }
+    }
+    else {
+        qinv = t;
+        if (stmt == (53 as ui32)) {
+            qinv = t ^ flip_mask;
+        }
+    }
+    h = (0 as ui32);
+    if (stmt == (54 as ui32)) {
+        h = (0 as ui32) ^ flip_mask;
+    }
+    diff = (0 as ui32);
+    if (stmt == (55 as ui32)) {
+        diff = (0 as ui32) ^ flip_mask;
+    }
+    diff = c1 - c2;
+    if (stmt == (56 as ui32)) {
+        diff = c1 - c2 ^ flip_mask;
+    }
+    h = qinv * diff - qinv * diff / p * p;
+    if (stmt == (57 as ui32)) {
+        h = qinv * diff - qinv * diff / p * p ^ flip_mask;
+    }
+    if ( h < (0 as ui32)) {
+        h = h + p;
+        if (stmt == (58 as ui32)) {
+            h = h + p ^ flip_mask;
+        }
+    }
+    c = (0 as ui32);
+    if (stmt == (59 as ui32)) {
+        c = (0 as ui32) ^ flip_mask;
+    }
+    c = c2 + h * q;
+    if (stmt == (60 as ui32)) {
+        c = c2 + h * q ^ flip_mask;
+    }
+    return (c as ui32);
+}
+stmt = (? as ui32);
+bit_shift = (? as ui32);
+assume (bit_shift <= (31 as ui32));
+assume (bit_shift >= (0 as ui32));
+assume (stmt >= (0 as ui32));
+assume (stmt <= (60 as ui32));
+flip_mask = ((1 as ui32) << bit_shift);
+
+res = main(stmt, flip_mask);
+assert(res == (0 as ui32));

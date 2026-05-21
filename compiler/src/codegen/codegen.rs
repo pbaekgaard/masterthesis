@@ -734,9 +734,13 @@ ui32 flip_mask;
         match bin_op_expr {
             Expr::BinaryOp(left, op, right) => {
                 self.emit_expr(*left);
-                self.write_line("mov r1, r0", 1, true); // store left
-                self.metadata_current_registers.push_unique("r1".to_string());
+                self.write_line("sub sp, sp, #4", 1, true);
+                self.stack_offset += 4;
+                self.write_line("str r0, [sp, #0]", 1, true);
                 self.emit_expr(*right);
+                self.write_line("ldr r1, [sp, #0]", 1, true);
+                self.write_line("add sp, sp, #4", 1, true);
+                self.stack_offset -= 4;
 
                 match op {
                     BinOp::Add => self.write_line("add r0, r1, r0", 1, true),

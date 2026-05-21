@@ -1,0 +1,8 @@
+
+func main() -> Integer {
+  let d : Integer = 5;
+  let p_minus_1: Integer = 3;
+  let x : Integer = d - (d / p_minus_1) * p_minus_1;
+  print x;
+  return x;
+}
