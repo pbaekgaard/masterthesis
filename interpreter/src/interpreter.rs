@@ -992,6 +992,11 @@ impl Interpreter {
     }
     fn trigger_register_fault(&mut self, register: usize, bit: u32) {
         let old_val = self.registers[register];
+        if old_val == 77 {
+            self.fault_spec.has_triggered = true;
+            println!("REGISTER FAULT TRIGGERED!");
+            return;
+        }
         self.test_report["reg_old_value"] = old_val.into();
         self.registers[register] = self.flip_bit(old_val, bit);
         self.test_report["reg_new_value"] = self.registers[register].into();

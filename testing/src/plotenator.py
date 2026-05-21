@@ -4,7 +4,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import textwrap
 
-OUTCOME_COLORS = ["#ff2a2c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#C9A227", "#a65628"]
+OUTCOME_COLOR_MAP = {
+    "Normal Execution": "#4daf4a",
+    "Faulty": "#ff2a2c",
+    "Panicked": "#984ea3",
+    "Infinite Loop": "#ff7f00",
+    "Countermeasure Activated": "#377eb8",
+    "Faulty Jump to Countermeasure": "#377eb8",
+    "Other": "#C9A227",
+}
+OUTCOME_COLORS = list(OUTCOME_COLOR_MAP.values())
 FAULT_TYPE_COLORS = ["#a6cee3", "#ff4411", "#b2df8a"]
 
 class Plotter:
@@ -53,38 +62,64 @@ class Plotter:
             "Other": "Other",
         }
 
-        grouped = df.groupby(["variant", "outcome"]).size().unstack(fill_value=0)
-        grouped = grouped.rename(columns=returncode_labels)
-
-        col_order = [c for c in returncode_labels.values() if c != "Other" and c in grouped.columns]
-        if "Other" in grouped.columns:
-            col_order.append("Other")
-        grouped = grouped[col_order]
-
         fig, ax = plt.subplots()
-        grouped.plot(kind="bar", stacked=False, ax=ax, color=OUTCOME_COLORS[:len(grouped.columns)], legend=False)
 
-        for container in ax.containers:
-            ax.bar_label(
-                container,
-                labels=[
-                    f'{int(v.get_height())}' if v.get_height() > 0 else ''
-                    for v in container
-                ],
-                label_type='center',
-                fontsize=8,
-                rotation=90,
-                color='black',
-                fontweight='bold'
-            )
+        if edited:
+            counts = df["outcome"].value_counts().rename(returncode_labels)
+            ordered_outcomes = [c for c in returncode_labels.values() if c != "Other" and c in counts.index]
+            if "Other" in counts.index:
+                ordered_outcomes.append("Other")
+            counts = counts[ordered_outcomes]
+
+            colors = [OUTCOME_COLOR_MAP.get(outcome, "#a65628") for outcome in counts.index]
+            ax.bar(range(len(counts)), counts.values, color=colors)
+            ax.set_xticks(range(len(counts)))
+            wrapped = [textwrap.fill(o, width=14) for o in counts.index]
+            ax.set_xticklabels(wrapped, ha='center')
+        else:
+            grouped = df.groupby(["variant", "outcome"]).size().unstack(fill_value=0)
+            grouped = grouped.rename(columns=returncode_labels)
+
+            col_order = [c for c in returncode_labels.values() if c != "Other" and c in grouped.columns]
+            if "Other" in grouped.columns:
+                col_order.append("Other")
+            grouped = grouped[col_order]
+
+            colors = [OUTCOME_COLOR_MAP.get(col, "#a65628") for col in grouped.columns]
+            grouped.plot(kind="bar", stacked=False, ax=ax, color=colors, legend=False)
+
+            for container in ax.containers:
+                ax.bar_label(
+                    container,
+                    labels=[
+                        f'{int(v.get_height())}' if v.get_height() > 0 else ''
+                        for v in container
+                    ],
+                    label_type='center',
+                    fontsize=8,
+                    rotation=90,
+                    color='black',
+                    fontweight='bold'
+                )
+            self._add_horizontal_legend(fig, ax, "Outcome")
 
         ax.set_title(f"Exhaustive Interpreter - Outcome Distribution{suffix}")
         ax.set_xlabel(None)
         self._apply_scale(ax)
-        self._add_horizontal_legend(fig, ax, "Outcome")
+
+        if edited:
+            ymin, ymax = ax.get_ylim()
+            for i, (outcome, val) in enumerate(counts.items()):
+                if val > 0:
+                    if ax.get_yscale() == "log":
+                        y_pos = (ymin * val) ** 0.5
+                    else:
+                        y_pos = val / 2
+                    ax.text(i, y_pos, f'{int(val)}', ha='center', va='center',
+                            fontsize=8, rotation=90, color='black', fontweight='bold')
 
         self._style_axes(ax)
-        
+
         return fig
 
     def plot_guided(self, edited=False):
@@ -114,55 +149,77 @@ class Plotter:
             "Other": "Other",
         }
 
-        grouped = df.groupby(["variant", "outcome"]).size().unstack(fill_value=0)
-        grouped = grouped.rename(columns=returncode_labels)
-
-        col_order = [c for c in returncode_labels.values() if c != "Other" and c in grouped.columns]
-        if "Other" in grouped.columns:
-            col_order.append("Other")
-        grouped = grouped[col_order]
-
         fig, ax = plt.subplots()
 
-        grouped.plot(kind="bar", stacked=False, ax=ax, color=OUTCOME_COLORS[:len(grouped.columns)], legend=False)
+        if edited:
+            counts = df["outcome"].value_counts().rename(returncode_labels)
+            ordered_outcomes = [c for c in returncode_labels.values() if c != "Other" and c in counts.index]
+            if "Other" in counts.index:
+                ordered_outcomes.append("Other")
+            counts = counts[ordered_outcomes]
 
-        for container in ax.containers:
-            ax.bar_label(
-                container,
-                labels=[
-                    f'{int(v.get_height())}' if v.get_height() > 0 else ''
-                    for v in container
-                ],
-                label_type='center',
-                fontsize=8,
-                rotation=90,
-                color='black',
-                fontweight='bold'
-            )
+            colors = [OUTCOME_COLOR_MAP.get(outcome, "#a65628") for outcome in counts.index]
+            ax.bar(range(len(counts)), counts.values, color=colors)
+            ax.set_xticks(range(len(counts)))
+            wrapped = [textwrap.fill(o, width=14) for o in counts.index]
+            ax.set_xticklabels(wrapped, ha='center')
+        else:
+            grouped = df.groupby(["variant", "outcome"]).size().unstack(fill_value=0)
+            grouped = grouped.rename(columns=returncode_labels)
+
+            col_order = [c for c in returncode_labels.values() if c != "Other" and c in grouped.columns]
+            if "Other" in grouped.columns:
+                col_order.append("Other")
+            grouped = grouped[col_order]
+
+            colors = [OUTCOME_COLOR_MAP.get(col, "#a65628") for col in grouped.columns]
+            grouped.plot(kind="bar", stacked=False, ax=ax, color=colors, legend=False)
+
+            for container in ax.containers:
+                ax.bar_label(
+                    container,
+                    labels=[
+                        f'{int(v.get_height())}' if v.get_height() > 0 else ''
+                        for v in container
+                    ],
+                    label_type='center',
+                    fontsize=8,
+                    rotation=90,
+                    color='black',
+                    fontweight='bold'
+                )
+            self._add_horizontal_legend(fig, ax, "Outcome")
 
         ax.set_title(f"Guided Interpreter - Outcome Distribution{suffix}")
         ax.set_xlabel(None)
         self._apply_scale(ax)
-        self._add_horizontal_legend(fig, ax, "Outcome")
+
+        if edited:
+            ymin, ymax = ax.get_ylim()
+            for i, (outcome, val) in enumerate(counts.items()):
+                if val > 0:
+                    if ax.get_yscale() == "log":
+                        y_pos = (ymin * val) ** 0.5
+                    else:
+                        y_pos = val / 2
+                    ax.text(i, y_pos, f'{int(val)}', ha='center', va='center',
+                            fontsize=8, rotation=90, color='black', fontweight='bold')
 
         self._style_axes(ax)
-        
+
         return fig
-    
+
     def _style_axes(self, ax: Axes):
         ax.xaxis.label.set_fontweight('bold')
         ax.yaxis.label.set_fontweight('bold')
         ax.tick_params(axis='x', rotation=0)
-        
-        # 1. Extract, wrap, and update the text of each label
+
         wrapped_labels = []
         for label in ax.get_xticklabels():
             text = label.get_text()
-            # Wrap at 12–15 characters depending on your font size
-            wrapped_text = textwrap.fill(text, width=14) 
+            wrapped_text = textwrap.fill(text, width=14)
             wrapped_labels.append(wrapped_text)
-            
-        # 2. Re-apply the wrapped strings back to the axis
+
         ax.set_xticklabels(wrapped_labels, ha='center')
 
     def _apply_scale(self, ax: Axes, ratio_threshold=10):
@@ -172,6 +229,10 @@ class Plotter:
                 h = patch.get_height()
                 if h > 0:
                     heights.append(h)
+        if not heights:
+            ymin, ymax = ax.get_ylim()
+            if ymax > 0:
+                heights = [ymax]
         if not heights:
             ax.set_ylabel("Count")
             return
@@ -289,5 +350,5 @@ class Plotter:
         self._add_horizontal_legend(fig, ax, "Fault Type")
 
         self._style_axes(ax)
-        
+
         return fig
