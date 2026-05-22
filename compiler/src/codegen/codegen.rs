@@ -70,12 +70,11 @@ impl CodeGenerator {
         self.wh_write_line(format!("assume (bit_shift <= (31 as ui32));").as_str(), 0);
         self.wh_write_line(format!("assume (bit_shift >= (0 as ui32));").as_str(), 0);
         self.wh_write_line(format!("assume (stmt >= (0 as ui32));").as_str(), 0);
-        self.wh_write_line(format!("assume (stmt <= ({} as ui32));",self.stmt-1).as_str(), 0);
+        self.wh_write_line(format!("assume (stmt <= ({} as ui32));", self.stmt - 1).as_str(), 0);
         self.wh_write_line(format!("flip_mask = ((1 as ui32) << bit_shift);").as_str(), 0);
 
         self.wh_write_line("\nres = main(stmt, flip_mask);", 0);
         self.wh_write_line(format!("assert(res == (XYZ as ui32));").as_str(), 0);
-
     }
 
     fn gen_init(&mut self) {
@@ -439,6 +438,7 @@ ui32 flip_mask;
                 self.metadata_current_registers.push_unique("r0".to_string());
                 let curr_stmt = self.stmt;
                 let pc_before = self.pc;
+                let rhs_is_id = matches!(&expr, Expr::Identifier(_));
                 self.emit_expr(expr);
                 let offset = self.locals.get(&name).expect("Undefined variable");
                 if self.stack_offset - offset == 0 {
@@ -453,15 +453,15 @@ ui32 flip_mask;
                 if self.hard && self.dup_pairs.contains_key(&name) {
                     let dup_name = self.dup_pairs.get(&name).unwrap();
                     let dup_offset = self.locals.get(dup_name).expect("Undefined dup variable");
-                    if self.stack_offset - dup_offset == 0 {
-                        self.write_line("str r0, [sp]", 1, true);
+                    let dup_store = if self.stack_offset - dup_offset == 0 {
+                        "str r0, [sp]".to_string()
                     } else {
-                        self.write_line(
-                            &format!("str r0, [sp, #{}]", self.stack_offset - dup_offset),
-                            1,
-                            true
-                        );
+                        format!("str r0, [sp, #{}]", self.stack_offset - dup_offset)
+                    };
+                    if rhs_is_id {
+                        self.write_line("mov r0, r2", 1, true);
                     }
+                    self.write_line(&dup_store, 1, true);
                 }
                 self.wh_emit_assign(assign_stmt);
                 if self.hard {
@@ -488,7 +488,7 @@ ui32 flip_mask;
         match assign_stmt {
             Stmt::AssignStatement(identifyer, expr) => {
                 self.wh_emit_dup_checks_for_expr(&expr);
-                let expr_str = self.wh_build_expr_str(expr);
+                let expr_str = self.wh_build_expr_str(expr.clone());
                 if expr_str == "".to_string() {
                     return;
                 }
@@ -497,7 +497,8 @@ ui32 flip_mask;
 
                 if self.hard && self.dup_pairs.contains_key(&identifyer) {
                     let dup_name = self.dup_pairs.get(&identifyer).unwrap();
-                    let assign_dup_line = format!("{dup_name} = {expr_str}");
+                    let dup_val = self.wh_build_dup_expr_str(expr);
+                    let assign_dup_line = format!("{dup_name} = {dup_val}");
                     self.wh_write_line(&format!("{assign_dup_line};"), self.wh_indent);
                 }
 
@@ -566,7 +567,14 @@ ui32 flip_mask;
                 if self.hard {
                     self.stack_offset += 4;
                     self.write_line("sub sp, sp, #4", 1, true);
-                    self.emit_expr(expr.clone());
+                    match &expr {
+                        Expr::Identifier(rhs_name) if self.dup_pairs.contains_key(rhs_name) => {
+                            self.write_line("mov r0, r2", 1, true);
+                        }
+                        _ => {
+                            self.emit_expr(expr.clone());
+                        }
+                    }
                     self.write_line("str r0, [sp]", 1, true);
                     self.locals.insert(dup_name.clone(), self.stack_offset);
                     self.dup_pairs.insert(name.clone(), dup_name.clone());
@@ -607,15 +615,19 @@ ui32 flip_mask;
                     self.dup_pairs.insert(dup_name, name.clone());
                 }
 
-                let val = self.wh_build_expr_str(expr);
+                let val = self.wh_build_expr_str(expr.clone());
                 let assign_line = name.clone() + " = " + val.as_str();
 
                 self.wh_write_line(format!("{};", assign_line.as_str()).as_str(), self.wh_indent);
 
                 if self.hard {
                     let dup_name = format!("{}_dup", name);
-                    let assign_dup_line = dup_name + " = " + val.as_str();
-                    self.wh_write_line(format!("{};", assign_dup_line.as_str()).as_str(), self.wh_indent);
+                    let dup_val = self.wh_build_dup_expr_str(expr);
+                    let assign_dup_line = dup_name + " = " + dup_val.as_str();
+                    self.wh_write_line(
+                        format!("{};", assign_dup_line.as_str()).as_str(),
+                        self.wh_indent
+                    );
                 }
 
                 self.wh_instrument_assign(assign_line.as_str());
@@ -660,29 +672,31 @@ ui32 flip_mask;
         }
     }
     fn wh_build_expr_str(&self, expr: Expr) -> String {
-        // IntegerLiteral(i64),
-        // BooleanLiteral(bool),
-        // StringLiteral(String),
-        // Identifier(String),
-        // BinaryOp(Box<Expr>, BinOp, Box<Expr>),
-        // UnaryOp(UnOp, Box<Expr>),
+        self.wh_build_expr_str_impl(expr, false)
+    }
+
+    fn wh_build_dup_expr_str(&self, expr: Expr) -> String {
+        self.wh_build_expr_str_impl(expr, true)
+    }
+
+    fn wh_build_expr_str_impl(&self, expr: Expr, use_dup: bool) -> String {
         match expr {
-            Expr::IntegerLiteral(val) => {
-                return format!("({val} as ui32)");
-            }
+            Expr::IntegerLiteral(val) => format!("({val} as ui32)"),
             Expr::BooleanLiteral(val) => {
                 let ival = if val { 1 } else { 0 };
-                return format!("{ival}");
+                format!("{ival}")
             }
-            Expr::StringLiteral(_val) => {
-                return "".to_string();
-            }
+            Expr::StringLiteral(_val) => "".to_string(),
             Expr::Identifier(val) => {
-                return val;
+                if use_dup && self.hard && self.dup_pairs.contains_key(&val) {
+                    self.dup_pairs.get(&val).unwrap().clone()
+                } else {
+                    val
+                }
             }
             Expr::BinaryOp(left, op, right) => {
-                let left_str = self.wh_build_expr_str(*left);
-                let right_str = self.wh_build_expr_str(*right);
+                let left_str = self.wh_build_expr_str_impl(*left, use_dup);
+                let right_str = self.wh_build_expr_str_impl(*right, use_dup);
                 let op_str = match op {
                     BinOp::Add => "+",
                     BinOp::Sub => "-",
@@ -693,11 +707,9 @@ ui32 flip_mask;
                     BinOp::Equals => "==",
                     BinOp::NotEquals => "!=",
                 };
-                return format!("{left_str} {op_str} {right_str}");
+                format!("{left_str} {op_str} {right_str}")
             }
-            Expr::UnaryOp(_, _) => {
-                return "".to_string();
-            }
+            Expr::UnaryOp(_, _) => "".to_string(),
             _ => panic!("building expr string went wrong"),
         }
     }
@@ -718,7 +730,11 @@ ui32 flip_mask;
                 if self.hard && self.dup_pairs.contains_key(&name) {
                     let dup_name = self.dup_pairs.get(&name).unwrap();
                     let dup_offset = self.locals.get(dup_name).expect("Undefined dup variable");
-                    self.write_line(&format!("ldr r2, [sp, #{}]", self.stack_offset - dup_offset), 1, true);
+                    self.write_line(
+                        &format!("ldr r2, [sp, #{}]", self.stack_offset - dup_offset),
+                        1,
+                        true
+                    );
                     self.write_line("cmp r0, r2", 1, true);
                     self.write_line("bne countermeasure", 1, true);
                 }
@@ -1403,11 +1419,24 @@ mod tests {
                 .expect("Failed to parse exit code");
 
             let result = std::process::Command::new("./bin/run_asm").arg(&output_asm_path).output();
+            let mut actual_exit_code: i32 = 0;
+            if trv_path.to_str().unwrap().contains("hash") {
+                actual_exit_code = match result {
+                    Ok(output) => {
+                        let stdout_text = String::from_utf8_lossy(&output.stdout);
 
-            let actual_exit_code = match result {
-                Ok(output) => output.status.code().unwrap_or(-1),
-                Err(e) => panic!("{}",e),
-            };
+                        let lines: Vec<&str> = stdout_text.lines().collect();
+                        let value = lines[1].parse::<i32>().ok();
+                        value.unwrap()
+                    }
+                    Err(e) => panic!("{}", e),
+                };
+            } else {
+                actual_exit_code = match result {
+                    Ok(output) => output.status.code().unwrap_or(-1),
+                    Err(e) => panic!("{}", e),
+                };
+            }
 
             std::fs::remove_file(&output_asm_path).ok();
 
@@ -1419,6 +1448,93 @@ mod tests {
                 expected_exit_code,
                 actual_exit_code
             );
+        }
+    }
+    #[test]
+    fn compiles_all_hard_correct() {
+        initialize();
+
+        let test_codes_dir = std::path::Path::new("test_codes");
+        let trv_files: Vec<_> = std::fs
+            ::read_dir(test_codes_dir)
+            .unwrap()
+            .filter_map(|entry| {
+                let path = entry.unwrap().path();
+                if path.extension().map_or(false, |ext| ext == "trv") {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for trv_path in trv_files {
+            let source = std::fs::read_to_string(&trv_path).expect("Failed to read trv file");
+            let mut lexer: Lexer = Lexer::new(source);
+            let tokens: Vec<Token> = lexer.tokenize();
+            let mut parser: Parser = Parser::new(tokens);
+            let ast: AST = parser.parse_program();
+
+            let file_stem = trv_path.file_stem().unwrap().to_str().unwrap();
+            let output_asm_path = format!("temp/tests/{}.s", file_stem);
+            let output_wh_path = format!("temp/tests/{}.wh", file_stem);
+            let output_file = File::options()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&output_asm_path)
+                .expect(&format!("Failed to create file: {}", output_asm_path));
+
+            let wh_output_file = File::options()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&output_wh_path)
+                .expect(&format!("Failed to create file: {}", output_wh_path));
+            let mut codegen = CodeGenerator::new(output_file, wh_output_file);
+            codegen.generate(ast, true);
+
+            let output_path = trv_path.with_extension("trv.output");
+            let expected_exit_code = std::fs
+                ::read_to_string(&output_path)
+                .expect("Failed to read output file")
+                .trim()
+                .parse::<i32>()
+                .expect("Failed to parse exit code");
+
+            let result = std::process::Command::new("./bin/run_asm").arg(&output_asm_path).output();
+            let mut actual_exit_code: i32 = 0;
+            if trv_path.to_str().unwrap().contains("hash") {
+                actual_exit_code = match result {
+                    Ok(output) => {
+                        let stdout_text = String::from_utf8_lossy(&output.stdout);
+
+                        let lines: Vec<&str> = stdout_text.lines().collect();
+                        let value = lines[1].parse::<i32>().ok();
+                        value.unwrap()
+                    }
+                    Err(e) => panic!("{}", e),
+                };
+            } else {
+                actual_exit_code = match result {
+                    Ok(output) => output.status.code().unwrap_or(-1),
+                    Err(e) => panic!("{}", e),
+                };
+            }
+
+            std::fs::remove_file(&output_asm_path).ok();
+
+            assert_eq!(
+                expected_exit_code,
+                actual_exit_code,
+                "File {}: expected exit code {}, got {}",
+                file_stem,
+                expected_exit_code,
+                actual_exit_code
+            );
+            
         }
     }
 }

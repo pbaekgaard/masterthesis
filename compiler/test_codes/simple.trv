@@ -1,6 +1,5 @@
-func main() -> Boolean {
+func main() -> Integer {
   let num : Integer = 0;
-  let test : Boolean = True;
 
   while num < 10 do {
     let etellerandet : Integer = 1;
@@ -14,9 +13,5 @@ func main() -> Boolean {
     num = 11;
   }
 
-  if test != True {
-      return test;
-  } else {
-    return num;
-  }
+  return num;
 }

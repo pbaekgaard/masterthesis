@@ -1,6 +1,8 @@
 #!/bin/python3
 
 import argparse, os, toml, shutil, subprocess, sys
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datetime import datetime
 from src.database import ResultsDatabase
@@ -278,7 +280,7 @@ class Experiment:
         if trv_files_to_edit:
             editor = os.environ.get("EDITOR", "nano")
             
-            known_terminals = ["foot", "alacritty", "kitty", "gnome-terminal", "xterm", "konsole", "ghostty"]
+            known_terminals = ["foot", "alacritty", "kitty", "gnome-terminal", "xterm", "kgx", "ghostty"]
             term_cmd = None
             for t in known_terminals:
                 if shutil.which(t):
@@ -296,8 +298,8 @@ class Experiment:
                 for edited_file in edited_files:
                     print(f"\nOpening {edited_file} in {editor} (new terminal window)...")
                     if term_cmd:
-                        if term_cmd == "gnome-terminal":
-                            p = subprocess.Popen(["gnome-terminal", "--wait", "--", editor, edited_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        if term_cmd == "kgx":
+                            p = subprocess.Popen(["kgx", "--wait", "--", editor, edited_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                         elif term_cmd == "xterm":
                             p = subprocess.Popen(["xterm", "-e", editor, edited_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                         elif term_cmd == "konsole":
