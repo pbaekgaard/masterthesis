@@ -1,0 +1,102 @@
+# CRT-RSA Encryption
+# Message: 65
+# Public key: (e=17, n=3233)
+# p = 61, q = 53
+# Expected ciphertext: 2790
+
+func main() -> Integer {
+    let p : Integer = 61;
+    let q : Integer = 53;
+    let n : Integer = 3233;
+    let e : Integer = 17;
+    let m : Integer = 65;
+
+    # CRT exponents: ep = e mod (p-1), eq = e mod (q-1)
+    let p_minus_1 : Integer = 0;
+    let q_minus_1 : Integer = 0;
+    let ep : Integer = 0;
+    let eq : Integer = 0;
+
+    p_minus_1 = p - 1;
+    q_minus_1 = q - 1;
+
+    # ep = e - (e / p_minus_1) * p_minus_1  (manual mod)
+    ep = e - (e / p_minus_1) * p_minus_1;
+    # eq = e - (e / q_minus_1) * q_minus_1
+    eq = e - (e / q_minus_1) * q_minus_1;
+
+    # c1 = m^ep mod p  (modular exponentiation inlined)
+    let c1 : Integer = 0;
+    let base1 : Integer = 0;
+    let exp1 : Integer = 0;
+    c1 = 1;
+    base1 = m - (m / p) * p;
+    exp1 = ep;
+    while exp1 > 0 do {
+        if exp1 - (exp1 / 2) * 2 == 1 then {
+            c1 = (c1 * base1) - ((c1 * base1) / p) * p;
+        }
+        exp1 = exp1 / 2;
+        base1 = (base1 * base1) - ((base1 * base1) / p) * p;
+    }
+
+    # c2 = m^eq mod q
+    let c2 : Integer = 0;
+    let base2 : Integer = 0;
+    let exp2 : Integer = 0;
+    c2 = 1;
+    base2 = m - (m / q) * q;
+    exp2 = eq;
+    while exp2 > 0 do {
+        if exp2 - (exp2 / 2) * 2 == 1 then {
+            c2 = (c2 * base2) - ((c2 * base2) / q) * q;
+        }
+        exp2 = exp2 / 2;
+        base2 = (base2 * base2) - ((base2 * base2) / q) * q;
+    }
+
+    # qinv = q^(-1) mod p using extended Euclidean algorithm
+    let qinv : Integer = 0;
+    let t : Integer = 0;
+    let newt : Integer = 0;
+    let r : Integer = 0;
+    let newr : Integer = 0;
+    let quotient : Integer = 0;
+    let tmp : Integer = 0;
+
+    t = 0;
+    newt = 1;
+    r = p;
+    newr = q;
+    while newr != 0 do {
+        quotient = r / newr;
+        tmp = t - quotient * newt;
+        t = newt;
+        newt = tmp;
+        tmp = r - quotient * newr;
+        r = newr;
+        newr = tmp;
+    }
+    if t < 0 then {
+        qinv = t + p;
+    } else {
+        qinv = t;
+    }
+
+    # h = qinv * (c1 - c2) mod p
+    let h : Integer = 0;
+    let diff : Integer = 0;
+    diff = c1 - c2;
+    h = qinv * diff - (qinv * diff / p) * p;
+    if h < 0 then {
+        h = h + p;
+    }
+
+    # c = c2 + h * q
+    let c : Integer = 0;
+    c = c2 + h * q;
+
+    print c;
+
+    return c;
+}

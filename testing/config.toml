@@ -1,4 +1,4 @@
-test_folder = "eval_cases"
+test_folder = "eval_cases/pinny"
 plotmode = "save" # show, save or both
 
 injection_points = []
