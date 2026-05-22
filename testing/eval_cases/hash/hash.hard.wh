@@ -1,0 +1,199 @@
+ui32 res;
+ui32 stmt;
+ui32 bit_shift;
+ui32 flip_mask;
+
+fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
+    ui32 message;
+    ui32 message_dup;
+    ui32 h;
+    ui32 h_dup;
+    ui32 multiplier;
+    ui32 multiplier_dup;
+    ui32 prime_modulo;
+    ui32 prime_modulo_dup;
+    ui32 temp_msg;
+    ui32 temp_msg_dup;
+    ui32 chunk;
+    ui32 chunk_dup;
+    ui32 step_counter;
+    step_counter = (0 as ui32);
+    message = (0 as ui32);
+    message_dup = (0 as ui32);
+    if (stmt == (0 as ui32)) {
+        message = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (1 as ui32)) {
+        return (77 as ui32);
+    }
+    message = (12345 as ui32);
+    message_dup = (12345 as ui32);
+    if (stmt == (1 as ui32)) {
+        message = (12345 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (2 as ui32)) {
+        return (77 as ui32);
+    }
+    h = (5381 as ui32);
+    h_dup = (5381 as ui32);
+    if (stmt == (2 as ui32)) {
+        h = (5381 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (3 as ui32)) {
+        return (77 as ui32);
+    }
+    multiplier = (33 as ui32);
+    multiplier_dup = (33 as ui32);
+    if (stmt == (3 as ui32)) {
+        multiplier = (33 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (4 as ui32)) {
+        return (77 as ui32);
+    }
+    prime_modulo = (0 as ui32);
+    prime_modulo_dup = (0 as ui32);
+    if (stmt == (4 as ui32)) {
+        prime_modulo = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (5 as ui32)) {
+        return (77 as ui32);
+    }
+    prime_modulo = (104 as ui32) * (1000 as ui32) + (729 as ui32);
+    prime_modulo_dup = (104 as ui32) * (1000 as ui32) + (729 as ui32);
+    if (stmt == (5 as ui32)) {
+        prime_modulo = (104 as ui32) * (1000 as ui32) + (729 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (6 as ui32)) {
+        return (77 as ui32);
+    }
+    temp_msg = message;
+    temp_msg_dup = message;
+    if (stmt == (6 as ui32)) {
+        temp_msg = message ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (7 as ui32)) {
+        return (77 as ui32);
+    }
+    chunk = (0 as ui32);
+    chunk_dup = (0 as ui32);
+    if (stmt == (7 as ui32)) {
+        chunk = (0 as ui32) ^ flip_mask;
+    }
+    step_counter++;
+    if (step_counter != (8 as ui32)) {
+        return (77 as ui32);
+    }
+    if (temp_msg != temp_msg_dup) {
+        return (77 as ui32);
+    }
+    if ( temp_msg == (0 as ui32)) {
+        step_counter++;
+        if (step_counter != (9 as ui32)) {
+            return (77 as ui32);
+        }
+        temp_msg = (7 as ui32);
+        temp_msg_dup = (7 as ui32);
+        if (stmt == (8 as ui32)) {
+            temp_msg = (7 as ui32) ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (10 as ui32)) {
+            return (77 as ui32);
+        }
+    }
+    if (temp_msg != temp_msg_dup) {
+        return (77 as ui32);
+    }
+    if (temp_msg != temp_msg_dup) {
+        return (77 as ui32);
+    }
+    chunk = temp_msg - temp_msg / (100 as ui32) * (100 as ui32);
+    chunk_dup = temp_msg - temp_msg / (100 as ui32) * (100 as ui32);
+    if (stmt == (9 as ui32)) {
+        chunk = temp_msg - temp_msg / (100 as ui32) * (100 as ui32) ^ flip_mask;
+    }
+    if (h != h_dup) {
+        return (77 as ui32);
+    }
+    if (multiplier != multiplier_dup) {
+        return (77 as ui32);
+    }
+    if (chunk != chunk_dup) {
+        return (77 as ui32);
+    }
+    h = h * multiplier + chunk;
+    h_dup = h * multiplier + chunk;
+    if (stmt == (10 as ui32)) {
+        h = h * multiplier + chunk ^ flip_mask;
+    }
+    if (h != h_dup) {
+        return (77 as ui32);
+    }
+    if (h != h_dup) {
+        return (77 as ui32);
+    }
+    if (prime_modulo != prime_modulo_dup) {
+        return (77 as ui32);
+    }
+    if (prime_modulo != prime_modulo_dup) {
+        return (77 as ui32);
+    }
+    h = h - h / prime_modulo * prime_modulo;
+    h_dup = h - h / prime_modulo * prime_modulo;
+    if (stmt == (11 as ui32)) {
+        h = h - h / prime_modulo * prime_modulo ^ flip_mask;
+    }
+    if (temp_msg != temp_msg_dup) {
+        return (77 as ui32);
+    }
+    temp_msg = temp_msg / (100 as ui32);
+    temp_msg_dup = temp_msg / (100 as ui32);
+    if (stmt == (12 as ui32)) {
+        temp_msg = temp_msg / (100 as ui32) ^ flip_mask;
+    }
+    if (h != h_dup) {
+        return (77 as ui32);
+    }
+    if ( h < (0 as ui32)) {
+        step_counter++;
+        if (step_counter != (11 as ui32)) {
+            return (77 as ui32);
+        }
+        if (h != h_dup) {
+            return (77 as ui32);
+        }
+        if (prime_modulo != prime_modulo_dup) {
+            return (77 as ui32);
+        }
+        h = h + prime_modulo;
+        h_dup = h + prime_modulo;
+        if (stmt == (13 as ui32)) {
+            h = h + prime_modulo ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (12 as ui32)) {
+            return (77 as ui32);
+        }
+    }
+    if (h != h_dup) {
+        return (77 as ui32);
+    }
+    return (h as ui32);
+}
+stmt = (? as ui32);
+bit_shift = (? as ui32);
+assume (bit_shift <= (31 as ui32));
+assume (bit_shift >= (0 as ui32));
+assume (stmt >= (0 as ui32));
+assume (stmt <= (13 as ui32));
+flip_mask = ((1 as ui32) << bit_shift);
+
+res = main(stmt, flip_mask);
+assert(res == (XYZ as ui32));

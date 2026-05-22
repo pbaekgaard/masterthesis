@@ -8,10 +8,13 @@ fi
 
 INPUT_FILE=$1
 BASE_NAME="${INPUT_FILE%.*}"
+echo "INPUT=$INPUT_FILE"
+echo "BASE_NAME=$BASE_NAME"
+ARM_AS=/usr/bin/arm-none-eabi-as
+ARM_LD=/usr/bin/arm-none-eabi-ld
 
-# 2. Assemble & Link
-arm-none-eabi-as -mthumb -o "$BASE_NAME.o" "$INPUT_FILE" || exit 1
-arm-none-eabi-ld -o "$BASE_NAME" "$BASE_NAME.o" || exit 1
+"$ARM_AS" -mthumb -o "$BASE_NAME.o" "$INPUT_FILE" || exit 2
+"$ARM_LD" -o "$BASE_NAME" "$BASE_NAME.o" || exit 3
 
 # 3. Run and capture the exit code
 echo "--- Running $BASE_NAME ---"

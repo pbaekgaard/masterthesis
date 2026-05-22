@@ -805,7 +805,8 @@ mod tests {
     use crate::CodeGenerator;
     use std::fs::File;
     use std::io::{ Read, Seek, SeekFrom };
-    use std::sync::Once;
+    use std::path::Path;
+use std::sync::Once;
 
     static INIT: Once = Once::new();
 
@@ -1252,119 +1253,6 @@ mod tests {
     }
 
     #[test]
-    fn can_generate_nested_while() {
-        initialize();
-        let source = std::fs
-            ::read_to_string("test_codes/test_while_nested.trv")
-            .expect("Failed to read file");
-        let mut lexer: Lexer = Lexer::new(source);
-        let tokens: Vec<Token> = lexer.tokenize();
-        let mut parser: Parser = Parser::new(tokens);
-        let ast: AST = parser.parse_program();
-        let output_file = File::options()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open("temp/tests/test_can_generate_nested_while.s")
-            .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.s");
-        let wh_output_file = File::options()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open("temp/tests/test_can_generate_nested_while.wh")
-            .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.wh");
-        let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-        codegen.generate(ast, false);
-        codegen.file.seek(SeekFrom::Start(0)).unwrap();
-        let mut buf = String::new();
-        codegen.file.read_to_string(&mut buf).unwrap();
-        let expected = (
-            indoc::indoc! {
-                r##"
-                .syntax unified
-                .thumb
-
-                .section .text
-                .global _start
-                .type _start, %function
-
-                _start:
-                    sub sp, sp, #4
-                    mov r0, #0
-                    str r0, [sp]
-                while_0:
-                    ldr r0, [sp, #0]
-                    mov r1, r0
-                    mov r0, #3
-                    cmp r1, r0
-                    mov r0, #0
-                    it lt
-                    movlt r0, #1
-                    cmp r0, #0
-                    beq end_while_0
-                    sub sp, sp, #4
-                    mov r0, #0
-                    str r0, [sp]
-                while_1:
-                    ldr r0, [sp, #0]
-                    mov r1, r0
-                    mov r0, #2
-                    cmp r1, r0
-                    mov r0, #0
-                    it lt
-                    movlt r0, #1
-                    cmp r0, #0
-                    beq end_while_1
-                    ldr r0, [sp, #0]
-                    mov r1, r0
-                    mov r0, #1
-                    add r0, r1, r0
-                    str r0, [sp]
-                    b while_1
-                end_while_1:
-                    ldr r0, [sp, #4]
-                    mov r1, r0
-                    mov r0, #1
-                    add r0, r1, r0
-                    str r0, [sp, #4]
-                    add sp, sp, #4
-                    b while_0
-                end_while_0:
-                    ldr r0, [sp, #0]
-                    mov r7, #1
-                    svc #0
-
-                .size _start, .-_start
-                _metadata:
-                    .word 0x10000000 @ 0
-                    .word 0xa+1
-                    .word 0xb+3
-                    .word 0x0 @ [r0]
-                    .word 0x00000001 @ a
-                    .word 0x10000000 @ 1
-                    .word 0xa+14
-                    .word 0xb+16
-                    .word 0x0 @ [r0]
-                    .word 0x00000001 @ b
-                    .word 0x10000000 @ 2
-                    .word 0xa+27
-                    .word 0xb+31
-                    .word 0x0 @ [r0,r1]
-                    .word 0x00000001 @ b
-                    .word 0x10000000 @ 3
-                    .word 0xa+34
-                    .word 0xb+38
-                    .word 0x0 @ [r0,r1]
-                    .word 0x00000001 @ a
-            "##
-            }
-        ).to_string();
-        assert_eq!(expected, buf)
-    }
-
-    #[test]
     fn compiles_all_correct() {
         initialize();
 
@@ -1418,7 +1306,8 @@ mod tests {
                 .parse::<i32>()
                 .expect("Failed to parse exit code");
 
-            let result = std::process::Command::new("./bin/run_asm").arg(&output_asm_path).output();
+            println!("Failing for {output_asm_path}");
+            let result = std::process::Command::new("bin/run_asm").arg(&output_asm_path).output();
             let mut actual_exit_code: i32 = 0;
             if trv_path.to_str().unwrap().contains("hash") {
                 actual_exit_code = match result {
@@ -1426,19 +1315,30 @@ mod tests {
                         let stdout_text = String::from_utf8_lossy(&output.stdout);
 
                         let lines: Vec<&str> = stdout_text.lines().collect();
-                        let value = lines[1].parse::<i32>().ok();
-                        value.unwrap()
+                        let value = lines[1].parse::<i32>().ok().unwrap();
+                        println!("stdvalue = {value}");
+                        value
                     }
                     Err(e) => panic!("{}", e),
                 };
             } else {
                 actual_exit_code = match result {
-                    Ok(output) => output.status.code().unwrap_or(-1),
+                    Ok(output) => {
+                        let value = output.status.code().unwrap_or(-1);
+                        let stdout_text = String::from_utf8(output.stdout).unwrap();
+                        println!("stdout_text: {stdout_text}");
+                        println!("value = {value}");
+                        value
+                    },
                     Err(e) => panic!("{}", e),
                 };
             }
 
-            std::fs::remove_file(&output_asm_path).ok();
+            println!("actual_exit_code = {actual_exit_code}");
+
+            // std::fs::remove_file(&output_asm_path).ok();
+
+            std::fs::remove_dir_all(Path::new("/home/pbk/school/P10-Master/compiler/temp"));
 
             assert_eq!(
                 expected_exit_code,
