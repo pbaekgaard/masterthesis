@@ -1,16 +1,2 @@
 test_folder = "eval_cases/pinny"
 plotmode = "save" # show, save or both
-
-injection_points = []
-
-[pass_mode]
-default = "returncode"
-
-[pass_mode.returncode]
-passed = 0
-failed = 1
-paniced = 2
-
-[pass_mode.stdout]
-expected_pass = "g_authenticated: 0"
-expected_fail = "g_authenticated: 1"
