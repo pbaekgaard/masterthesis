@@ -74,7 +74,7 @@ impl CodeGenerator {
         self.wh_write_line(format!("flip_mask = ((1 as ui32) << bit_shift);").as_str(), 0);
 
         self.wh_write_line("\nres = main(stmt, flip_mask);", 0);
-        self.wh_write_line(format!("assert(res == (0 as ui32));").as_str(), 0);
+        self.wh_write_line(format!("assert(res == (XYZ as ui32));").as_str(), 0);
 
     }
 

@@ -1,2 +1,2 @@
-test_folder = "eval_cases/pinny"
+test_folder = "eval_cases/hash"
 plotmode = "save" # show, save or both

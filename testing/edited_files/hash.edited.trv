@@ -1,0 +1,100 @@
+func main() -> Integer {
+    # 123456789 is too big for a single ARM move.
+    # We build it: 12345 * 10000 + 6789
+    let message : Integer = 0;
+    let messageDup : Integer = 0;
+    message = 12345;
+    messageDup = 12345;
+
+    # Initialize hash with a non-zero prime offset (like FNV)
+    let h : Integer = 5381; 
+    let hDup : Integer = 5381; 
+    let multiplier : Integer = 33;
+    let multiplierDup : Integer = 33;
+
+    # 104729 is too big for a single ARM move.
+    # We build it: 104 * 1000 + 729
+    let prime_modulo : Integer = 0; 
+    let prime_moduloDup : Integer = 0; 
+    prime_modulo = 104 * 1000 + 729;
+    prime_moduloDup = 104 * 1000 + 729;
+    
+    if message != messageDup {
+        return 77;
+    }
+    let temp_msg : Integer = message;
+    let temp_msgDup : Integer = messageDup;
+    let chunk : Integer = 0;
+    let chunkDup : Integer = 0;
+
+    # Handle a 0 message quickly
+    if temp_msg == 0 then {
+        if temp_msg != temp_msgDup {
+            return 77;
+        }
+        temp_msg = 7; # Fallback seed
+        temp_msgDup = 7; # Fallback seed
+    }
+
+    # Single loop: process the integer by stripping off digits/chunks
+    while temp_msg > 0 do {
+        if temp_msg != temp_msgDup {
+            return 77;
+        }
+        # chunk = temp_msg mod 100 (processes two digits at a time)
+        if chunk != chunkDup {
+            return 77;
+        }
+        chunk = temp_msg - (temp_msg / 100) * 100;
+        chunkDup = temp_msgDup - (temp_msgDup / 100) * 100;
+        
+        # Mix the chunk into the hash
+        if h != hDup {
+            return 77;
+        }
+        if multiplier != multiplierDup {
+            return 77;
+        }
+        if chunk != chunkDup {
+            return 77;
+        }
+        h = (h * multiplier) + chunk;
+        hDup = (hDup * multiplierDup) + chunkDup;
+        
+        # Inline modulo: h = h mod prime_modulo
+        if h != hDup {
+            return 77;
+        }
+        if prime_modulo != prime_moduloDup {
+            return 77;
+        }
+        h = h - (h / prime_modulo) * prime_modulo;
+        hDup = hDup - (hDup / prime_moduloDup) * prime_moduloDup;
+
+        # Move to the next chunk
+        if temp_msg != temp_msgDup {
+            return 77;
+        }
+        temp_msg = temp_msg / 100;
+        temp_msgDup = temp_msgDup / 100;
+    }
+
+    # Final guard statement if operations pushed the integer into negative wrap
+    if h != hDup {
+        return 77;
+    }
+    if h < 0 then {
+
+        if h != hDup {
+            return 77;
+        }
+        h = h + prime_modulo;
+        hDup = hDup + prime_moduloDup;
+    }
+
+    if h != hDup {
+        return 77;
+    }
+    print h;
+    return h;
+}

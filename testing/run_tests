@@ -25,28 +25,6 @@ class Experiment:
         )
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
         self.plot_mode = config.get("plotmode", "save")
-        self.injection_points = config.get(
-            "injection_points",
-            [
-                "r0",
-                "r1",
-                "r2",
-                "r3",
-                "r4",
-                "r5",
-                "r6",
-                "r7",
-                "r8",
-                "r9",
-                "r10",
-                "r11",
-                "r12",
-            ],
-        )
-        self.default_pass_mode = config.get("pass_mode", {}).get(
-            "default", "returncode"
-        )
-        self.pass_mode_configs = config.get("pass_mode", {})
         self.runner = TestRunner(config_path=args.config)
         self.tests = self.runner._discover_tests()
         self.compile_results = None
@@ -394,8 +372,16 @@ class Experiment:
         plotter.export_symex_csv(symex_csv_path)
 
         self.db.close()
-        
-        zip_base = os.path.join(self.artifacts_folder, self.run_name)
+
+        prompt = f"Name for artifact zip (default: {self.run_name}): "
+        try:
+            name = input(prompt).strip()
+        except EOFError:
+            name = ""
+        if not name:
+            name = self.run_name
+
+        zip_base = os.path.join(self.artifacts_folder, name)
         temp_name = os.path.join(self.artifacts_folder, "test_results")
         os.rename(self.run_folder, temp_name)
         shutil.make_archive(

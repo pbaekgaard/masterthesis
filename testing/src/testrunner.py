@@ -110,27 +110,28 @@ def _check_passed(result, pass_mode_config, cm_start, cm_end, injection_point):
         return 77
     elif "Detected Infinite Loop" in result.stdout:
         return 3
-    if mode == "returncode" and result.returncode == 0:
-        return 1
-    elif "panic" in result.stderr:
-        return 2
-    elif mode == "returncode" and result.returncode != 0:
-        if cm_start is not None and cm_end is not None and injection_point is not None:
-            parts = injection_point.split(":")
-            if parts[0] == "pc":
-                pc_value = int(parts[1])
-                bit_value = int(parts[2])
-                mask = 1 << bit_value
-                flipped_pc = pc_value ^ mask
-                if(flipped_pc in range(cm_start, cm_end+1)):
-                    return 78
-                return 0
-            return 0
-        return 0
-    elif mode == "stdout":
-        if expected_pass and expected_pass in result.stdout:
+    if mode == "returncode":
+        if result.returncode == expected_pass:
             return 1
-        elif expected_fail and expected_fail in result.stdout and result.returncode == 1:
+        elif "panic" in result.stderr:
+            return 2
+        elif result.returncode == expected_fail:
+            if cm_start is not None and cm_end is not None and injection_point is not None:
+                parts = injection_point.split(":")
+                if parts[0] == "pc":
+                    pc_value = int(parts[1])
+                    bit_value = int(parts[2])
+                    mask = 1 << bit_value
+                    flipped_pc = pc_value ^ mask
+                    if flipped_pc in range(cm_start, cm_end + 1):
+                        return 78
+            return 0
+        else:
+            return 0
+    elif mode == "stdout":
+        if expected_pass and str(expected_pass) in result.stdout:
+            return 1
+        elif expected_fail and str(expected_fail) in result.stdout:
             return 0
         return 1
     else:
@@ -171,8 +172,6 @@ class TestRunner:
                 "r12",
             ],
         )
-        self.default_pass_mode = config.get("pass_mode", {}).get("default", "returncode")
-        self.pass_mode_configs = config.get("pass_mode", {})
         self.tests = self._discover_tests()
         self.compile_results = None
 
@@ -186,17 +185,7 @@ class TestRunner:
 
         for trv_file in trv_files:
             test_name = trv_file[:-4]
-            output_file = trv_file + ".output"
-            toml_file = trv_file + ".toml"
-
-            if output_file not in files:
-                continue
-
             trv_path = os.path.join(self.tests_folder, trv_file)
-            output_path = os.path.join(self.tests_folder, output_file)
-
-            with open(output_path, "r") as f:
-                expected_output = f.read().strip()
 
             pass_mode_config = self._load_pass_mode_config(test_name, trv_file, files)
 
@@ -204,7 +193,7 @@ class TestRunner:
                 {
                     "name": test_name,
                     "path": trv_path,
-                    "expected_output": expected_output,
+                    "expected_output": "",
                     "pass_mode": pass_mode_config,
                 }
             )
@@ -212,29 +201,37 @@ class TestRunner:
         return tests
 
     def _load_pass_mode_config(self, test_name, trv_file, files):
-        toml_file = trv_file + ".toml"
+        conf_file = "test.conf"
 
-        if toml_file in files:
-            toml_path = os.path.join(self.tests_folder, toml_file)
-            with open(toml_path, "r") as f:
-                test_config = toml.load(f)
-            pass_mode = test_config.get("pass_mode", {})
-            if "mode" in pass_mode:
-                mode = pass_mode["mode"]
-                mode_config = self.pass_mode_configs.get(mode, {})
+        if conf_file in files:
+            conf_path = os.path.join(self.tests_folder, conf_file)
+            config = {}
+            with open(conf_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or ":" not in line:
+                        continue
+                    key, _, value = line.partition(":")
+                    config[key.strip()] = value.strip()
+
+            mode = config.get("mode", "returncode")
+            if mode == "returncode":
                 return {
                     "mode": mode,
-                    "expected_pass": pass_mode.get("passed", 0) if mode == "returncode" else pass_mode.get("expected_pass"),
-                    "expected_fail": pass_mode.get("failed", 1) if mode == "returncode" else pass_mode.get("expected_fail"),
+                    "expected_pass": int(config.get("passed", "0")),
+                    "expected_fail": int(config.get("failed", "1")),
+                }
+            else:
+                return {
+                    "mode": mode,
+                    "expected_pass": config.get("passed", ""),
+                    "expected_fail": config.get("failed", ""),
                 }
 
-        mode = self.default_pass_mode
-        mode_config = self.pass_mode_configs.get(mode, {})
-        return {
-            "mode": mode,
-            "expected_pass": mode_config.get("passed", 0) if mode == "returncode" else mode_config.get("expected_pass"),
-            "expected_fail": mode_config.get("failed", 1) if mode == "returncode" else mode_config.get("expected_fail"),
-        }
+        raise FileNotFoundError(
+            f"Missing test.conf in {self.tests_folder}. "
+            "Each test folder must have a test.conf file defining mode, passed, and failed."
+        )
 
     def check_bin(self):
         from pathlib import Path
@@ -351,7 +348,7 @@ class TestRunner:
         registers = []
         cpsr_registers = []
         pc_points = []
-        do_all = False
+        do_all = True
 
         if len(self.injection_points) == 0:
             do_all = True
@@ -479,6 +476,18 @@ class TestRunner:
 
         return results
 
+    def _patch_wh_assert(self, asm_path, expected_value):
+        wh_path = asm_path.replace(".s", ".wh")
+        if not os.path.exists(wh_path):
+            return
+        with open(wh_path, "r") as f:
+            content = f.read()
+        if "XYZ" not in content:
+            return
+        content = content.replace("XYZ", str(expected_value))
+        with open(wh_path, "w") as f:
+            f.write(content)
+
     def compile(self, nohard=False):
         results = []
         for test in self.tests:
@@ -489,6 +498,8 @@ class TestRunner:
                 success, asm_path, stdout, stderr = self.compile_test(
                     test, hard, self.compiled_folder
                 )
+                if success:
+                    self._patch_wh_assert(asm_path, test["pass_mode"]["expected_pass"])
                 test_result[hard_str] = {
                     "success": success,
                     "asm_path": asm_path,
