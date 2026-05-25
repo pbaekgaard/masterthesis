@@ -53,17 +53,31 @@ fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
     if (stmt == (7 as ui32)) {
         vd_dup = x_dup + y_dup + z_dup + (1 as ui32) ^ flip_mask;
     }
+    if ( vd != vd_dup) {
+        return ((77 as ui32) as ui32);
+    }
     if ( vd == (6 as ui32)) {
         vd = (7 as ui32);
         if (stmt == (8 as ui32)) {
             vd = (7 as ui32) ^ flip_mask;
         }
+        vd_dup = (7 as ui32);
+        if (stmt == (9 as ui32)) {
+            vd_dup = (7 as ui32) ^ flip_mask;
+        }
     }
     else {
         vd = (8 as ui32);
-        if (stmt == (9 as ui32)) {
+        if (stmt == (10 as ui32)) {
             vd = (8 as ui32) ^ flip_mask;
         }
+        vd_dup = (8 as ui32);
+        if (stmt == (11 as ui32)) {
+            vd_dup = (8 as ui32) ^ flip_mask;
+        }
+    }
+    if ( vd != vd_dup) {
+        return ((77 as ui32) as ui32);
     }
     return (vd as ui32);
 }
@@ -72,7 +86,7 @@ bit_shift = (? as ui32);
 assume (bit_shift <= (31 as ui32));
 assume (bit_shift >= (0 as ui32));
 assume (stmt >= (0 as ui32));
-assume (stmt <= (9 as ui32));
+assume (stmt <= (11 as ui32));
 flip_mask = ((1 as ui32) << bit_shift);
 
 res = main(stmt, flip_mask);

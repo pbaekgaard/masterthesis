@@ -138,6 +138,21 @@ ui32 flip_mask;
         self.write_line("\n.size _start, .-_start", 0, true);
         self.wh_write_line("}", 0);
     }
+    fn emit_vd(&mut self, expr: Expr) {
+        //husk det er den der laver vd checket
+        let collected_identifiers = expr.get_all_identifiers();
+        for c in collected_identifiers.clone() {
+            let duped = c.clone() + "_dup";
+            let condition = Expr::BinaryOp(
+                Box::new(Expr::Identifier(c)),
+                BinOp::NotEquals,
+                Box::new(Expr::Identifier(duped))
+            );
+            let then = Block { statements: vec![Stmt::Return(Expr::IntegerLiteral(77))] };
+            let if_statement = Stmt::If { condition, block: then, option: None };
+            self.emit_if(if_statement);
+        }
+    }
     fn emit_block(&mut self, block: Block, is_main: bool) {
         let initial_offset = self.stack_offset;
         let initial_locals = self.locals.clone();
@@ -147,29 +162,45 @@ ui32 flip_mask;
             match stmt {
                 Stmt::Let(ref name, ref typ, ref expr) => {
                     if self.vd {
-                        let collected_identifiers = expr.get_all_identifiers();
-                        for c in collected_identifiers.clone(){
-                            let duped = c.clone() + "_dup";
-                            let condition = Expr::BinaryOp(Box::new(Expr::Identifier(c)), BinOp::NotEquals, Box::new(Expr::Identifier(duped)));
-                            let then = Block{statements: vec![Stmt::Return(Expr::IntegerLiteral(77))]};
-                            let if_statement = Stmt::If { condition, block: then, option:None};
-                            self.emit_if(if_statement);
-                        }
+                        self.emit_vd(expr.clone());
                     }
                     self.emit_let(stmt.clone());
                     if self.vd {
                         let dup_expr = expr.duplicate_identifiers("_dup");
                         let dup_stmt = Stmt::Let(format!("{}_dup", name), typ.clone(), dup_expr);
-                        self.emit_let(dup_stmt)
+                        self.emit_let(dup_stmt);
                     }
-                },
-                Stmt::AssignStatement(_, _) => self.emit_assign(stmt),
-                Stmt::Return(_) => {
+                }
+                Stmt::AssignStatement(ref name, ref expr) => {
+                    if self.vd {
+                        self.emit_vd(expr.clone());
+                    }
+                    self.emit_assign(stmt.clone());
+                    if self.vd {
+                        let dup_expr = expr.duplicate_identifiers("_dup");
+                        let dup_stmt = Stmt::AssignStatement(format!("{}_dup", name), dup_expr);
+                        self.emit_assign(dup_stmt);
+                    }
+                }
+                Stmt::Return(ref expr) => {
+                    if self.vd {
+                        self.emit_vd(expr.clone());
+                    }
                     self.emit_return(stmt, is_main);
                     has_return = true;
                 }
-                Stmt::If { .. } => self.emit_if(stmt),
-                Stmt::While { .. } => self.emit_while(stmt),
+                Stmt::If { condition: ref expr, .. } => {
+                    if self.vd {
+                        self.emit_vd(expr.clone());
+                    }
+                    self.emit_if(stmt);
+                }
+                Stmt::While { ref expr, .. } => {
+                    if self.vd {
+                        self.emit_vd(expr.clone());
+                    }
+                    self.emit_while(stmt);
+                }
                 Stmt::Print(exprs) => self.emit_print(exprs),
                 _ => panic!("Error found in expression in return"),
             }
@@ -240,7 +271,7 @@ ui32 flip_mask;
             self.write_line("num_buf:", 0, false);
             self.write_line(".space 16", 1, false);
         }
-        if self.sc{
+        if self.sc {
             self.write_line("step_counter:", 0, false);
             self.write_line(".word 0", 1, false);
             self.write_line("fault_msg:", 0, false);
@@ -1259,5 +1290,4 @@ mod tests {
         ).to_string();
         assert_eq!(expected, buf)
     }
-
 }

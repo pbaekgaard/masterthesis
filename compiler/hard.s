@@ -123,6 +123,24 @@ endif_2:
     ldr r0, [sp, #4]
     sub sp, sp, #4
     str r0, [sp, #0]
+    ldr r0, [sp, #4]
+    ldr r1, [sp, #0]
+    add sp, sp, #4
+    cmp r1, r0
+    mov r0, #0
+    it ne
+    movne r0, #1
+    cmp r0, #0
+    beq else_3
+    mov r0, #77
+    mov r7, #1
+    svc #0
+    b endif_3
+else_3:
+endif_3:
+    ldr r0, [sp, #4]
+    sub sp, sp, #4
+    str r0, [sp, #0]
     mov r0, #6
     ldr r1, [sp, #0]
     add sp, sp, #4
@@ -131,14 +149,36 @@ endif_2:
     it eq
     moveq r0, #1
     cmp r0, #0
-    beq else_3
+    beq else_4
     mov r0, #7
     str r0, [sp, #4]
-    b endif_3
-else_3:
+    mov r0, #7
+    str r0, [sp]
+    b endif_4
+else_4:
     mov r0, #8
     str r0, [sp, #4]
-endif_3:
+    mov r0, #8
+    str r0, [sp]
+endif_4:
+    ldr r0, [sp, #4]
+    sub sp, sp, #4
+    str r0, [sp, #0]
+    ldr r0, [sp, #4]
+    ldr r1, [sp, #0]
+    add sp, sp, #4
+    cmp r1, r0
+    mov r0, #0
+    it ne
+    movne r0, #1
+    cmp r0, #0
+    beq else_5
+    mov r0, #77
+    mov r7, #1
+    svc #0
+    b endif_5
+else_5:
+endif_5:
     ldr r0, [sp, #4]
     mov r7, #1
     svc #0
@@ -199,12 +239,22 @@ _metadata:
     .word 0x0 @ [r0]
     .word 0x00000001 @ vd_dup
     .word 0x10000000 @ 8
-    .word 0xa+127
-    .word 0xb+128
+    .word 0xa+145
+    .word 0xb+146
     .word 0x0 @ [r0]
     .word 0x00000001 @ vd
     .word 0x10000000 @ 9
-    .word 0xa+131
-    .word 0xb+132
+    .word 0xa+147
+    .word 0xb+148
+    .word 0x0 @ [r0]
+    .word 0x00000001 @ vd_dup
+    .word 0x10000000 @ 10
+    .word 0xa+151
+    .word 0xb+152
     .word 0x0 @ [r0]
     .word 0x00000001 @ vd
+    .word 0x10000000 @ 11
+    .word 0xa+153
+    .word 0xb+154
+    .word 0x0 @ [r0]
+    .word 0x00000001 @ vd_dup
