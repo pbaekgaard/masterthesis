@@ -20,7 +20,6 @@ pub struct CodeGenerator {
     locals: HashMap<String, i32>,
     stack_offset: i32,
     label_count: usize,
-    hard: bool,
     sc: bool,
     vd: bool,
     string_literals: Vec<(String, String)>,
@@ -43,7 +42,6 @@ impl CodeGenerator {
             locals: HashMap::new(),
             stack_offset: 0,
             label_count: 0,
-            hard: false,
             sc: false,
             vd: false,
             string_literals: Vec::new(),
@@ -143,14 +141,17 @@ ui32 flip_mask;
         let collected_identifiers = expr.get_all_identifiers();
         for c in collected_identifiers.clone() {
             let duped = c.clone() + "_dup";
-            let condition = Expr::BinaryOp(
-                Box::new(Expr::Identifier(c)),
-                BinOp::NotEquals,
-                Box::new(Expr::Identifier(duped))
-            );
-            let then = Block { statements: vec![Stmt::Return(Expr::IntegerLiteral(77))] };
-            let if_statement = Stmt::If { condition, block: then, option: None };
-            self.emit_if(if_statement);
+            let dup_offset = self.stack_offset - *self.locals.get(&duped).unwrap();
+            let offset = self.stack_offset - *self.locals.get(&c).unwrap();
+            self.write_line(format!("ldr r0, [sp, #{}]", offset).as_str(), 1, true);
+            self.write_line(format!("ldr r1, [sp, #{}]", dup_offset).as_str(), 1, true);
+            self.write_line("cmp r1, r0", 1, true);
+            self.write_line("bne countermeasure", 1, true);
+            self.wh_write_line(&format!("if ({} != {}) {{", c, duped), self.wh_indent);
+            self.wh_indent += 1;
+            self.wh_write_line("return 77;", self.wh_indent);
+            self.wh_indent -= 1;
+            self.wh_write_line("}", 1);
         }
     }
     fn emit_block(&mut self, block: Block, is_main: bool) {
@@ -173,6 +174,7 @@ ui32 flip_mask;
                 }
                 Stmt::AssignStatement(ref name, ref expr) => {
                     if self.vd {
+                        self.emit_vd(Expr::Identifier(name.into()));
                         self.emit_vd(expr.clone());
                     }
                     self.emit_assign(stmt.clone());
@@ -230,26 +232,19 @@ ui32 flip_mask;
         }
         self.step_counter += 1;
 
-        if self.in_loop {
-            self.write_line("add r9, r9, #1", 1, true);
-            self.write_line("cmp r9, r10", 1, true);
-            self.write_line("bne countermeasure", 1, true);
-            self.write_line("add r10, r10, #1", 1, true);
-        } else {
-            self.write_line("add r9, r9, #1", 1, true);
-            self.write_line(&format!("cmp r9, #{}", self.step_counter), 1, true);
-            self.write_line("bne countermeasure", 1, true);
+        self.write_line("add r9, r9, #1", 1, true);
+        self.write_line(&format!("cmp r9, #{}", self.step_counter), 1, true);
+        self.write_line("bne countermeasure", 1, true);
 
-            self.wh_write_line("step_counter++;", self.wh_indent);
-            self.wh_write_line(
-                &format!("if (step_counter != ({} as ui32)) {{", self.step_counter),
-                self.wh_indent
-            );
-            self.wh_indent += 1;
-            self.wh_write_line("return (77 as ui32);", self.wh_indent);
-            self.wh_indent -= 1;
-            self.wh_write_line("}", self.wh_indent);
-        }
+        self.wh_write_line("step_counter++;", self.wh_indent);
+        self.wh_write_line(
+            &format!("if (step_counter != ({} as ui32)) {{", self.step_counter),
+            self.wh_indent
+        );
+        self.wh_indent += 1;
+        self.wh_write_line("return (77 as ui32);", self.wh_indent);
+        self.wh_indent -= 1;
+        self.wh_write_line("}", self.wh_indent);
     }
 
     fn emit_print_data(&mut self) {
@@ -313,7 +308,7 @@ ui32 flip_mask;
                 self.wh_indent -= 1;
                 self.wh_write_line("}", self.wh_indent);
 
-                if let Some(else_block) = option {
+                if let Some(else_block) = option.clone() {
                     if self.sc {
                         self.step_counter = saved;
                     }
@@ -333,6 +328,10 @@ ui32 flip_mask;
                 }
 
                 self.write_line(&format!("endif_{}:", label_id), 0, true);
+                if option.is_none() {
+                    self.step_counter = std::cmp::max(self.step_counter, saved_then);
+                    self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
+                }
             }
             _ => panic!("emit_if called with non-if statement"),
         }
@@ -346,10 +345,13 @@ ui32 flip_mask;
                 let saved = self.step_counter;
                 self.in_loop = true;
 
+                self.step_counter = 0;
+
+                self.write_line(&format!("while_{}:", label_id), 0, true);
                 if self.sc {
+                    self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
                     self.write_line(&format!("mov r10, #{}", self.step_counter + 1), 1, true);
                 }
-                self.write_line(&format!("while_{}:", label_id), 0, true);
 
                 self.emit_step_check();
                 self.emit_expr(expr);

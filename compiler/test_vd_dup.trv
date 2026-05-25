@@ -5,19 +5,20 @@ func main() -> Integer {
   let y_dup : Integer = 2;
   let z : Integer = 4;
   let z_dup : Integer = 4;
-
   if x != x_dup {
       return 77;
   }
+
   if y != y_dup {
       return 77;
   }
+
   if z != z_dup {
-      return 77;
+      return 77; 
   }
+
   let vd : Integer = x + y + z + 1;
   let vd_dup : Integer = x_dup + y_dup + z_dup + 1;
-
 
   if vd != vd_dup {
       return 77;
@@ -32,6 +33,7 @@ func main() -> Integer {
       if vd != vd_dup {
           return 77;
       }
+      vd = 8;
       vd_dup = 8;
   }
 

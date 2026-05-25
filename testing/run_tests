@@ -11,6 +11,46 @@ from src.symexrunner import SymexRunner
 from src.plotenator import Plotter
 from rich.console import Console
 
+def pinny_check_passed(result, pass_mode_config, cm_start, cm_end, injection_point):
+        mode = pass_mode_config.get("mode", "returncode")
+        expected_pass = pass_mode_config.get("expected_pass", None)
+        expected_fail = pass_mode_config.get("expected_fail", None)
+
+        if "COUNTERMEASURE" in result.stdout or result.returncode == 77:
+            return 77
+        elif "Detected Infinite Loop" in result.stdout:
+            return 3
+        if mode == "returncode":
+            if result.returncode == expected_pass:
+                return 1
+            elif "panic" in result.stderr:
+                return 2
+            elif result.returncode == expected_fail:
+                if cm_start is not None and cm_end is not None and injection_point is not None:
+                    parts = injection_point.split(":")
+                    if parts[0] == "pc":
+                        pc_value = int(parts[1])
+                        bit_value = int(parts[2])
+                        mask = 1 << bit_value
+                        flipped_pc = pc_value ^ mask
+                        if flipped_pc in range(cm_start, cm_end + 1):
+                            return 78
+                return 0
+            else:
+                return 0
+        elif mode == "stdout":
+            if expected_pass and str(expected_pass) in result.stdout:
+                return 1
+            elif expected_fail and str(expected_fail) in result.stdout:
+                return 0
+            return 1
+        else:
+            print(f"STDOUT: {result.stdout}")
+            print(f"STDERR: {result.stderr}")
+            print(f"RETURNCODE: {result.returncode}")
+            raise ValueError(f"Unknown pass mode: {mode}")
+
+
 
 class Experiment:
     def __init__(self, args, run_variants, config_path=None):
@@ -27,7 +67,7 @@ class Experiment:
         )
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
         self.plot_mode = config.get("plotmode", "save")
-        self.runner = TestRunner(config_path=args.config)
+        self.runner = TestRunner(config_path=args.config, oracle=pinny_check_passed)
         self.tests = self.runner._discover_tests()
         self.compile_results = None
 

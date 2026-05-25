@@ -49,49 +49,6 @@ def _get_countermeasure_location_range(asm_path: str):
 # start, end = _get_countermeasure_location_range("code.s")
 # print(f"Countermeasure range: {start} to {end}")
 
-def _fault_worker(args):
-    asm_path, injection_point, pass_mode_config = args
-
-    bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
-    interpreter_path = os.path.join(bin_dir, "interpreter")
-
-    cmd = [interpreter_path, asm_path, "--injection-point", injection_point, "--test-mode"]
-
-    result = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
-
-    (cm_start, cm_end) = _get_countermeasure_location_range(asm_path)
-    passed = _check_passed(result, pass_mode_config, cm_start, cm_end, injection_point)
-
-    matched_output_line = None
-    if pass_mode_config.get("mode") == "stdout":
-        expected_pass = pass_mode_config.get("expected_pass", "")
-        expected_fail = pass_mode_config.get("expected_fail", "")
-        
-        stdout_lines = result.stdout.strip().split("\n")
-        
-        if passed and expected_pass:
-            for line in stdout_lines:
-                if expected_pass in line:
-                    matched_output_line = line.strip()
-                    break
-        elif not passed and expected_fail:
-            for line in stdout_lines:
-                if expected_fail in line:
-                    matched_output_line = line.strip()
-                    break
-        
-        if matched_output_line is None:
-            matched_output_line = "N/A"
-    return {
-        "injection_point": injection_point,
-        "returncode": result.returncode,
-        "stdout": result.stdout.strip(),
-        "stderr": result.stderr.strip(),
-        "expected_output": pass_mode_config.get("expected_pass", ""),
-        "matched_output_line": matched_output_line,
-        "passed": passed,
-        "test_report": _extract_test_report(result.stdout),
-    }
 
 def _extract_test_report(stdout: str):
     keyword = r'"title":\s*"test_report"'
@@ -101,48 +58,10 @@ def _extract_test_report(stdout: str):
         return match.group(0)
     return '{"title": "test_report"}'
     
-def _check_passed(result, pass_mode_config, cm_start, cm_end, injection_point):
-    mode = pass_mode_config.get("mode", "returncode")
-    expected_pass = pass_mode_config.get("expected_pass", None)
-    expected_fail = pass_mode_config.get("expected_fail", None)
-
-    if "COUNTERMEASURE" in result.stdout or result.returncode == 77:
-        return 77
-    elif "Detected Infinite Loop" in result.stdout:
-        return 3
-    if mode == "returncode":
-        if result.returncode == expected_pass:
-            return 1
-        elif "panic" in result.stderr:
-            return 2
-        elif result.returncode == expected_fail:
-            if cm_start is not None and cm_end is not None and injection_point is not None:
-                parts = injection_point.split(":")
-                if parts[0] == "pc":
-                    pc_value = int(parts[1])
-                    bit_value = int(parts[2])
-                    mask = 1 << bit_value
-                    flipped_pc = pc_value ^ mask
-                    if flipped_pc in range(cm_start, cm_end + 1):
-                        return 78
-            return 0
-        else:
-            return 0
-    elif mode == "stdout":
-        if expected_pass and str(expected_pass) in result.stdout:
-            return 1
-        elif expected_fail and str(expected_fail) in result.stdout:
-            return 0
-        return 1
-    else:
-        print(f"STDOUT: {result.stdout}")
-        print(f"STDERR: {result.stderr}")
-        print(f"RETURNCODE: {result.returncode}")
-        raise ValueError(f"Unknown pass mode: {mode}")
 
 
 class TestRunner:
-    def __init__(self, config_path=None):
+    def __init__(self, config_path=None, oracle=None):
         if config_path is None:
             config_path = os.path.join(os.path.dirname(__file__), "..", "config.toml")
 
@@ -153,6 +72,7 @@ class TestRunner:
         self.tests_folder = os.path.join(
             self.base_dir, config.get("test_folder", "fissc")
         )
+        self.oracle = oracle
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
         self.injection_points = config.get(
             "injection_points",
@@ -174,6 +94,53 @@ class TestRunner:
         )
         self.tests = self._discover_tests()
         self.compile_results = None
+
+    def _fault_worker(self, args):
+        asm_path, injection_point, pass_mode_config = args
+
+        bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
+        interpreter_path = os.path.join(bin_dir, "interpreter")
+
+        cmd = [interpreter_path, asm_path, "--injection-point", injection_point, "--test-mode"]
+
+        result = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
+
+        (cm_start, cm_end) = _get_countermeasure_location_range(asm_path)
+        passed = self._check_passed(result, pass_mode_config, cm_start, cm_end, injection_point)
+
+        matched_output_line = None
+        if pass_mode_config.get("mode") == "stdout":
+            expected_pass = pass_mode_config.get("expected_pass", "")
+            expected_fail = pass_mode_config.get("expected_fail", "")
+            
+            stdout_lines = result.stdout.strip().split("\n")
+            
+            if passed and expected_pass:
+                for line in stdout_lines:
+                    if expected_pass in line:
+                        matched_output_line = line.strip()
+                        break
+            elif not passed and expected_fail:
+                for line in stdout_lines:
+                    if expected_fail in line:
+                        matched_output_line = line.strip()
+                        break
+            
+            if matched_output_line is None:
+                matched_output_line = "N/A"
+        return {
+            "injection_point": injection_point,
+            "returncode": result.returncode,
+            "stdout": result.stdout.strip(),
+            "stderr": result.stderr.strip(),
+            "expected_output": pass_mode_config.get("expected_pass", ""),
+            "matched_output_line": matched_output_line,
+            "passed": passed,
+            "test_report": _extract_test_report(result.stdout),
+        }
+
+    def _check_passed(self, result, pass_mode_config, cm_start, cm_end, injection_point):
+        return self.oracle(result, pass_mode_config, cm_start, cm_end, injection_point)
 
     def _discover_tests(self):
         tests = []
@@ -466,7 +433,7 @@ class TestRunner:
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count) as executor:
             for res in tqdm(
-                executor.map(_fault_worker, tasks, chunksize=50),
+                executor.map(self._fault_worker, tasks, chunksize=50),
                 total=len(tasks),
                 desc="Fault Injection",
             ):

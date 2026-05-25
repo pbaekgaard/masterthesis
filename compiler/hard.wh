@@ -12,6 +12,8 @@ fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
     ui32 z_dup;
     ui32 vd;
     ui32 vd_dup;
+    ui32 step_counter;
+    step_counter = (0 as ui32);
     x = (0 as ui32);
     if (stmt == (0 as ui32)) {
         x = (0 as ui32) ^ flip_mask;
@@ -36,14 +38,14 @@ fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
     if (stmt == (5 as ui32)) {
         z_dup = (4 as ui32) ^ flip_mask;
     }
-    if ( x != x_dup) {
-        return ((77 as ui32) as ui32);
+    if (x != x_dup) {
+        return 77;
     }
-    if ( y != y_dup) {
-        return ((77 as ui32) as ui32);
+    if (y != y_dup) {
+        return 77;
     }
-    if ( z != z_dup) {
-        return ((77 as ui32) as ui32);
+    if (z != z_dup) {
+        return 77;
     }
     vd = x + y + z + (1 as ui32);
     if (stmt == (6 as ui32)) {
@@ -53,31 +55,58 @@ fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
     if (stmt == (7 as ui32)) {
         vd_dup = x_dup + y_dup + z_dup + (1 as ui32) ^ flip_mask;
     }
-    if ( vd != vd_dup) {
-        return ((77 as ui32) as ui32);
+    if (vd != vd_dup) {
+        return 77;
     }
     if ( vd == (6 as ui32)) {
+        step_counter++;
+        if (step_counter != (1 as ui32)) {
+            return (77 as ui32);
+        }
+        if (vd != vd_dup) {
+            return 77;
+    }
         vd = (7 as ui32);
         if (stmt == (8 as ui32)) {
             vd = (7 as ui32) ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (2 as ui32)) {
+            return (77 as ui32);
         }
         vd_dup = (7 as ui32);
         if (stmt == (9 as ui32)) {
             vd_dup = (7 as ui32) ^ flip_mask;
         }
+        step_counter++;
+        if (step_counter != (3 as ui32)) {
+            return (77 as ui32);
+        }
     }
     else {
+        if (vd != vd_dup) {
+            return 77;
+    }
         vd = (8 as ui32);
         if (stmt == (10 as ui32)) {
             vd = (8 as ui32) ^ flip_mask;
+        }
+        step_counter++;
+        if (step_counter != (1 as ui32)) {
+            return (77 as ui32);
         }
         vd_dup = (8 as ui32);
         if (stmt == (11 as ui32)) {
             vd_dup = (8 as ui32) ^ flip_mask;
         }
+        step_counter++;
+        if (step_counter != (2 as ui32)) {
+            return (77 as ui32);
+        }
+        step_counter = (3 as ui32);
     }
-    if ( vd != vd_dup) {
-        return ((77 as ui32) as ui32);
+    if (vd != vd_dup) {
+        return 77;
     }
     return (vd as ui32);
 }
