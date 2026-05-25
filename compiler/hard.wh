@@ -1,0 +1,79 @@
+ui32 res;
+ui32 stmt;
+ui32 bit_shift;
+ui32 flip_mask;
+
+fn main(ui32 stmt, ui32 flip_mask) -> ui32 {
+    ui32 x;
+    ui32 x_dup;
+    ui32 y;
+    ui32 y_dup;
+    ui32 z;
+    ui32 z_dup;
+    ui32 vd;
+    ui32 vd_dup;
+    x = (0 as ui32);
+    if (stmt == (0 as ui32)) {
+        x = (0 as ui32) ^ flip_mask;
+    }
+    x_dup = (0 as ui32);
+    if (stmt == (1 as ui32)) {
+        x_dup = (0 as ui32) ^ flip_mask;
+    }
+    y = (2 as ui32);
+    if (stmt == (2 as ui32)) {
+        y = (2 as ui32) ^ flip_mask;
+    }
+    y_dup = (2 as ui32);
+    if (stmt == (3 as ui32)) {
+        y_dup = (2 as ui32) ^ flip_mask;
+    }
+    z = (4 as ui32);
+    if (stmt == (4 as ui32)) {
+        z = (4 as ui32) ^ flip_mask;
+    }
+    z_dup = (4 as ui32);
+    if (stmt == (5 as ui32)) {
+        z_dup = (4 as ui32) ^ flip_mask;
+    }
+    if ( x != x_dup) {
+        return ((77 as ui32) as ui32);
+    }
+    if ( y != y_dup) {
+        return ((77 as ui32) as ui32);
+    }
+    if ( z != z_dup) {
+        return ((77 as ui32) as ui32);
+    }
+    vd = x + y + z + (1 as ui32);
+    if (stmt == (6 as ui32)) {
+        vd = x + y + z + (1 as ui32) ^ flip_mask;
+    }
+    vd_dup = x_dup + y_dup + z_dup + (1 as ui32);
+    if (stmt == (7 as ui32)) {
+        vd_dup = x_dup + y_dup + z_dup + (1 as ui32) ^ flip_mask;
+    }
+    if ( vd == (6 as ui32)) {
+        vd = (7 as ui32);
+        if (stmt == (8 as ui32)) {
+            vd = (7 as ui32) ^ flip_mask;
+        }
+    }
+    else {
+        vd = (8 as ui32);
+        if (stmt == (9 as ui32)) {
+            vd = (8 as ui32) ^ flip_mask;
+        }
+    }
+    return (vd as ui32);
+}
+stmt = (? as ui32);
+bit_shift = (? as ui32);
+assume (bit_shift <= (31 as ui32));
+assume (bit_shift >= (0 as ui32));
+assume (stmt >= (0 as ui32));
+assume (stmt <= (9 as ui32));
+flip_mask = ((1 as ui32) << bit_shift);
+
+res = main(stmt, flip_mask);
+assert(res == (XYZ as ui32));

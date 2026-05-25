@@ -1,6 +1,4 @@
-use crate::{
-    lexer::token::{Token, TokenType},
-};
+use crate::{ lexer::token::{ Token, TokenType } };
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Let(String, Type, Expr),
@@ -49,31 +47,27 @@ pub enum Expr {
     Identifier(String),
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     UnaryOp(UnOp, Box<Expr>),
-    Call(Vec<Expr>), 
+    Call(Vec<Expr>),
 }
 
 impl Expr {
     /// Recursively traverses the expression and appends a suffix to all Identifiers.
     pub fn duplicate_identifiers(&self, suffix: &str) -> Self {
         match self {
-            Expr::Identifier(name) => {
-                Expr::Identifier(format!("{}{}", name, suffix))
-            }
+            Expr::Identifier(name) => { Expr::Identifier(format!("{}{}", name, suffix)) }
             Expr::BinaryOp(left, op, right) => {
                 Expr::BinaryOp(
                     Box::new(left.duplicate_identifiers(suffix)),
                     op.clone(),
-                    Box::new(right.duplicate_identifiers(suffix)),
+                    Box::new(right.duplicate_identifiers(suffix))
                 )
             }
             Expr::UnaryOp(op, expr) => {
-                Expr::UnaryOp(
-                    op.clone(),
-                    Box::new(expr.duplicate_identifiers(suffix)),
-                )
+                Expr::UnaryOp(op.clone(), Box::new(expr.duplicate_identifiers(suffix)))
             }
             Expr::Call(args) => {
-                let dup_args = args.iter()
+                let dup_args = args
+                    .iter()
                     .map(|arg| arg.duplicate_identifiers(suffix))
                     .collect();
                 Expr::Call(dup_args)
@@ -82,6 +76,35 @@ impl Expr {
             Expr::IntegerLiteral(_) | Expr::BooleanLiteral(_) | Expr::StringLiteral(_) => {
                 self.clone()
             }
+        }
+    }
+    pub fn get_all_identifiers(&self) -> Vec<String> {
+        let mut identifiers = Vec::new();
+        self.collect_identifiers(&mut identifiers);
+        identifiers
+    }
+
+    // A private helper function that passes a mutable reference
+    // to avoid allocating multiple vectors during recursion.
+    fn collect_identifiers(&self, acc: &mut Vec<String>) {
+        match self {
+            Expr::Identifier(name) => {
+                acc.push(name.clone());
+            }
+            Expr::BinaryOp(left, _, right) => {
+                left.collect_identifiers(acc);
+                right.collect_identifiers(acc);
+            }
+            Expr::UnaryOp(_, expr) => {
+                expr.collect_identifiers(acc);
+            }
+            Expr::Call(args) => {
+                for arg in args {
+                    arg.collect_identifiers(acc);
+                }
+            }
+            // Literals do not contain any identifiers
+            Expr::IntegerLiteral(_) | Expr::BooleanLiteral(_) | Expr::StringLiteral(_) => {}
         }
     }
 }
@@ -123,12 +146,13 @@ impl Parser {
                 TokenType::Func => {
                     ast.push(self.parse_func());
                 }
-                _ => panic!(
-                    "Wrong token {} at {}:{}",
-                    self.current(),
-                    self.current().line,
-                    self.current().column,
-                ),
+                _ =>
+                    panic!(
+                        "Wrong token {} at {}:{}",
+                        self.current(),
+                        self.current().line,
+                        self.current().column
+                    ),
             }
         }
         ast
@@ -178,10 +202,7 @@ impl Parser {
                 let _ = self.expect(TokenType::Boolean);
                 Type::Boolean
             }
-            _ => panic!(
-                "Unknown return type for function: {}",
-                self.current().token_type
-            ),
+            _ => panic!("Unknown return type for function: {}", self.current().token_type),
         };
 
         let _ = self.expect(TokenType::LeftBrace);
@@ -294,13 +315,14 @@ impl Parser {
         let type_of_var = match self.current().token_type {
             TokenType::Integer => Type::Integer,
             TokenType::Boolean => Type::Boolean,
-            _ => panic!(
-                "Expected type, got {:?} ({}) at {}:{}",
-                self.current().token_type,
-                self.current().value,
-                self.current().line,
-                self.current().column
-            ),
+            _ =>
+                panic!(
+                    "Expected type, got {:?} ({}) at {}:{}",
+                    self.current().token_type,
+                    self.current().value,
+                    self.current().line,
+                    self.current().column
+                ),
         };
         self.consume();
         let _ = self.expect(TokenType::Assign);
@@ -404,9 +426,7 @@ impl Parser {
     fn parse_primary(&mut self) -> Expr {
         let tok = self.consume();
         match tok.token_type {
-            TokenType::IntegerLiteral => {
-                Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap())
-            }
+            TokenType::IntegerLiteral => { Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap()) }
             TokenType::Identifier => {
                 if self.match_token(TokenType::LeftParen) {
                     self.consume();
@@ -469,10 +489,15 @@ impl Parser {
         if tok.token_type == expected {
             Ok(self.consume())
         } else {
-            Err(format!(
-                "Expected {:?} at {}:{}, found {:?}",
-                expected, tok.line, tok.column, tok.token_type
-            ))
+            Err(
+                format!(
+                    "Expected {:?} at {}:{}, found {:?}",
+                    expected,
+                    tok.line,
+                    tok.column,
+                    tok.token_type
+                )
+            )
         }
     }
 }
@@ -483,13 +508,15 @@ mod tests {
     use crate::parser::parser::Stmt;
     use crate::{
         lexer::lexer::Lexer,
-        parser::parser::{BinOp, Block, Expr, Function, Type, UnOp, AST},
+        parser::parser::{ BinOp, Block, Expr, Function, Type, UnOp, AST },
     };
 
     #[test]
     fn test_parser_parses_correct_ast() {
         use std::fs;
-        let source = fs::read_to_string("test_codes/test_correct_ast.trv").expect("Failed to read file");
+        let source = fs
+            ::read_to_string("test_codes/test_correct_ast.trv")
+            .expect("Failed to read file");
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = Parser::new(tokens);
@@ -506,35 +533,32 @@ mod tests {
                         expr: Expr::BinaryOp(
                             Box::new(Expr::Identifier("num".to_string())),
                             BinOp::LessThan,
-                            Box::new(Expr::IntegerLiteral(10)),
+                            Box::new(Expr::IntegerLiteral(10))
                         ),
                         block: Block {
-                            statements: vec![Stmt::AssignStatement(
-                                "num".to_string(),
-                                Expr::IntegerLiteral(11),
-                            )],
+                            statements: vec![
+                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
+                            ],
                         },
                     },
                     Stmt::If {
                         condition: Expr::BinaryOp(
                             Box::new(Expr::Identifier("num".to_string())),
                             BinOp::GreaterThan,
-                            Box::new(Expr::IntegerLiteral(10)),
+                            Box::new(Expr::IntegerLiteral(10))
                         ),
                         block: Block {
-                            statements: vec![Stmt::AssignStatement(
-                                "num".to_string(),
-                                Expr::IntegerLiteral(12),
-                            )],
+                            statements: vec![
+                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(12))
+                            ],
                         },
                         option: Some(Block {
-                            statements: vec![Stmt::AssignStatement(
-                                "num".to_string(),
-                                Expr::IntegerLiteral(11),
-                            )],
+                            statements: vec![
+                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
+                            ],
                         }),
                     },
-                    Stmt::Return(Expr::Identifier("num".to_string())),
+                    Stmt::Return(Expr::Identifier("num".to_string()))
                 ],
             },
         }];
@@ -560,11 +584,13 @@ mod tests {
         let expected = Expr::BinaryOp(
             Box::new(Expr::IntegerLiteral(1)),
             BinOp::Add,
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::IntegerLiteral(2)),
-                BinOp::Mul,
-                Box::new(Expr::IntegerLiteral(3)),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(2)),
+                    BinOp::Mul,
+                    Box::new(Expr::IntegerLiteral(3))
+                )
+            )
         );
         assert_eq!(ast, expected);
     }
@@ -573,13 +599,15 @@ mod tests {
     fn test_add_binds_tighter_than_mul() {
         let ast = parse_expr("1 * 2 + 3");
         let expected = Expr::BinaryOp(
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::IntegerLiteral(1)),
-                BinOp::Mul,
-                Box::new(Expr::IntegerLiteral(2)),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Mul,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            ),
             BinOp::Add,
-            Box::new(Expr::IntegerLiteral(3)),
+            Box::new(Expr::IntegerLiteral(3))
         );
         assert_eq!(ast, expected);
     }
@@ -590,11 +618,13 @@ mod tests {
         let expected = Expr::BinaryOp(
             Box::new(Expr::Identifier("a".to_string())),
             BinOp::Equals,
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::Identifier("b".to_string())),
-                BinOp::LessThan,
-                Box::new(Expr::Identifier("c".to_string())),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::Identifier("b".to_string())),
+                    BinOp::LessThan,
+                    Box::new(Expr::Identifier("c".to_string()))
+                )
+            )
         );
         assert_eq!(ast, expected);
     }
@@ -605,11 +635,13 @@ mod tests {
         let expected = Expr::BinaryOp(
             Box::new(Expr::Identifier("a".to_string())),
             BinOp::LessThan,
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::Identifier("b".to_string())),
-                BinOp::Add,
-                Box::new(Expr::Identifier("c".to_string())),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::Identifier("b".to_string())),
+                    BinOp::Add,
+                    Box::new(Expr::Identifier("c".to_string()))
+                )
+            )
         );
         assert_eq!(ast, expected);
     }
@@ -618,13 +650,15 @@ mod tests {
     fn test_add_is_left_associative() {
         let ast = parse_expr("1 + 2 + 3");
         let expected = Expr::BinaryOp(
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::IntegerLiteral(1)),
-                BinOp::Add,
-                Box::new(Expr::IntegerLiteral(2)),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Add,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            ),
             BinOp::Add,
-            Box::new(Expr::IntegerLiteral(3)),
+            Box::new(Expr::IntegerLiteral(3))
         );
         assert_eq!(ast, expected);
     }
@@ -633,13 +667,15 @@ mod tests {
     fn test_mul_is_left_associative() {
         let ast = parse_expr("1 * 2 * 3");
         let expected = Expr::BinaryOp(
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::IntegerLiteral(1)),
-                BinOp::Mul,
-                Box::new(Expr::IntegerLiteral(2)),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Mul,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            ),
             BinOp::Mul,
-            Box::new(Expr::IntegerLiteral(3)),
+            Box::new(Expr::IntegerLiteral(3))
         );
         assert_eq!(ast, expected);
     }
@@ -648,21 +684,27 @@ mod tests {
     fn test_mixed_precedence_complex() {
         let ast = parse_expr("1 + 2 * 3 - 4 / 2");
         let expected = Expr::BinaryOp(
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::IntegerLiteral(1)),
-                BinOp::Add,
-                Box::new(Expr::BinaryOp(
-                    Box::new(Expr::IntegerLiteral(2)),
-                    BinOp::Mul,
-                    Box::new(Expr::IntegerLiteral(3)),
-                )),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Add,
+                    Box::new(
+                        Expr::BinaryOp(
+                            Box::new(Expr::IntegerLiteral(2)),
+                            BinOp::Mul,
+                            Box::new(Expr::IntegerLiteral(3))
+                        )
+                    )
+                )
+            ),
             BinOp::Sub,
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::IntegerLiteral(4)),
-                BinOp::Div,
-                Box::new(Expr::IntegerLiteral(2)),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(4)),
+                    BinOp::Div,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            )
         );
         assert_eq!(ast, expected);
     }
@@ -671,13 +713,15 @@ mod tests {
     fn test_parentheses_override_precedence() {
         let ast = parse_expr("(1 + 2) * 3");
         let expected = Expr::BinaryOp(
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::IntegerLiteral(1)),
-                BinOp::Add,
-                Box::new(Expr::IntegerLiteral(2)),
-            )),
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Add,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            ),
             BinOp::Mul,
-            Box::new(Expr::IntegerLiteral(3)),
+            Box::new(Expr::IntegerLiteral(3))
         );
         assert_eq!(ast, expected);
     }
@@ -688,7 +732,7 @@ mod tests {
         let expected = Expr::BinaryOp(
             Box::new(Expr::UnaryOp(UnOp::Neg, Box::new(Expr::IntegerLiteral(1)))),
             BinOp::Mul,
-            Box::new(Expr::IntegerLiteral(2)),
+            Box::new(Expr::IntegerLiteral(2))
         );
         assert_eq!(ast, expected);
     }
@@ -699,7 +743,7 @@ mod tests {
         let expected = Expr::BinaryOp(
             Box::new(Expr::UnaryOp(UnOp::Not, Box::new(Expr::BooleanLiteral(true)))),
             BinOp::Equals,
-            Box::new(Expr::BooleanLiteral(false)),
+            Box::new(Expr::BooleanLiteral(false))
         );
         assert_eq!(ast, expected);
     }

@@ -146,6 +146,16 @@ ui32 flip_mask;
         for stmt in block.statements {
             match stmt {
                 Stmt::Let(ref name, ref typ, ref expr) => {
+                    if self.vd {
+                        let collected_identifiers = expr.get_all_identifiers();
+                        for c in collected_identifiers.clone(){
+                            let duped = c.clone() + "_dup";
+                            let condition = Expr::BinaryOp(Box::new(Expr::Identifier(c)), BinOp::NotEquals, Box::new(Expr::Identifier(duped)));
+                            let then = Block{statements: vec![Stmt::Return(Expr::IntegerLiteral(77))]};
+                            let if_statement = Stmt::If { condition, block: then, option:None};
+                            self.emit_if(if_statement);
+                        }
+                    }
                     self.emit_let(stmt.clone());
                     if self.vd {
                         let dup_expr = expr.duplicate_identifiers("_dup");
