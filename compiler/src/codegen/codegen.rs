@@ -149,9 +149,9 @@ ui32 flip_mask;
             self.write_line("bne countermeasure", 1, true);
             self.wh_write_line(&format!("if ({} != {}) {{", c, duped), self.wh_indent);
             self.wh_indent += 1;
-            self.wh_write_line("return 77;", self.wh_indent);
+            self.wh_write_line("return (77 as ui32);", self.wh_indent);
             self.wh_indent -= 1;
-            self.wh_write_line("}", 1);
+            self.wh_write_line("}", self.wh_indent);
         }
     }
     fn emit_block(&mut self, block: Block, is_main: bool) {
@@ -274,12 +274,6 @@ ui32 flip_mask;
         }
     }
 
-    fn wh_emit_if_start(&mut self, condition: Expr) {
-        let expr = self.wh_build_expr_str(condition);
-        self.wh_write_line(&format!("if ( {expr}) {{"), self.wh_indent);
-        self.wh_indent += 1;
-    }
-
     fn emit_if(&mut self, if_stmt: Stmt) {
         match if_stmt {
             Stmt::If { condition, block, option } => {
@@ -287,7 +281,9 @@ ui32 flip_mask;
                 self.label_count += 1;
 
                 self.emit_expr(condition.clone());
-                self.wh_emit_if_start(condition);
+                let expr = self.wh_build_expr_str(condition);
+                self.wh_write_line(&format!("if ( {expr}) {{"), self.wh_indent);
+                self.wh_indent += 1;
                 self.write_line("cmp r0, #0", 1, true);
                 self.write_line(&format!("beq else_{}", label_id), 1, true);
 
@@ -328,9 +324,13 @@ ui32 flip_mask;
                 }
 
                 self.write_line(&format!("endif_{}:", label_id), 0, true);
-                if option.is_none() {
+                if option.is_none() && self.sc {
                     self.step_counter = std::cmp::max(self.step_counter, saved_then);
                     self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
+                    self.wh_write_line(
+                        &format!("step_counter = ({} as ui32);", self.step_counter),
+                        self.wh_indent
+                    );
                 }
             }
             _ => panic!("emit_if called with non-if statement"),
@@ -348,9 +348,13 @@ ui32 flip_mask;
                 self.step_counter = 0;
 
                 self.write_line(&format!("while_{}:", label_id), 0, true);
+                let cond = self.wh_build_expr_str(expr.clone());
+                self.wh_write_line(&format!("while ( {cond}) {{"), self.wh_indent);
+                self.wh_indent += 1;
                 if self.sc {
                     self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
                     self.write_line(&format!("mov r10, #{}", self.step_counter + 1), 1, true);
+                    self.wh_write_line("step_counter = (0 as ui32);", self.wh_indent);
                 }
 
                 self.emit_step_check();
@@ -363,9 +367,12 @@ ui32 flip_mask;
 
                 self.write_line(&format!("b while_{}", label_id), 1, true);
                 self.write_line(&format!("end_while_{}:", label_id), 0, true);
+                self.wh_indent -= 1;
+                self.wh_write_line("}", self.wh_indent);
                 if self.sc {
                     self.step_counter = saved;
                     self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
+                    self.wh_write_line(&format!("step_counter = ({} as ui32);", self.step_counter), self.wh_indent);
                 }
                 self.in_loop = false;
             }

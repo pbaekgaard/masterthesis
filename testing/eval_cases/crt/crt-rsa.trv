@@ -1,65 +1,55 @@
-# CRT-RSA Decryption
+# CRT-RSA Encryption
 # Message: 65
 # Public key: (e=17, n=3233)
 # p = 61, q = 53
-# d (private exponent) = 2753
-# Ciphertext c = 2790
-# Expected result: 65
+# Expected ciphertext: 2790
 
 func main() -> Integer {
     let p : Integer = 61;
     let q : Integer = 53;
     let n : Integer = 3233;
-    let d : Integer = 2753;
-    let c : Integer = 2790;
+    let e : Integer = 17;
+    let m : Integer = 65;
 
-    # CRT exponents: dp = d mod (p-1), dq = d mod (q-1)
+    # CRT exponents: ep = e mod (p-1), eq = e mod (q-1)
     let p_minus_1 : Integer = 0;
     let q_minus_1 : Integer = 0;
-    let dp : Integer = 0;
-    let dq : Integer = 0;
+    let ep : Integer = 0;
+    let eq : Integer = 0;
 
     p_minus_1 = p - 1;
     q_minus_1 = q - 1;
 
-    # dp = d - (d / p_minus_1) * p_minus_1  (manual mod)
-    dp = d - (d / p_minus_1) * p_minus_1;
-    # dq = d - (d / q_minus_1) * q_minus_1
-    dq = d - (d / q_minus_1) * q_minus_1;
+    # ep = e - (e / p_minus_1) * p_minus_1  (manual mod)
+    ep = e - (e / p_minus_1) * p_minus_1;
+    # eq = e - (e / q_minus_1) * q_minus_1
+    eq = e - (e / q_minus_1) * q_minus_1;
 
-    # m1 = c^dp mod p  (modular exponentiation inlined)
-    let m1 : Integer = 0;
+    # c1 = m^ep mod p  (modular exponentiation inlined)
+    let c1 : Integer = 0;
     let base1 : Integer = 0;
     let exp1 : Integer = 0;
-    m1 = 1;
-    base1 = c - (c / p) * p;
-    exp1 = dp;
+    c1 = 1;
+    base1 = m - (m / p) * p;
+    exp1 = ep;
     while exp1 > 0 do {
         if exp1 - (exp1 / 2) * 2 == 1 then {
-            m1 = (m1 * base1) - ((m1 * base1) / p) * p;
+            c1 = (c1 * base1) - ((c1 * base1) / p) * p;
         }
         exp1 = exp1 / 2;
         base1 = (base1 * base1) - ((base1 * base1) / p) * p;
     }
 
-    # Single-event upset: bit-flip in m1 (Bellcore-style fault)
-    # This flips the LSB of m1 exactly once, leaking info via faulty CRT output
-    let fault_triggered : Integer = 0;
-    if fault_triggered == 0 then {
-        m1 = m1 + 1;
-        fault_triggered = 1;
-    }
-
-    # m2 = c^dq mod q
-    let m2 : Integer = 0;
+    # c2 = m^eq mod q
+    let c2 : Integer = 0;
     let base2 : Integer = 0;
     let exp2 : Integer = 0;
-    m2 = 1;
-    base2 = c - (c / q) * q;
-    exp2 = dq;
+    c2 = 1;
+    base2 = m - (m / q) * q;
+    exp2 = eq;
     while exp2 > 0 do {
         if exp2 - (exp2 / 2) * 2 == 1 then {
-            m2 = (m2 * base2) - ((m2 * base2) / q) * q;
+            c2 = (c2 * base2) - ((c2 * base2) / q) * q;
         }
         exp2 = exp2 / 2;
         base2 = (base2 * base2) - ((base2 * base2) / q) * q;
@@ -93,18 +83,20 @@ func main() -> Integer {
         qinv = t;
     }
 
-    # h = qinv * (m1 - m2) mod p
+    # h = qinv * (c1 - c2) mod p
     let h : Integer = 0;
     let diff : Integer = 0;
-    diff = m1 - m2;
+    diff = c1 - c2;
     h = qinv * diff - (qinv * diff / p) * p;
     if h < 0 then {
         h = h + p;
     }
 
-    # m = m2 + h * q
-    let m : Integer = 0;
-    m = m2 + h * q;
+    # c = c2 + h * q
+    let c : Integer = 0;
+    c = c2 + h * q;
 
-    return m;
+    print c;
+
+    return c;
 }

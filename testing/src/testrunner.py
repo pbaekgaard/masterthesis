@@ -233,16 +233,24 @@ class TestRunner:
         trv_path = test["path"]
         test_name = test["name"]
 
-        if hard:
+        if hard == "hard":
             asm_path = os.path.join(compiled_folder, f"{test_name}.hard")
+        elif hard == "sc":
+            asm_path = os.path.join(compiled_folder, f"{test_name}.sc")
+        elif hard == "vd":
+            asm_path = os.path.join(compiled_folder, f"{test_name}.vd")
         else:
             asm_path = os.path.join(compiled_folder, f"{test_name}")
 
         compiler_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
 
         cmd = [os.path.join(compiler_dir, "compiler"), trv_path, "-o", asm_path]
-        if hard:
+        if hard == "hard":
             cmd.append("--hard")
+        elif hard == "sc":
+            cmd.append("--sc")
+        elif hard == "vd":
+            cmd.append("--vd")
 
         result = subprocess.run(cmd, cwd=compiler_dir, capture_output=True, text=True)
         asm_path = asm_path + ".s"
@@ -416,6 +424,10 @@ class TestRunner:
             injection_points = self._generate_injection_points(asm_path)
         else:
             injection_points = self._symex_to_injection_points(variant, asm_path, minimc_res)
+            if injection_points is None or len(injection_points) == 0:
+                print("NO INJECTION POINTS FOUND FROM SYMEX")
+            else:
+                print("FOUND INJECTION POINTS FROM SYMEX")
 
         if limit is not None and len(injection_points) > limit:
             injection_points = injection_points[:limit]
@@ -455,19 +467,18 @@ class TestRunner:
         with open(wh_path, "w") as f:
             f.write(content)
 
-    def compile(self, nohard=False):
+    def compile(self):
         results = []
         for test in self.tests:
-            test_result = {"name": test["name"], "normal": None, "hard": None}
+            test_result = {"name": test["name"], "normal": None, "hard": None, "sc": None, "vd": None}
 
-            for hard in [False, True]:
-                hard_str = "hard" if hard else "normal"
+            for hard in ["hard", "sc", "vd", "normal"]:
                 success, asm_path, stdout, stderr = self.compile_test(
                     test, hard, self.compiled_folder
                 )
                 if success:
                     self._patch_wh_assert(asm_path, test["pass_mode"]["expected_pass"])
-                test_result[hard_str] = {
+                test_result[hard] = {
                     "success": success,
                     "asm_path": asm_path,
                     "stdout": stdout,
@@ -478,29 +489,28 @@ class TestRunner:
         self.compile_results = results
         return results
 
-    def run_tests(self, limit=None, run_variants="both", minimc_res=None):
+    def run_tests(self, limit=None, run_variants="all", minimc_res=None, guided=False):
         if self.compile_results is None:
             self.compile()
 
         all_fault_results = []
 
         if run_variants == "normal":
-            variants = [False]
+            variants = ["normal"]
         elif run_variants == "hard":
-            variants = [True]
+            variants = ["hard"]
         else:
-            variants = [False, True]
+            variants = ["hard", "sc", "vd", "normal"]
         compile_results = self.compile_results or []
 
         for test, result in zip(self.tests, compile_results):
             print(f"Test: {test['name']}")
 
             for hard in variants:
-                hard_str = "hard" if hard else "normal"
-                res = result[hard_str]
+                res = result[hard]
 
                 if not res["success"]:
-                    print(f"  Compilation failed ({hard_str})")
+                    print(f"  Compilation failed ({hard})")
                     if res["stdout"]:
                         print(f"    stdout: {res['stdout']}")
                     if res["stderr"]:
@@ -509,16 +519,20 @@ class TestRunner:
 
                 asm_path = res["asm_path"]
                 max_pc = self._get_program_max_pc(asm_path)
-                injection_points = self._generate_injection_points(asm_path)
+                injection_points = []
+                if guided:
+                    injection_points = self._symex_to_injection_points(hard, asm_path, minimc_res)
+                else:
+                    injection_points = self._generate_injection_points(asm_path)
 
-                print(f"  Compiled ({hard_str}) successfully")
+                print(f"  Compiled ({hard}) successfully")
                 print(f"  ASM path: {asm_path}")
                 print(f"  Max PC: {max_pc}")
                 print(f"  Fault runs to execute: {len(injection_points)}")
 
                 fault_results = self._run_fault_campaign(
                     test_name=test["name"],
-                    variant=hard_str,
+                    variant=hard,
                     asm_path=asm_path,
                     pass_mode_config=test["pass_mode"],
                     limit=limit,

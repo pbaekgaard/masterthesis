@@ -23,7 +23,7 @@ class SymexRunner:
                 for f in os.listdir(self.artifacts_folder)
                 if f.endswith(".wh")
                 and (
-                    run_variants == "both"
+                    run_variants == "all"
                     or (run_variants == "normal" and not f.endswith(".hard.wh"))
                     or (run_variants == "hard" and f.endswith(".hard.wh"))
                 )

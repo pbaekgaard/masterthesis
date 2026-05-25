@@ -200,21 +200,22 @@ class Experiment:
         self.runner.oracle = self.oracle.get(self.config.get("test_folder", None))
         print("Whiley Files are ready for adding fault injections...")
         print("\nRunning symex...")
-        symex_runner = SymexRunner(config_path=self.args.config)
-        symex_runner.artifacts_folder = self.runner.compiled_folder
-        symex_results = symex_runner.run(self.run_variants)
-
-        self.db.insert_symex_results_batch(self.run_id, symex_results)
+        if not self.args.skip_minimc:
+            symex_runner = SymexRunner(config_path=self.args.config)
+            symex_runner.artifacts_folder = self.runner.compiled_folder
+            symex_results = symex_runner.run(self.run_variants)
+            self.db.insert_symex_results_batch(self.run_id, symex_results)
 
         if not self.args.skip_run:
-            print(f"\nRunning Interpreter Guided...")
-            guided_fault_results = self.runner.run_tests(limit=self.args.limit, run_variants=run_variants, minimc_res=symex_results)
+            if not self.args.skip_minimc:
+                print(f"\nRunning Interpreter Guided...")
+                guided_fault_results = self.runner.run_tests(limit=self.args.limit, run_variants=self.run_variants, minimc_res=symex_results, guided=True)
+                self.db.insert_interpreter_results_batch(self.run_id, guided_fault_results, True)
             print(f"\nRunning Interpreter Exhaustively...")
             exhaustive_fault_results = self.runner.run_tests(
-                limit=self.args.limit, run_variants=run_variants
+                limit=self.args.limit, run_variants=self.run_variants
             )
             self.db.insert_interpreter_results_batch(self.run_id, exhaustive_fault_results)
-            self.db.insert_interpreter_results_batch(self.run_id, guided_fault_results, True)
         else:
             print(f"\nSkipping test run (--skip-run)")
 
@@ -479,6 +480,11 @@ if __name__ == "__main__":
         help="Only setup and compile, skip running tests",
     )
     parser.add_argument(
+        "--skip-minimc",
+        action="store_true",
+        help="Only setup and compile, skip running tests",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=None,
@@ -516,6 +522,6 @@ if __name__ == "__main__":
     elif args.nohard:
         run_variants = "normal"
     else:
-        run_variants = "both"
+        run_variants = "all"
     exp = Experiment(args, run_variants)
     exp.run()
