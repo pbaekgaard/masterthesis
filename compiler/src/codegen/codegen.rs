@@ -123,12 +123,14 @@ ui32 bit_shift;
 ui32 flip_mask;
 "#, 0);
         self.wh_write_line("fn main(ui32 stmt, ui32 flip_mask) -> ui32 {", 0);
+        self.wh_write_line("ui32 has_faulted;", 1);
         if self.sc {
             self.write_line("mov r9, #0", 1, true); // step counter in register
             self.write_line("mov r10, #1", 1, true); // step counter in register
             self.wh_write_line("ui32 step_counter;", 1);
             self.wh_write_line("step_counter = (0 as ui32);", 1);
         }
+        self.wh_write_line("has_faulted = (0 as ui32);", 1);
         self.emit_block(func.body, true);
         if self.sc || self.vd {
             self.emit_countermeasure();
@@ -147,6 +149,8 @@ ui32 flip_mask;
             self.write_line(format!("ldr r1, [sp, #{}]", dup_offset).as_str(), 1, true);
             self.write_line("cmp r1, r0", 1, true);
             self.write_line("bne countermeasure", 1, true);
+            self.write_line(format!("str r0, [sp, #{}]", offset).as_str(), 1, true);
+            self.write_line(format!("str r1, [sp, #{}]", dup_offset).as_str(), 1, true);
             self.wh_write_line(&format!("if ({} != {}) {{", c, duped), self.wh_indent);
             self.wh_indent += 1;
             self.wh_write_line("return (77 as ui32);", self.wh_indent);
@@ -623,11 +627,22 @@ ui32 flip_mask;
     }
     fn wh_instrument_assign(&mut self, assign_line: &str) {
         self.wh_write_line(
+            "if (has_faulted == (0 as ui32)) {",
+            self.wh_indent
+        );
+        self.wh_indent += 1;
+        self.wh_write_line(
             format!("if (stmt == ({} as ui32)) {{", self.stmt).as_str(),
             self.wh_indent
         );
         self.wh_indent += 1;
         self.wh_write_line(format!("{} ^ flip_mask;", assign_line).as_str(), self.wh_indent);
+        self.wh_write_line(
+            "has_faulted = (1 as ui32);",
+            self.wh_indent
+        );
+        self.wh_indent -= 1;
+        self.wh_write_line("}", self.wh_indent);
         self.wh_indent -= 1;
         self.wh_write_line("}", self.wh_indent);
         self.stmt += 1;

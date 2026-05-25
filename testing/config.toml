@@ -1,2 +1,2 @@
-test_folder = "eval_cases/crt"
+test_folder = "eval_cases/hash"
 plotmode = "save" # show, save or both

@@ -477,7 +477,7 @@ class TestRunner:
                     test, hard, self.compiled_folder
                 )
                 if success:
-                    self._patch_wh_assert(asm_path, test["pass_mode"]["expected_pass"])
+                    self._patch_wh_assert(asm_path, test["pass_mode"]["expected_pass"].split(",")[0])
                 test_result[hard] = {
                     "success": success,
                     "asm_path": asm_path,

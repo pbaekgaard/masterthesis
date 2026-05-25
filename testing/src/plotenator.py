@@ -2,23 +2,28 @@ from matplotlib.axes import Axes
 from src.database import ResultsDatabase
 import matplotlib.pyplot as plt
 import pandas as pd
-import textwrap
 
 OUTCOME_COLOR_MAP = {
     "Normal Execution": "#4daf4a",
     "Faulty": "#ff2a2c",
+    "Faulty (Message Leaked)": "#ff2a2c",
     "Panicked": "#984ea3",
     "Infinite Loop": "#ff7f00",
+    "Message Leaked": "#e6ab02",
+    "Wrong Hash Returned": "#17becf",
+    "Unknown": "#999999",
     "Countermeasure Activated": "#377eb8",
-    "Faulty Jump to Countermeasure": "#377eb8",
+    "Faulty Jump to Countermeasure": "#000000",
     "Other": "#C9A227",
 }
 OUTCOME_COLORS = list(OUTCOME_COLOR_MAP.values())
 FAULT_TYPE_COLORS = ["#a6cee3", "#ff4411", "#b2df8a"]
+FIG_WIDTH = 14
 
 class Plotter:
-    def __init__(self, db: ResultsDatabase):
+    def __init__(self, db: ResultsDatabase, test_name: str):
         self.db = db
+        self.test_name = test_name
 
     def create_plots(self):
         return {
@@ -38,6 +43,42 @@ class Plotter:
             "guided_fault_types_normal_edited": self.plot_fault_types(edited=True, table="guided", variant="normal"),
         }
 
+    def get_return_labels(self):
+        if self.test_name == "crt":
+            return {
+                0: "Normal Execution",
+                1: "Faulty",
+                2: "Panicked",
+                3: "Infinite Loop",
+                4: "Message Leaked",
+                7: "Unknown",
+                77: "Countermeasure Activated",
+                78: "Faulty Jump to Countermeasure",
+                "Other": "Other",
+            }
+        elif self.test_name == "pinny":
+            return {
+                0: "Normal Execution",
+                1: "Faulty",
+                2: "Panicked",
+                3: "Infinite Loop",
+                77: "Countermeasure Activated",
+                78: "Faulty Jump to Countermeasure",
+                "Other": "Other",
+            }
+        elif self.test_name == "hash":
+            return {
+                0: "Normal Execution",
+                1: "Faulty (Message Leaked)",
+                2: "Panicked",
+                4: "Wrong Hash Returned",
+                3: "Infinite Loop",
+                77: "Countermeasure Activated",
+                78: "Faulty Jump to Countermeasure",
+                "Other": "Other",
+            }
+        else:
+            raise Exception("something wrong with the name")
 
     def plot_exhaustive(self, edited=False):
         suffix = " (Guided Manual Hardening)" if edited else ""
@@ -45,28 +86,18 @@ class Plotter:
         df = self.db.query_df(f"SELECT * FROM exhaustive_interpreter_results {where}")
 
         if df.empty:
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
             ax.text(0.5, 0.5, f"No data{suffix}", ha='center', va='center', transform=ax.transAxes)
             ax.set_title(f"Exhaustive Interpreter - Outcome Distribution{suffix}")
             return fig
 
-        known_codes = {0, 1, 2, 3, 77, 78}
+        returncode_labels = self.get_return_labels()
+        known_codes = {k for k in returncode_labels if isinstance(k, int)}
         df = df.copy()
-        df["outcome"] = df["returncode"].apply(
+        df["outcome"] = df["passed"].apply(
             lambda rc: rc if rc in known_codes else "Other"
         )
-
-        returncode_labels = {
-            0: "Normal Execution",
-            1: "Faulty",
-            2: "Panicked",
-            3: "Infinite Loop",
-            77: "Countermeasure Activated",
-            78: "Faulty Jump to Countermeasure",
-            "Other": "Other",
-        }
-
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
 
         if edited:
             counts = df["outcome"].value_counts().rename(returncode_labels)
@@ -78,8 +109,7 @@ class Plotter:
             colors = [OUTCOME_COLOR_MAP.get(outcome, "#a65628") for outcome in counts.index]
             ax.bar(range(len(counts)), counts.values, color=colors)
             ax.set_xticks(range(len(counts)))
-            wrapped = [textwrap.fill(o, width=14) for o in counts.index]
-            ax.set_xticklabels(wrapped, ha='center')
+            ax.set_xticklabels(counts.index, ha='center')
         else:
             grouped = df.groupby(["variant", "outcome"]).size().unstack(fill_value=0)
             grouped = grouped.rename(columns=returncode_labels)
@@ -132,28 +162,19 @@ class Plotter:
         df = self.db.query_df(f"SELECT * FROM guided_interpreter_results {where}")
 
         if df.empty:
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
             ax.text(0.5, 0.5, f"No data{suffix}", ha='center', va='center', transform=ax.transAxes)
             ax.set_title(f"Guided Interpreter - Outcome Distribution{suffix}")
             return fig
 
-        known_codes = {0, 1, 2, 3, 77, 78}
+        returncode_labels = self.get_return_labels()
+        known_codes = {k for k in returncode_labels if isinstance(k, int)}
         df = df.copy()
-        df["outcome"] = df["returncode"].apply(
+        df["outcome"] = df["passed"].apply(
             lambda rc: rc if rc in known_codes else "Other"
         )
 
-        returncode_labels = {
-            0: "Normal Execution",
-            1: "Faulty",
-            2: "Panicked",
-            3: "Infinite Loop",
-            77: "Countermeasure Activated",
-            78: "Faulty Jump to Countermeasure",
-            "Other": "Other",
-        }
-
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
 
         if edited:
             counts = df["outcome"].value_counts().rename(returncode_labels)
@@ -165,8 +186,7 @@ class Plotter:
             colors = [OUTCOME_COLOR_MAP.get(outcome, "#a65628") for outcome in counts.index]
             ax.bar(range(len(counts)), counts.values, color=colors)
             ax.set_xticks(range(len(counts)))
-            wrapped = [textwrap.fill(o, width=14) for o in counts.index]
-            ax.set_xticklabels(wrapped, ha='center')
+            ax.set_xticklabels(counts.index, ha='center')
         else:
             grouped = df.groupby(["variant", "outcome"]).size().unstack(fill_value=0)
             grouped = grouped.rename(columns=returncode_labels)
@@ -218,14 +238,6 @@ class Plotter:
         ax.yaxis.label.set_fontweight('bold')
         ax.tick_params(axis='x', rotation=0)
 
-        wrapped_labels = []
-        for label in ax.get_xticklabels():
-            text = label.get_text()
-            wrapped_text = textwrap.fill(text, width=14)
-            wrapped_labels.append(wrapped_text)
-
-        ax.set_xticklabels(wrapped_labels, ha='center')
-
     def _apply_scale(self, ax: Axes, ratio_threshold=10):
         heights = []
         for container in ax.containers:
@@ -249,22 +261,21 @@ class Plotter:
             ax.set_ylabel("Count")
             ymin, ymax = ax.get_ylim()
 
-    def _add_horizontal_legend(self, fig, ax, title, wrap_width=14):
+    def _add_horizontal_legend(self, fig, ax, title):
         handles, labels = ax.get_legend_handles_labels()
-        wrapped = [textwrap.fill(l, width=wrap_width) for l in labels]
         leg = fig.legend(
-            handles, wrapped,
+            handles, labels,
             title=title,
             loc='lower center',
             bbox_to_anchor=(0.5, 0.05),
-            ncol=min(len(handles), 4),
+            ncol=min(len(handles), 6),
             fontsize=8,
             title_fontsize=9,
             frameon=True,
         )
         leg.get_title().set_fontweight('bold')
         fig.tight_layout()
-        fig.subplots_adjust(bottom=0.25)
+        fig.subplots_adjust(bottom=0.2)
 
     def export_symex_csv(self, output_path):
         df = self.db.query_df("SELECT * FROM symex_results")
@@ -297,20 +308,11 @@ class Plotter:
 
         fault_outcomes = df.copy()
 
-        known_codes = {0, 1, 2, 3, 77, 78}
-        fault_outcomes["outcome"] = fault_outcomes["returncode"].apply(
+        returncode_labels = self.get_return_labels()
+        known_codes = {k for k in returncode_labels if isinstance(k, int)}
+        fault_outcomes["outcome"] = fault_outcomes["passed"].apply(
             lambda rc: rc if rc in known_codes else "Other"
         )
-
-        returncode_labels = {
-            0: "Normal Execution",
-            1: "Faulty",
-            2: "Panicked!",
-            3: "Infinite Loop",
-            77: "Countermeasure Activated",
-            78: "Faulty Jump to Countermeasure",
-            "Other": "Other",
-        }
         fault_outcomes["outcome"] = fault_outcomes["outcome"].map(returncode_labels)
 
         fault_type_map = {"pc": "PC", "reg": "REG", "cpsr": "CPSR"}
@@ -329,7 +331,7 @@ class Plotter:
                 grouped[col] = 0
         grouped = grouped[ordered_cols]
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
         grouped.plot(kind="bar", stacked=False, ax=ax, color=FAULT_TYPE_COLORS[:len(grouped.columns)], legend=False)
 
         for container in ax.containers:

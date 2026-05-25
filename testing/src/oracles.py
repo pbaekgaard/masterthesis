@@ -29,6 +29,8 @@ def hash_check_passed(result, pass_mode_config, cm_start, cm_end, injection_poin
             flipped_pc = pc_value ^ mask
             if flipped_pc in range(cm_start, cm_end + 1):
                 return 78
+    if "panic" in result.stderr:
+        return 2
     if "COUNTERMEASURE" in result.stdout or result.returncode == 77:
         return 77
     elif "Detected Infinite Loop" in result.stdout:
@@ -39,7 +41,7 @@ def hash_check_passed(result, pass_mode_config, cm_start, cm_end, injection_poin
             return 1
         elif expected_fail and str(expected_fail) in result.stdout:
             return 0
-        return 2
+        return 4
     else:
         print(f"STDOUT: {result.stdout}")
         print(f"STDERR: {result.stderr}")

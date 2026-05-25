@@ -427,7 +427,9 @@ class Experiment:
                 )
                 self._run_edited_tests(edited_file, test_base)
 
-        plotter = Plotter(self.db)
+
+        test_name = self.tests_folder.split("/")[-1]
+        plotter = Plotter(self.db, test_name)
         plots = plotter.create_plots()
 
         plots_dir = os.path.join(self.run_folder, "plots")
@@ -515,7 +517,7 @@ class Experiment:
         os.makedirs(self.runner.compiled_folder, exist_ok=True)
 
         for f in os.listdir(self.tests_folder):
-            if f.endswith(".trv") or f.endswith(".trv.output") or f.endswith(".wh"):
+            if f.endswith(".trv") or f.endswith(".trv.output") or f.endswith(".wh") or f == "test.conf":
                 shutil.copy(os.path.join(self.tests_folder, f), self.run_tests_folder)
 
         self.db = ResultsDatabase(db_path)
