@@ -52,6 +52,40 @@ pub enum Expr {
     Call(Vec<Expr>), 
 }
 
+impl Expr {
+    /// Recursively traverses the expression and appends a suffix to all Identifiers.
+    pub fn duplicate_identifiers(&self, suffix: &str) -> Self {
+        match self {
+            Expr::Identifier(name) => {
+                Expr::Identifier(format!("{}{}", name, suffix))
+            }
+            Expr::BinaryOp(left, op, right) => {
+                Expr::BinaryOp(
+                    Box::new(left.duplicate_identifiers(suffix)),
+                    op.clone(),
+                    Box::new(right.duplicate_identifiers(suffix)),
+                )
+            }
+            Expr::UnaryOp(op, expr) => {
+                Expr::UnaryOp(
+                    op.clone(),
+                    Box::new(expr.duplicate_identifiers(suffix)),
+                )
+            }
+            Expr::Call(args) => {
+                let dup_args = args.iter()
+                    .map(|arg| arg.duplicate_identifiers(suffix))
+                    .collect();
+                Expr::Call(dup_args)
+            }
+            // Literals don't contain identifiers, so they remain unchanged
+            Expr::IntegerLiteral(_) | Expr::BooleanLiteral(_) | Expr::StringLiteral(_) => {
+                self.clone()
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
     Add,
