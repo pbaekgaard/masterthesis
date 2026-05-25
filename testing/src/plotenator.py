@@ -28,9 +28,13 @@ class Plotter:
             "guided_edited": self.plot_guided(edited=True),
             "exhaustive_fault_types_normal": self.plot_fault_types(edited=False, table="exhaustive", variant="normal"),
             "exhaustive_fault_types_hard": self.plot_fault_types(edited=False, table="exhaustive", variant="hard"),
+            "exhaustive_fault_types_sc": self.plot_fault_types(edited=False, table="exhaustive", variant="sc"),
+            "exhaustive_fault_types_vd": self.plot_fault_types(edited=False, table="exhaustive", variant="vd"),
             "exhaustive_fault_types_normal_edited": self.plot_fault_types(edited=True, table="exhaustive", variant="normal"),
             "guided_fault_types_normal": self.plot_fault_types(edited=False, table="guided", variant="normal"),
             "guided_fault_types_hard": self.plot_fault_types(edited=False, table="guided", variant="hard"),
+            "guided_fault_types_sc": self.plot_fault_types(edited=False, table="guided", variant="sc"),
+            "guided_fault_types_vd": self.plot_fault_types(edited=False, table="guided", variant="vd"),
             "guided_fault_types_normal_edited": self.plot_fault_types(edited=True, table="guided", variant="normal"),
         }
 
