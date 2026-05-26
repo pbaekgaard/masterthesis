@@ -5,16 +5,17 @@ import pandas as pd
 
 OUTCOME_COLOR_MAP = {
     "Normal Execution": "#4daf4a",
-    "Faulty": "#ff2a2c",
+    "Faulty (Authenticated = 1)": "#ff2a2c",
     "Faulty (Message Leaked)": "#ff2a2c",
+    "Faulty (P or Q Derived)": "#ff2a2c",
     "Panicked": "#984ea3",
-    "Infinite Loop": "#ff7f00",
+    "Infinite Loop": "#555555",
     "Message Leaked": "#e6ab02",
-    "Wrong Hash Returned": "#17becf",
-    "Unknown": "#999999",
+    "Wrong Hash Returned": "#e6ab02",
+    "Faulty Encryption": "#ff7f00",
     "Countermeasure Activated": "#377eb8",
-    "Faulty Jump to Countermeasure": "#000000",
-    "Other": "#C9A227",
+    "Faulty Jump to Countermeasure": "#00FFFF",
+    "Other": "#FFFF00",
 }
 OUTCOME_COLORS = list(OUTCOME_COLOR_MAP.values())
 FAULT_TYPE_COLORS = ["#a6cee3", "#ff4411", "#b2df8a"]
@@ -43,22 +44,55 @@ class Plotter:
             "guided_fault_types_normal_edited": self.plot_fault_types(edited=True, table="guided", variant="normal"),
         }
 
-    def get_return_labels(self):
+    def get_return_labels(self, variant=None):
+        if variant == "normal":
+            if self.test_name == "crt":
+                return {
+                    0: "Faulty (P or Q Derived)",
+                    1: "Normal Execution",
+                    2: "Panicked",
+                    3: "Infinite Loop",
+                    4: "Message Leaked",
+                    7: "Faulty Encryption",
+                    77: "Faulty Encryption",
+                    "Other": "Other",
+                }
+            elif self.test_name == "pinny":
+                return {
+                    0: "Faulty (Authenticated = 1)",
+                    1: "Normal Execution",
+                    2: "Panicked",
+                    3: "Infinite Loop",
+                    "Other": "Other",
+                }
+            elif self.test_name == "hash":
+                return {
+                    0: "Faulty (Message Leaked)",
+                    1: "Normal Execution",
+                    2: "Panicked",
+                    4: "Wrong Hash Returned",
+                    3: "Infinite Loop",
+                    77: "Wrong Hash Returned",
+                    "Other": "Other",
+                }
+            else:
+                raise Exception("something wrong with the name")
+
         if self.test_name == "crt":
             return {
-                0: "Faulty (P or Q Derived) ",
+                0: "Faulty (P or Q Derived)",
                 1: "Normal Execution",
                 2: "Panicked",
                 3: "Infinite Loop",
                 4: "Message Leaked",
-                7: "Unknown",
+                7: "Faulty Encryption",
                 77: "Countermeasure Activated",
                 78: "Faulty Jump to Countermeasure",
                 "Other": "Other",
             }
         elif self.test_name == "pinny":
             return {
-                0: "Faulty",
+                0: "Faulty (Authenticated = 1)",
                 1: "Normal Execution",
                 2: "Panicked",
                 3: "Infinite Loop",
@@ -308,7 +342,7 @@ class Plotter:
 
         fault_outcomes = df.copy()
 
-        returncode_labels = self.get_return_labels()
+        returncode_labels = self.get_return_labels(variant=variant)
         known_codes = {k for k in returncode_labels if isinstance(k, int)}
         fault_outcomes["outcome"] = fault_outcomes["passed"].apply(
             lambda rc: rc if rc in known_codes else "Other"

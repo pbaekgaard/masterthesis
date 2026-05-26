@@ -15,6 +15,37 @@ from src.plotenator import Plotter
 from rich.console import Console
 
 
+def replot(folder):
+    db_path = os.path.join(folder, "results.db")
+    if not os.path.exists(db_path):
+        print(f"Error: no results.db found in {folder}")
+        sys.exit(1)
+
+    db = ResultsDatabase(db_path)
+
+    df = db.query_df("SELECT tests_folder FROM runs ORDER BY id DESC LIMIT 1")
+    if df.empty:
+        print("Error: no runs found in database")
+        sys.exit(1)
+
+    tests_folder = df.iloc[0, 0]
+    test_name = tests_folder.rstrip("/").split("/")[-1]
+
+    plotter = Plotter(db, test_name)
+    plots = plotter.create_plots()
+
+    plots_dir = os.path.join(folder, "plots")
+    os.makedirs(plots_dir, exist_ok=True)
+
+    for name, fig in plots.items():
+        path = os.path.join(plots_dir, f"{name}.svg")
+        fig.savefig(path, format="svg", bbox_inches="tight")
+        plt.close(fig)
+
+    db.close()
+    print(f"Plots regenerated in {plots_dir}/")
+
+
 class Experiment:
     def __init__(self, args, run_variants, config_path=None):
         if config_path is None:
@@ -39,6 +70,7 @@ class Experiment:
     def _build_stmt_to_trv_mapping(self, wh_path, trv_path):
         """Build a mapping from stmt numbers to .trv file lines."""
         import re
+        print(f"Trying to map {wh_path} to {trv_path}")
 
         stmt_to_expr = {}
 
@@ -627,12 +659,18 @@ if __name__ == "__main__":
         help="Skip hardened version when running tests",
     )
     parser.add_argument("--hard", action="store_true", help="Only run hardened version")
+    parser.add_argument("--replot", type=str, metavar="FOLDER",
+                        help="Replot all plots from a test_results folder")
     args, unknown = parser.parse_known_args()
 
     force = "-f" in unknown or "--reinit" in unknown
 
     if args.setup:
         exit(run_setup(target=args.setup, force=force))
+
+    if args.replot:
+        replot(args.replot)
+        sys.exit(0)
 
     missing_bins = get_missing_binaries()
     if missing_bins:
