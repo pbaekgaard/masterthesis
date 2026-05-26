@@ -111,13 +111,42 @@ class Experiment:
         )
         print(f"{'='*60}")
 
+        conf_file = "test.conf"
+        pass_mode_conf = {}
+
+        if conf_file:
+            conf_path = os.path.join(self.tests_folder, conf_file)
+            config = {}
+            with open(conf_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or ":" not in line:
+                        continue
+                    key, _, value = line.partition(":")
+                    config[key.strip()] = value.strip()
+
+            mode = config.get("mode")
+            if mode is None:
+                raise Exception("test.conf missing mode")
+            expected_pass = config.get("passed")
+            if expected_pass is None:
+                raise Exception("Failed to parse expected_pass from test.conf")
+            expected_fail = config.get("failed")
+            if expected_fail is None:
+                raise Exception("Failed to parse expected_fail from test.conf")
+            pass_mode_conf =  {
+                "mode": mode,
+                "expected_pass": expected_pass,
+                "expected_fail": expected_fail
+            }
+
         edited_test_name = os.path.splitext(os.path.basename(edited_trv_path))[0]
+
 
         edited_test = {
             "name": edited_test_name,
             "path": edited_trv_path,
-            "expected_output": "",
-            "pass_mode": {"mode": "returncode", "expected_pass": 0, "expected_fail": 1},
+            "pass_mode": pass_mode_conf
         }
 
         orig_tests = self.runner.tests

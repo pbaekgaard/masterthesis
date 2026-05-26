@@ -16,11 +16,6 @@ func main() -> Integer {
     let temp_msg : Integer = message;
     let chunk : Integer = 0;
 
-    # Handle a 0 message quickly
-    if temp_msg == 0 then {
-        temp_msg = 7; # Fallback seed
-    }
-
     # Single loop: process the integer by stripping off digits/chunks
     while temp_msg > 0 do {
         # chunk = temp_msg mod 100 (processes two digits at a time)

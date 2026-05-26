@@ -16,54 +16,77 @@ class SymexRunner:
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
         bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
         self.minimc_path = os.path.join(bin_dir, "minimc")
+
     def run(self, run_variants):
-        wh_files = sorted(
-            [
-                f
-                for f in os.listdir(self.artifacts_folder)
-                if f.endswith(".wh")
-                and (
+            # 1. Gather and filter the files based on the requested run_variants strategy
+            wh_files = []
+            for f in os.listdir(self.artifacts_folder):
+                if not f.endswith(".wh"):
+                    continue
+                    
+                is_hard = f.endswith(".hard.wh")
+                is_vd = f.endswith(".vd.wh")
+                is_sc = f.endswith(".sc.wh")
+                is_normal = not (is_hard or is_vd or is_sc)
+
+                if (
                     run_variants == "all"
-                    or (run_variants == "normal" and not f.endswith(".hard.wh"))
-                    or (run_variants == "hard" and f.endswith(".hard.wh"))
-                )
-            ]
-        )
+                    or (run_variants == "normal" and is_normal)
+                    or (run_variants == "hard" and is_hard)
+                    or (run_variants == "vd" and is_vd)
+                    or (run_variants == "sc" and is_sc)
+                ):
+                    wh_files.append(f)
+                    
+            wh_files.sort()
 
-        all_results = []
+            all_results = []
 
-        for wh_file in wh_files:
-            wh_path = os.path.join(self.artifacts_folder, wh_file)
-            print(f"Running MiniMC on {wh_file}")
-            cmd = [self.minimc_path, wh_path, "mc", "--mc.symbolic", "--mc.all", "--mc.concretize"]
+            for wh_file in wh_files:
+                wh_path = os.path.join(self.artifacts_folder, wh_file)
+                print(f"Running MiniMC on {wh_file}")
+                cmd = [self.minimc_path, wh_path, "mc", "--mc.symbolic", "--mc.all", "--mc.concretize"]
 
-            result = subprocess.run(
-                cmd,
-                cwd=self.tests_folder,
-                capture_output=True,
-                text=True,
-                env={**os.environ, "TERM": "dumb"},  # cleaner output
-            )
-
-            violations = extract_violations(result.stdout)
-            parsed = [parse_violation(v) for v in violations]
-            variant = "Normal"
-            if wh_file.__contains__(".hard.wh"):
-                variant = "Hard"
-
-
-            for v in parsed:
-                all_results.append(
-                    {
-                        "test": wh_file.replace(".hard.wh", "").replace(".wh", ""),
-                        "variant": variant,
-                        "stmt": v.get("stmt"),
-                        "faulty_bit": v.get("bit_shift"),
-                        "result": v.get("res"),
-                    }
+                result = subprocess.run(
+                    cmd,
+                    cwd=self.tests_folder,
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, "TERM": "dumb"},  # cleaner output
                 )
 
-        return all_results
+                violations = extract_violations(result.stdout)
+                parsed = [parse_violation(v) for v in violations]
+                
+                # 2. Determine the clean variant name string
+                if wh_file.endswith(".hard.wh"):
+                    variant = "Hard"
+                elif wh_file.endswith(".vd.wh"):
+                    variant = "VD"
+                elif wh_file.endswith(".sc.wh"):
+                    variant = "SC"
+                else:
+                    variant = "Normal"
+
+                # 3. Strip all suffixes from the test name cleanly
+                test_name = wh_file
+                for suffix in [".hard.wh", ".vd.wh", ".sc.wh", ".wh"]:
+                    if test_name.endswith(suffix):
+                        test_name = test_name[:-len(suffix)]
+                        break
+
+                for v in parsed:
+                    all_results.append(
+                        {
+                            "test": test_name,
+                            "variant": variant,
+                            "stmt": v.get("stmt"),
+                            "faulty_bit": v.get("bit_shift"),
+                            "result": v.get("res"),
+                        }
+                    )
+
+            return all_results
 
 
 def strip_ansi(text):

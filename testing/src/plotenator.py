@@ -46,8 +46,8 @@ class Plotter:
     def get_return_labels(self):
         if self.test_name == "crt":
             return {
-                0: "Normal Execution",
-                1: "Faulty",
+                0: "Faulty (P or Q Derived) ",
+                1: "Normal Execution",
                 2: "Panicked",
                 3: "Infinite Loop",
                 4: "Message Leaked",
@@ -58,8 +58,8 @@ class Plotter:
             }
         elif self.test_name == "pinny":
             return {
-                0: "Normal Execution",
-                1: "Faulty",
+                0: "Faulty",
+                1: "Normal Execution",
                 2: "Panicked",
                 3: "Infinite Loop",
                 77: "Countermeasure Activated",
@@ -68,8 +68,8 @@ class Plotter:
             }
         elif self.test_name == "hash":
             return {
-                0: "Normal Execution",
-                1: "Faulty (Message Leaked)",
+                0: "Faulty (Message Leaked)",
+                1: "Normal Execution",
                 2: "Panicked",
                 4: "Wrong Hash Returned",
                 3: "Infinite Loop",

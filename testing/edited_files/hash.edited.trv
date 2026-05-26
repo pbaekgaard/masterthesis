@@ -27,22 +27,17 @@ func main() -> Integer {
     let chunk : Integer = 0;
     let chunkDup : Integer = 0;
 
-    # Handle a 0 message quickly
-    if temp_msg == 0 then {
-        if temp_msg != temp_msgDup {
-            return 77;
-        }
-        temp_msg = 7; # Fallback seed
-        temp_msgDup = 7; # Fallback seed
+    # Single loop: process the integer by stripping off digits/chunks
+    if temp_msg != temp_msgDup {
+        return 77;
     }
 
-    # Single loop: process the integer by stripping off digits/chunks
     while temp_msg > 0 do {
-        if temp_msg != temp_msgDup {
-            return 77;
-        }
         # chunk = temp_msg mod 100 (processes two digits at a time)
         if chunk != chunkDup {
+            return 77;
+        }
+        if temp_msg != temp_msgDup {
             return 77;
         }
         chunk = temp_msg - (temp_msg / 100) * 100;
@@ -84,8 +79,10 @@ func main() -> Integer {
         return 77;
     }
     if h < 0 then {
-
         if h != hDup {
+            return 77;
+        }
+        if prime_modulo != prime_moduloDup {
             return 77;
         }
         h = h + prime_modulo;
@@ -96,5 +93,8 @@ func main() -> Integer {
         return 77;
     }
     print h;
+    if h != hDup {
+        return 77;
+    }
     return h;
 }
