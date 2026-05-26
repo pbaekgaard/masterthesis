@@ -153,22 +153,42 @@ class Plotter:
                 col_order.append("Other")
             grouped = grouped[col_order]
 
-            colors = [OUTCOME_COLOR_MAP.get(col, "#a65628") for col in grouped.columns]
-            grouped.plot(kind="bar", stacked=False, ax=ax, color=colors, legend=False)
+            variant_labels = {"sc": "Statement Counter", "vd": "Variable Duplication"}
+            grouped.index = [variant_labels.get(v, v) for v in grouped.index]
+
+            variants = grouped.index.tolist()
+            n_variants = len(variants)
+            max_bars = max((grouped.loc[v] > 0).sum() for v in variants) if variants else 1
+            group_width = 0.8
+
+            seen_outcomes = set()
+            for i, variant in enumerate(variants):
+                row = grouped.loc[variant]
+                sorted_row = row.sort_values(ascending=False)
+                sorted_row = sorted_row[sorted_row > 0]
+                n = len(sorted_row)
+                for j, (outcome, val) in enumerate(sorted_row.items()):
+                    if n == 1:
+                        x = i
+                    else:
+                        x = i - group_width / 2 + (j + 0.5) * group_width / n
+                    color = OUTCOME_COLOR_MAP.get(outcome, "#a65628")
+                    label = outcome if outcome not in seen_outcomes else None
+                    if label:
+                        seen_outcomes.add(outcome)
+                    ax.bar(x, val, width=0.9 * group_width / n, color=color, label=label)
+
+            ax.set_xticks(range(n_variants))
+            ax.set_xticklabels(variants)
 
             for container in ax.containers:
-                ax.bar_label(
-                    container,
-                    labels=[
-                        f'{int(v.get_height())}' if v.get_height() > 0 else ''
-                        for v in container
-                    ],
-                    label_type='center',
-                    fontsize=8,
-                    rotation=90,
-                    color='black',
-                    fontweight='bold'
-                )
+                for patch in container:
+                    h = patch.get_height()
+                    if h > 0:
+                        x = patch.get_x() + patch.get_width() / 2
+                        ax.text(x, h / 2, f'{int(h)}', ha='center', va='center',
+                                fontsize=8, rotation=90, color='black', fontweight='bold')
+
             self._add_horizontal_legend(fig, ax, "Outcome")
 
         ax.set_title(f"Exhaustive Interpreter - Outcome Distribution{suffix}")
@@ -230,22 +250,42 @@ class Plotter:
                 col_order.append("Other")
             grouped = grouped[col_order]
 
-            colors = [OUTCOME_COLOR_MAP.get(col, "#a65628") for col in grouped.columns]
-            grouped.plot(kind="bar", stacked=False, ax=ax, color=colors, legend=False)
+            variant_labels = {"sc": "Statement Counter", "vd": "Variable Duplication"}
+            grouped.index = [variant_labels.get(v, v) for v in grouped.index]
+
+            variants = grouped.index.tolist()
+            n_variants = len(variants)
+            max_bars = max((grouped.loc[v] > 0).sum() for v in variants) if variants else 1
+            group_width = 0.8
+
+            seen_outcomes = set()
+            for i, variant in enumerate(variants):
+                row = grouped.loc[variant]
+                sorted_row = row.sort_values(ascending=False)
+                sorted_row = sorted_row[sorted_row > 0]
+                n = len(sorted_row)
+                for j, (outcome, val) in enumerate(sorted_row.items()):
+                    if n == 1:
+                        x = i
+                    else:
+                        x = i - group_width / 2 + (j + 0.5) * group_width / n
+                    color = OUTCOME_COLOR_MAP.get(outcome, "#a65628")
+                    label = outcome if outcome not in seen_outcomes else None
+                    if label:
+                        seen_outcomes.add(outcome)
+                    ax.bar(x, val, width=0.9 * group_width / n, color=color, label=label)
+
+            ax.set_xticks(range(n_variants))
+            ax.set_xticklabels(variants)
 
             for container in ax.containers:
-                ax.bar_label(
-                    container,
-                    labels=[
-                        f'{int(v.get_height())}' if v.get_height() > 0 else ''
-                        for v in container
-                    ],
-                    label_type='center',
-                    fontsize=8,
-                    rotation=90,
-                    color='black',
-                    fontweight='bold'
-                )
+                for patch in container:
+                    h = patch.get_height()
+                    if h > 0:
+                        x = patch.get_x() + patch.get_width() / 2
+                        ax.text(x, h / 2, f'{int(h)}', ha='center', va='center',
+                                fontsize=8, rotation=90, color='black', fontweight='bold')
+
             self._add_horizontal_legend(fig, ax, "Outcome")
 
         ax.set_title(f"Guided Interpreter - Outcome Distribution{suffix}")
@@ -335,7 +375,8 @@ class Plotter:
 
         if df.empty:
             fig, ax = plt.subplots()
-            display_label = variant.title()
+            variant_display = {"sc": "Statement Counter", "vd": "Variable Duplication"}
+            display_label = variant_display.get(variant, variant.title())
             ax.text(0.5, 0.5, f"No data ({display_label}){suffix}", ha='center', va='center', transform=ax.transAxes)
             ax.set_title(f"Fault Type Distribution - {display_label}{suffix}")
             return fig
@@ -383,8 +424,15 @@ class Plotter:
             )
 
         interpreter_name = "Exhaustive" if table == "exhaustive" else "Guided"
-        display_label = variant.title()
-        ax.set_title(f"{interpreter_name} - Fault Type Distribution - {display_label}{suffix}")
+        variant_display = {"sc": "Statement Counter", "vd": "Variable Duplication"}
+        display_label = variant_display.get(variant, variant.title())
+        testName = self.test_name.capitalize()
+        if testName == "Hash":
+            testName = "Hashy"
+        elif testName == "Crt":
+            testName == "CRT-RSA"
+
+        ax.set_title(f"{interpreter_name} - Fault Type Distribution - {display_label}{suffix} ({testName})")
         ax.set_xlabel(None)
         self._apply_scale(ax)
         self._add_horizontal_legend(fig, ax, "Fault Type")
