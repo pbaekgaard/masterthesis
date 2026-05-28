@@ -126,15 +126,15 @@ def pinny_check_passed(result, pass_mode_config, cm_start, cm_end, injection_poi
         return 77
     elif "Detected Infinite Loop" in result.stdout:
         return 3
+    elif "panic" in result.stderr:
+        return 2
     if mode == "returncode":
-        if result.returncode == expected_pass:
+        if int(result.returncode) == int(expected_pass):
             return 1
-        elif "panic" in result.stderr:
-            return 2
-        elif result.returncode == expected_fail:
+        elif int(result.returncode) == int(expected_fail):
             return 0
         else:
-            return 0
+            return 7
     elif mode == "stdout":
         if expected_pass and str(expected_pass) in result.stdout:
             return 1

@@ -42,8 +42,12 @@ def replot(folder):
         fig.savefig(path, format="svg", bbox_inches="tight")
         plt.close(fig)
 
+    symex_csv_path = os.path.join(plots_dir, "symex_results.csv")
+    plotter.export_symex_csv(symex_csv_path)
+
     db.close()
     print(f"Plots regenerated in {plots_dir}/")
+    print(f"Symex results exported to {symex_csv_path}")
 
 
 class Experiment:
@@ -538,7 +542,7 @@ class Experiment:
             plt.show()
             for fig in plots.values():
                 plt.close(fig)
-        if self.args.skip_minimc:
+        if not self.args.skip_minimc:
             # symex exported as CSV instead of plot
             symex_csv_path = os.path.join(plots_dir, "symex_results.csv")
             plotter.export_symex_csv(symex_csv_path)

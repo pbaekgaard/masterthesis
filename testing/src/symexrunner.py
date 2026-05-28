@@ -16,7 +16,6 @@ class SymexRunner:
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
         bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
         self.minimc_path = os.path.join(bin_dir, "minimc")
-
     def run(self, run_variants):
             # 1. Gather and filter the files based on the requested run_variants strategy
             wh_files = []

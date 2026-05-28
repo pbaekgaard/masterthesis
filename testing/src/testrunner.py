@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import re
 import subprocess
@@ -456,7 +457,7 @@ class TestRunner:
         return results
 
     def _patch_wh_assert(self, asm_path, expected_value):
-        wh_path = asm_path.replace(".s", ".wh")
+        wh_path = str(Path(asm_path).with_suffix(".wh"))
         if not os.path.exists(wh_path):
             return
         with open(wh_path, "r") as f:
@@ -478,6 +479,8 @@ class TestRunner:
                 )
                 if success:
                     self._patch_wh_assert(asm_path, int(str(test["pass_mode"]["expected_pass"]).partition(",")[0]))
+                else:
+                    raise Exception("Something went wrong compiling test")
                 test_result[hard] = {
                     "success": success,
                     "asm_path": asm_path,

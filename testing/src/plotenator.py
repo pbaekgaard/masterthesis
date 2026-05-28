@@ -18,13 +18,20 @@ OUTCOME_COLOR_MAP = {
     "Other": "#FFFF00",
 }
 OUTCOME_COLORS = list(OUTCOME_COLOR_MAP.values())
-FAULT_TYPE_COLORS = ["#a6cee3", "#ff4411", "#b2df8a"]
-FIG_WIDTH = 14
+FAULT_TYPE_COLOR_MAP = {"PC": "#a6cee3", "REG": "#ff4411", "CPSR": "#b2df8a"}
+FIG_WIDTH = 13
+FIG_HEIGHT = 8
+LABEL_WRAP_WIDTH = 14
 
 class Plotter:
     def __init__(self, db: ResultsDatabase, test_name: str):
         self.db = db
         self.test_name = test_name
+
+    @property
+    def display_test_name(self):
+        mapping = {"crt": "Encrypty", "hash": "Hashy", "pinny": "Pinny"}
+        return mapping.get(self.test_name.lower(), self.test_name.capitalize())
 
     def create_plots(self):
         return {
@@ -43,6 +50,22 @@ class Plotter:
             "guided_fault_types_vd": self.plot_fault_types(edited=False, table="guided", variant="vd"),
             "guided_fault_types_normal_edited": self.plot_fault_types(edited=True, table="guided", variant="normal"),
         }
+
+    @staticmethod
+    def _wrap_label(label, width=LABEL_WRAP_WIDTH):
+        words = label.split()
+        if len(label) <= width or len(words) <= 1:
+            return label
+        lines = []
+        current_line = [words[0]]
+        for word in words[1:]:
+            if len(' '.join(current_line + [word])) > width:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+            else:
+                current_line.append(word)
+        lines.append(' '.join(current_line))
+        return '\n'.join(lines)
 
     def get_return_labels(self, variant=None):
         if variant == "normal":
@@ -120,18 +143,35 @@ class Plotter:
         df = self.db.query_df(f"SELECT * FROM exhaustive_interpreter_results {where}")
 
         if df.empty:
-            fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
+            fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
             ax.text(0.5, 0.5, f"No data{suffix}", ha='center', va='center', transform=ax.transAxes)
-            ax.set_title(f"Exhaustive Interpreter - Outcome Distribution{suffix}")
+            ax.set_title(f"Exhaustive Interpreter - Outcome Distribution of {self.display_test_name}{suffix}")
             return fig
 
-        returncode_labels = self.get_return_labels()
-        known_codes = {k for k in returncode_labels if isinstance(k, int)}
         df = df.copy()
-        df["outcome"] = df["passed"].apply(
-            lambda rc: rc if rc in known_codes else "Other"
-        )
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
+        normal_labels = []
+        returncode_labels = self.get_return_labels()
+        if not edited:
+            normal_labels = self.get_return_labels(variant="normal")
+        else:
+            normal_labels = self.get_return_labels()
+
+        normal_known = {k for k in normal_labels if isinstance(k, int)}
+        non_normal_known = {k for k in returncode_labels if isinstance(k, int)}
+
+        def _get_outcome(row):
+            rc = row["passed"]
+            if row["variant"] == "normal":
+                known = normal_known
+                labels = normal_labels
+            else:
+                known = non_normal_known
+                labels = returncode_labels
+            code = rc if rc in known else "Other"
+            return labels.get(code, "Other")
+
+        df["outcome"] = df.apply(_get_outcome, axis=1)
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
 
         if edited:
             counts = df["outcome"].value_counts().rename(returncode_labels)
@@ -139,21 +179,33 @@ class Plotter:
             if "Other" in counts.index:
                 ordered_outcomes.append("Other")
             counts = counts[ordered_outcomes]
-
+            counts = counts.sort_values(ascending=False)
+            if "Other" in counts.index:
+                other_val = counts.pop("Other")
+                counts["Other"] = other_val
             colors = [OUTCOME_COLOR_MAP.get(outcome, "#a65628") for outcome in counts.index]
+            counts.index = [self._wrap_label(l) for l in counts.index]
+
             ax.bar(range(len(counts)), counts.values, color=colors)
             ax.set_xticks(range(len(counts)))
             ax.set_xticklabels(counts.index, ha='center')
         else:
             grouped = df.groupby(["variant", "outcome"]).size().unstack(fill_value=0)
-            grouped = grouped.rename(columns=returncode_labels)
 
-            col_order = [c for c in returncode_labels.values() if c != "Other" and c in grouped.columns]
+            all_label_values = list(normal_labels.values()) + list(returncode_labels.values())
+            seen_labels = set()
+            unique_labels = []
+            for l in all_label_values:
+                if l not in seen_labels:
+                    seen_labels.add(l)
+                    unique_labels.append(l)
+
+            col_order = [c for c in unique_labels if c != "Other" and c in grouped.columns]
             if "Other" in grouped.columns:
                 col_order.append("Other")
             grouped = grouped[col_order]
 
-            variant_labels = {"sc": "Statement Counter", "vd": "Variable Duplication"}
+            variant_labels = {"sc": "Statement Counter", "vd": "Variable Duplication", "hard": "Hard", "normal" : "Normal"}
             grouped.index = [variant_labels.get(v, v) for v in grouped.index]
 
             variants = grouped.index.tolist()
@@ -181,17 +233,10 @@ class Plotter:
             ax.set_xticks(range(n_variants))
             ax.set_xticklabels(variants)
 
-            for container in ax.containers:
-                for patch in container:
-                    h = patch.get_height()
-                    if h > 0:
-                        x = patch.get_x() + patch.get_width() / 2
-                        ax.text(x, h / 2, f'{int(h)}', ha='center', va='center',
-                                fontsize=8, rotation=90, color='black', fontweight='bold')
-
+            self._label_bars(ax)
             self._add_horizontal_legend(fig, ax, "Outcome")
 
-        ax.set_title(f"Exhaustive Interpreter - Outcome Distribution{suffix}")
+        ax.set_title(f"Exhaustive Interpreter - Outcome Distribution of {self.display_test_name}{suffix}")
         ax.set_xlabel(None)
         self._apply_scale(ax)
 
@@ -203,8 +248,28 @@ class Plotter:
                         y_pos = (ymin * val) ** 0.5
                     else:
                         y_pos = val / 2
-                    ax.text(i, y_pos, f'{int(val)}', ha='center', va='center',
-                            fontsize=8, rotation=90, color='black', fontweight='bold')
+
+                    # --- 1. CALCULATE THE ACTUAL BAR HEIGHT IN PIXELS ---
+                    # Convert the top of your bar (val) and the bottom of the axis (ymin) to pixel coordinates
+                    pixel_top = ax.transData.transform((i, val))
+                    pixel_bottom = ax.transData.transform((i, ymin))
+                    bar_height_pixels = pixel_top - pixel_bottom
+
+                    # --- 2. CALCULATE THE LABEL HEIGHT IN PIXELS ---
+                    # (Using the same length logic you had)
+                    num_digits = len(str(int(val)))  # Use int(val) since that's what you display
+                    dpi = ax.get_figure().dpi
+                    char_width_pixels = (12 * 0.6) * (dpi / 10)
+                    label_height_pixels = num_digits * char_width_pixels
+
+                    # Draw the text
+                    if y_pos > label_height_pixels:
+                        ax.text(i, y_pos, f'{int(val)}', ha='center', va='center',
+                            fontsize=12, rotation=90, color='black', fontweight='bold')
+                    else:
+                        ax.text(i, y_pos*2, f'{int(val)}', ha='center', va='top',
+                            fontsize=12, rotation=90, color='black', fontweight='bold')
+
 
         self._style_axes(ax)
 
@@ -216,19 +281,30 @@ class Plotter:
         df = self.db.query_df(f"SELECT * FROM guided_interpreter_results {where}")
 
         if df.empty:
-            fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
+            fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
             ax.text(0.5, 0.5, f"No data{suffix}", ha='center', va='center', transform=ax.transAxes)
-            ax.set_title(f"Guided Interpreter - Outcome Distribution{suffix}")
+            ax.set_title(f"Guided Interpreter - Outcome Distribution of {self.display_test_name}{suffix}")
             return fig
 
-        returncode_labels = self.get_return_labels()
-        known_codes = {k for k in returncode_labels if isinstance(k, int)}
         df = df.copy()
-        df["outcome"] = df["passed"].apply(
-            lambda rc: rc if rc in known_codes else "Other"
-        )
+        returncode_labels = self.get_return_labels()
+        normal_labels = self.get_return_labels(variant="normal")
+        normal_known = {k for k in normal_labels if isinstance(k, int)}
+        non_normal_known = {k for k in returncode_labels if isinstance(k, int)}
 
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
+        def _get_outcome(row):
+            rc = row["passed"]
+            if row["variant"] == "normal":
+                known = normal_known
+                labels = normal_labels
+            else:
+                known = non_normal_known
+                labels = returncode_labels
+            code = rc if rc in known else "Other"
+            return labels.get(code, "Other")
+
+        df["outcome"] = df.apply(_get_outcome, axis=1)
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
 
         if edited:
             counts = df["outcome"].value_counts().rename(returncode_labels)
@@ -236,21 +312,33 @@ class Plotter:
             if "Other" in counts.index:
                 ordered_outcomes.append("Other")
             counts = counts[ordered_outcomes]
-
+            counts = counts.sort_values(ascending=False)
+            if "Other" in counts.index:
+                other_val = counts.pop("Other")
+                counts["Other"] = other_val
             colors = [OUTCOME_COLOR_MAP.get(outcome, "#a65628") for outcome in counts.index]
+            counts.index = [self._wrap_label(l) for l in counts.index]
+
             ax.bar(range(len(counts)), counts.values, color=colors)
             ax.set_xticks(range(len(counts)))
             ax.set_xticklabels(counts.index, ha='center')
         else:
             grouped = df.groupby(["variant", "outcome"]).size().unstack(fill_value=0)
-            grouped = grouped.rename(columns=returncode_labels)
 
-            col_order = [c for c in returncode_labels.values() if c != "Other" and c in grouped.columns]
+            all_label_values = list(normal_labels.values()) + list(returncode_labels.values())
+            seen_labels = set()
+            unique_labels = []
+            for l in all_label_values:
+                if l not in seen_labels:
+                    seen_labels.add(l)
+                    unique_labels.append(l)
+
+            col_order = [c for c in unique_labels if c != "Other" and c in grouped.columns]
             if "Other" in grouped.columns:
                 col_order.append("Other")
             grouped = grouped[col_order]
 
-            variant_labels = {"sc": "Statement Counter", "vd": "Variable Duplication"}
+            variant_labels = {"sc": "Statement Counter", "vd": "Variable Duplication", "hard": "Hard", "normal" : "Normal"}
             grouped.index = [variant_labels.get(v, v) for v in grouped.index]
 
             variants = grouped.index.tolist()
@@ -278,17 +366,10 @@ class Plotter:
             ax.set_xticks(range(n_variants))
             ax.set_xticklabels(variants)
 
-            for container in ax.containers:
-                for patch in container:
-                    h = patch.get_height()
-                    if h > 0:
-                        x = patch.get_x() + patch.get_width() / 2
-                        ax.text(x, h / 2, f'{int(h)}', ha='center', va='center',
-                                fontsize=8, rotation=90, color='black', fontweight='bold')
-
+            self._label_bars(ax)
             self._add_horizontal_legend(fig, ax, "Outcome")
 
-        ax.set_title(f"Guided Interpreter - Outcome Distribution{suffix}")
+        ax.set_title(f"Guided Interpreter - Outcome Distribution of {self.display_test_name}{suffix}")
         ax.set_xlabel(None)
         self._apply_scale(ax)
 
@@ -301,7 +382,7 @@ class Plotter:
                     else:
                         y_pos = val / 2
                     ax.text(i, y_pos, f'{int(val)}', ha='center', va='center',
-                            fontsize=8, rotation=90, color='black', fontweight='bold')
+                            fontsize=12, rotation=90, color='black', fontweight='bold')
 
         self._style_axes(ax)
 
@@ -335,6 +416,18 @@ class Plotter:
             ax.set_ylabel("Count")
             ymin, ymax = ax.get_ylim()
 
+    def _label_bars(self, ax):
+        for container in ax.containers:
+            ax.bar_label(
+                container,
+                labels=[f'{int(v.get_height())}' if v.get_height() > 0 else '' for v in container],
+                label_type='center',
+                fontsize=12,
+                rotation=90,
+                color='black',
+                fontweight='bold'
+            )
+
     def _add_horizontal_legend(self, fig, ax, title):
         handles, labels = ax.get_legend_handles_labels()
         leg = fig.legend(
@@ -343,13 +436,13 @@ class Plotter:
             loc='lower center',
             bbox_to_anchor=(0.5, 0.05),
             ncol=min(len(handles), 6),
-            fontsize=8,
-            title_fontsize=9,
+            fontsize=12,
+            title_fontsize=13,
             frameon=True,
         )
         leg.get_title().set_fontweight('bold')
         fig.tight_layout()
-        fig.subplots_adjust(bottom=0.2)
+        fig.subplots_adjust(bottom=0.25)
 
     def export_symex_csv(self, output_path):
         df = self.db.query_df("SELECT * FROM symex_results")
@@ -375,7 +468,7 @@ class Plotter:
 
         if df.empty:
             fig, ax = plt.subplots()
-            variant_display = {"sc": "Statement Counter", "vd": "Variable Duplication"}
+            variant_display = {"sc": "Statement Counter", "vd": "Variable Duplication", "hard": "Hard", "normal" : "Normal"}
             display_label = variant_display.get(variant, variant.title())
             ax.text(0.5, 0.5, f"No data ({display_label}){suffix}", ha='center', va='center', transform=ax.transAxes)
             ax.set_title(f"Fault Type Distribution - {display_label}{suffix}")
@@ -393,46 +486,43 @@ class Plotter:
         fault_type_map = {"pc": "PC", "reg": "REG", "cpsr": "CPSR"}
         fault_outcomes["fault_type_label"] = fault_outcomes["fault_type"].map(fault_type_map)
 
+        if edited:
+            fault_outcomes = fault_outcomes[fault_outcomes["fault_type_label"] == "REG"]
+
         grouped = fault_outcomes.groupby(["outcome", "fault_type_label"]).size().unstack(fill_value=0)
 
-        ordered_outcomes = [c for c in returncode_labels.values() if c != "Other" and c in grouped.index]
+        seen_outcomes = set()
+        ordered_outcomes = []
+        for c in returncode_labels.values():
+            if c != "Other" and c in grouped.index and c not in seen_outcomes:
+                seen_outcomes.add(c)
+                ordered_outcomes.append(c)
         if "Other" in grouped.index:
             ordered_outcomes.append("Other")
         grouped = grouped.reindex(ordered_outcomes)
+        row_totals = grouped.sum(axis=1)
+        grouped = grouped.loc[row_totals.sort_values(ascending=False).index]
+        if "Other" in grouped.index:
+            other_row = grouped.loc[["Other"]]
+            grouped = pd.concat([grouped.drop("Other"), other_row])
 
-        ordered_cols = ["PC", "REG", "CPSR"]
+        ordered_cols = ["REG"] if edited else ["PC", "REG", "CPSR"]
         for col in ordered_cols:
             if col not in grouped.columns:
                 grouped[col] = 0
         grouped = grouped[ordered_cols]
+        grouped.index = [self._wrap_label(l) for l in grouped.index]
 
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH, 6))
-        grouped.plot(kind="bar", stacked=False, ax=ax, color=FAULT_TYPE_COLORS[:len(grouped.columns)], legend=False)
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
+        grouped.plot(kind="bar", stacked=False, ax=ax, color=[FAULT_TYPE_COLOR_MAP[c] for c in grouped.columns], legend=False)
 
-        for container in ax.containers:
-            ax.bar_label(
-                container,
-                labels=[
-                    f'{int(v.get_height())}' if v.get_height() > 0 else ''
-                    for v in container
-                ],
-                label_type='center',
-                fontsize=8,
-                rotation=90,
-                color='black',
-                fontweight='bold'
-            )
+        self._label_bars(ax)
 
         interpreter_name = "Exhaustive" if table == "exhaustive" else "Guided"
-        variant_display = {"sc": "Statement Counter", "vd": "Variable Duplication"}
+        variant_display = {"sc": "Statement Counter", "vd": "Variable Duplication", "hard": "Hard", "normal" : "Normal"}
         display_label = variant_display.get(variant, variant.title())
-        testName = self.test_name.capitalize()
-        if testName == "Hash":
-            testName = "Hashy"
-        elif testName == "Crt":
-            testName == "CRT-RSA"
 
-        ax.set_title(f"{interpreter_name} - Fault Type Distribution - {display_label}{suffix} ({testName})")
+        ax.set_title(f"{interpreter_name} - Fault Type Distribution ({self.display_test_name}, {display_label}){suffix}")
         ax.set_xlabel(None)
         self._apply_scale(ax)
         self._add_horizontal_legend(fig, ax, "Fault Type")
