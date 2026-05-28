@@ -1,0 +1,13 @@
+func main() -> Integer {
+  let x : Integer = 0;
+  let y : Integer = 2;
+  let z : Integer = 4;
+  let vd : Integer = x + y + z + 1;
+
+  if vd == 6 then {
+    vd = 7;
+  } else {
+      vd = 8;
+  }
+  return vd;
+}

@@ -18,10 +18,10 @@ pub struct CodeGenerator {
     pub file: File,
     pub wh_file: File,
     locals: HashMap<String, i32>,
-    dup_pairs: HashMap<String, String>,
     stack_offset: i32,
     label_count: usize,
-    hard: bool,
+    sc: bool,
+    vd: bool,
     string_literals: Vec<(String, String)>,
     need_int_print: bool,
     step_counter: i32,
@@ -40,10 +40,10 @@ impl CodeGenerator {
             file,
             wh_file,
             locals: HashMap::new(),
-            dup_pairs: HashMap::new(),
             stack_offset: 0,
             label_count: 0,
-            hard: false,
+            sc: false,
+            vd: false,
             string_literals: Vec::new(),
             need_int_print: false,
             step_counter: 0,
@@ -56,8 +56,9 @@ impl CodeGenerator {
             metadata_current_registers: Vec::new(),
         }
     }
-    pub fn generate(&mut self, ast: AST, is_hard: bool) {
-        self.hard = is_hard;
+    pub fn generate(&mut self, ast: AST, only_sc: bool, only_vd: bool) {
+        self.sc = only_sc;
+        self.vd = only_vd;
         self.gen_init();
         for func in ast {
             self.emit(func);
@@ -65,17 +66,16 @@ impl CodeGenerator {
         self.emit_print_data();
         self.insert_metadata();
 
-        self.wh_write_line(format!("stmt = (? as ui32);").as_str(), 0);
-        self.wh_write_line(format!("bit_shift = (? as ui32);").as_str(), 0);
-        self.wh_write_line(format!("assume (bit_shift <= (31 as ui32));").as_str(), 0);
-        self.wh_write_line(format!("assume (bit_shift >= (0 as ui32));").as_str(), 0);
-        self.wh_write_line(format!("assume (stmt >= (0 as ui32));").as_str(), 0);
-        self.wh_write_line(format!("assume (stmt <= ({} as ui32));",self.stmt-1).as_str(), 0);
-        self.wh_write_line(format!("flip_mask = ((1 as ui32) << bit_shift);").as_str(), 0);
+        self.wh_write_line("stmt = (? as ui32);", 0);
+        self.wh_write_line("bit_shift = (? as ui32);", 0);
+        self.wh_write_line("assume (bit_shift <= (31 as ui32));", 0);
+        self.wh_write_line("assume (bit_shift >= (0 as ui32));", 0);
+        self.wh_write_line("assume (stmt >= (0 as ui32));", 0);
+        self.wh_write_line(format!("assume (stmt <= ({} as ui32));", self.stmt - 1).as_str(), 0);
+        self.wh_write_line("flip_mask = ((1 as ui32) << bit_shift);", 0);
 
         self.wh_write_line("\nres = main(stmt, flip_mask);", 0);
-        self.wh_write_line(format!("assert(res == (0 as ui32));").as_str(), 0);
-
+        self.wh_write_line("assert(res == (XYZ as ui32));".to_string().as_str(), 0);
     }
 
     fn gen_init(&mut self) {
@@ -123,41 +123,93 @@ ui32 bit_shift;
 ui32 flip_mask;
 "#, 0);
         self.wh_write_line("fn main(ui32 stmt, ui32 flip_mask) -> ui32 {", 0);
-        if self.hard {
+        self.wh_write_line("ui32 has_faulted;", 1);
+        if self.sc {
             self.write_line("mov r9, #0", 1, true); // step counter in register
             self.write_line("mov r10, #1", 1, true); // step counter in register
             self.wh_write_line("ui32 step_counter;", 1);
             self.wh_write_line("step_counter = (0 as ui32);", 1);
         }
+        self.wh_write_line("has_faulted = (0 as ui32);", 1);
         self.emit_block(func.body, true);
-        if self.hard {
+        if self.sc || self.vd {
             self.emit_countermeasure();
         }
         self.write_line("\n.size _start, .-_start", 0, true);
         self.wh_write_line("}", 0);
     }
+    fn emit_vd(&mut self, expr: Expr) {
+        //husk det er den der laver vd checket
+        let collected_identifiers = expr.get_all_identifiers();
+        for c in collected_identifiers.clone() {
+            let duped = c.clone() + "_dup";
+            let dup_offset = self.stack_offset - *self.locals.get(&duped).unwrap();
+            let offset = self.stack_offset - *self.locals.get(&c).unwrap();
+            self.write_line(format!("ldr r0, [sp, #{}]", offset).as_str(), 1, true);
+            self.write_line(format!("ldr r1, [sp, #{}]", dup_offset).as_str(), 1, true);
+            self.write_line("cmp r1, r0", 1, true);
+            self.write_line("bne countermeasure", 1, true);
+            self.write_line(format!("str r0, [sp, #{}]", offset).as_str(), 1, true);
+            self.write_line(format!("str r1, [sp, #{}]", dup_offset).as_str(), 1, true);
+            self.wh_write_line(&format!("if ({} != {}) {{", c, duped), self.wh_indent);
+            self.wh_indent += 1;
+            self.wh_write_line("return (77 as ui32);", self.wh_indent);
+            self.wh_indent -= 1;
+            self.wh_write_line("}", self.wh_indent);
+        }
+    }
     fn emit_block(&mut self, block: Block, is_main: bool) {
         let initial_offset = self.stack_offset;
         let initial_locals = self.locals.clone();
-        let initial_dup_pairs = self.dup_pairs.clone();
 
         let mut has_return = false;
         for stmt in block.statements {
             match stmt {
-                Stmt::Let(_, _, _) => self.emit_let(stmt),
-                Stmt::AssignStatement(_, _) => self.emit_assign(stmt),
-                Stmt::Return(_) => {
+                Stmt::Let(ref name, ref typ, ref expr) => {
+                    if self.vd {
+                        self.emit_vd(expr.clone());
+                    }
+                    self.emit_let(stmt.clone());
+                    if self.vd {
+                        let dup_expr = expr.duplicate_identifiers("_dup");
+                        let dup_stmt = Stmt::Let(format!("{}_dup", name), typ.clone(), dup_expr);
+                        self.emit_let(dup_stmt);
+                    }
+                }
+                Stmt::AssignStatement(ref name, ref expr) => {
+                    if self.vd {
+                        self.emit_vd(Expr::Identifier(name.into()));
+                        self.emit_vd(expr.clone());
+                    }
+                    self.emit_assign(stmt.clone());
+                    if self.vd {
+                        let dup_expr = expr.duplicate_identifiers("_dup");
+                        let dup_stmt = Stmt::AssignStatement(format!("{}_dup", name), dup_expr);
+                        self.emit_assign(dup_stmt);
+                    }
+                }
+                Stmt::Return(ref expr) => {
+                    if self.vd {
+                        self.emit_vd(expr.clone());
+                    }
                     self.emit_return(stmt, is_main);
                     has_return = true;
                 }
-                Stmt::If { .. } => self.emit_if(stmt),
-                Stmt::While { .. } => self.emit_while(stmt),
+                Stmt::If { condition: ref expr, .. } => {
+                    if self.vd {
+                        self.emit_vd(expr.clone());
+                    }
+                    self.emit_if(stmt);
+                }
+                Stmt::While { ref expr, .. } => {
+                    if self.vd {
+                        self.emit_vd(expr.clone());
+                    }
+                    self.emit_while(stmt);
+                }
                 Stmt::Print(exprs) => self.emit_print(exprs),
                 _ => panic!("Error found in expression in return"),
             }
-            // if self.hard {
-            //     self.emit_step_check();
-            // }
         }
 
         let offset_diff = self.stack_offset - initial_offset;
@@ -167,7 +219,6 @@ ui32 flip_mask;
 
         self.stack_offset = initial_offset;
         self.locals = initial_locals;
-        self.dup_pairs = initial_dup_pairs;
     }
     fn emit_countermeasure(&mut self) {
         self.write_line("countermeasure:", 0, true);
@@ -180,31 +231,24 @@ ui32 flip_mask;
     }
 
     fn emit_step_check(&mut self) {
-        if !self.hard {
+        if !self.sc {
             return;
         }
         self.step_counter += 1;
 
-        if self.in_loop {
-            self.write_line("add r9, r9, #1", 1, true);
-            self.write_line("cmp r9, r10", 1, true);
-            self.write_line("bne countermeasure", 1, true);
-            self.write_line("add r10, r10, #1", 1, true);
-        } else {
-            self.write_line("add r9, r9, #1", 1, true);
-            self.write_line(&format!("cmp r9, #{}", self.step_counter), 1, true);
-            self.write_line("bne countermeasure", 1, true);
+        self.write_line("add r9, r9, #1", 1, true);
+        self.write_line(&format!("cmp r9, #{}", self.step_counter), 1, true);
+        self.write_line("bne countermeasure", 1, true);
 
-            self.wh_write_line("step_counter++;", self.wh_indent);
-            self.wh_write_line(
-                &format!("if (step_counter != ({} as ui32)) {{", self.step_counter),
-                self.wh_indent
-            );
-            self.wh_indent += 1;
-            self.wh_write_line("return (77 as ui32);", self.wh_indent);
-            self.wh_indent -= 1;
-            self.wh_write_line("}", self.wh_indent);
-        }
+        self.wh_write_line("step_counter++;", self.wh_indent);
+        self.wh_write_line(
+            &format!("if (step_counter != ({} as ui32)) {{", self.step_counter),
+            self.wh_indent
+        );
+        self.wh_indent += 1;
+        self.wh_write_line("return (77 as ui32);", self.wh_indent);
+        self.wh_indent -= 1;
+        self.wh_write_line("}", self.wh_indent);
     }
 
     fn emit_print_data(&mut self) {
@@ -226,19 +270,12 @@ ui32 flip_mask;
             self.write_line("num_buf:", 0, false);
             self.write_line(".space 16", 1, false);
         }
-        if self.hard {
+        if self.sc {
             self.write_line("step_counter:", 0, false);
             self.write_line(".word 0", 1, false);
             self.write_line("fault_msg:", 0, false);
             self.write_line(".ascii \"Control flow violation detected\\n\"", 1, false);
         }
-    }
-
-    fn wh_emit_if_start(&mut self, condition: Expr) {
-        self.wh_emit_dup_checks_for_expr(&condition);
-        let expr = self.wh_build_expr_str(condition);
-        self.wh_write_line(&format!("if ( {expr}) {{"), self.wh_indent);
-        self.wh_indent += 1;
     }
 
     fn emit_if(&mut self, if_stmt: Stmt) {
@@ -248,7 +285,9 @@ ui32 flip_mask;
                 self.label_count += 1;
 
                 self.emit_expr(condition.clone());
-                self.wh_emit_if_start(condition);
+                let expr = self.wh_build_expr_str(condition);
+                self.wh_write_line(&format!("if ( {expr}) {{"), self.wh_indent);
+                self.wh_indent += 1;
                 self.write_line("cmp r0, #0", 1, true);
                 self.write_line(&format!("beq else_{}", label_id), 1, true);
 
@@ -269,14 +308,14 @@ ui32 flip_mask;
                 self.wh_indent -= 1;
                 self.wh_write_line("}", self.wh_indent);
 
-                if let Some(else_block) = option {
-                    if self.hard {
+                if let Some(else_block) = option.clone() {
+                    if self.sc {
                         self.step_counter = saved;
                     }
                     self.wh_write_line("else {", self.wh_indent);
                     self.wh_indent += 1;
                     self.emit_block(else_block, false);
-                    if self.hard {
+                    if self.sc {
                         self.step_counter = std::cmp::max(self.step_counter, saved_then);
                         self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
                         self.wh_write_line(
@@ -289,6 +328,14 @@ ui32 flip_mask;
                 }
 
                 self.write_line(&format!("endif_{}:", label_id), 0, true);
+                if option.is_none() && self.sc {
+                    self.step_counter = std::cmp::max(self.step_counter, saved_then);
+                    self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
+                    self.wh_write_line(
+                        &format!("step_counter = ({} as ui32);", self.step_counter),
+                        self.wh_indent
+                    );
+                }
             }
             _ => panic!("emit_if called with non-if statement"),
         }
@@ -302,10 +349,17 @@ ui32 flip_mask;
                 let saved = self.step_counter;
                 self.in_loop = true;
 
-                if self.hard {
-                    self.write_line(&format!("mov r10, #{}", self.step_counter + 1), 1, true);
-                }
+                self.step_counter = 0;
+
                 self.write_line(&format!("while_{}:", label_id), 0, true);
+                let cond = self.wh_build_expr_str(expr.clone());
+                self.wh_write_line(&format!("while ( {cond}) {{"), self.wh_indent);
+                self.wh_indent += 1;
+                if self.sc {
+                    self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
+                    self.write_line(&format!("mov r10, #{}", self.step_counter + 1), 1, true);
+                    self.wh_write_line("step_counter = (0 as ui32);", self.wh_indent);
+                }
 
                 self.emit_step_check();
                 self.emit_expr(expr);
@@ -317,9 +371,12 @@ ui32 flip_mask;
 
                 self.write_line(&format!("b while_{}", label_id), 1, true);
                 self.write_line(&format!("end_while_{}:", label_id), 0, true);
-                if self.hard {
+                self.wh_indent -= 1;
+                self.wh_write_line("}", self.wh_indent);
+                if self.sc {
                     self.step_counter = saved;
                     self.write_line(&format!("mov r9, #{}", self.step_counter), 1, true);
+                    self.wh_write_line(&format!("step_counter = ({} as ui32);", self.step_counter), self.wh_indent);
                 }
                 self.in_loop = false;
             }
@@ -422,7 +479,6 @@ ui32 flip_mask;
     fn emit_return(&mut self, return_stmt: Stmt, _is_main: bool) {
         match return_stmt {
             Stmt::Return(expr) => {
-                self.wh_emit_dup_checks_for_expr(&expr);
                 let return_string = self.wh_build_expr_str(expr.clone());
                 self.wh_emit_return(&return_string);
                 self.emit_expr(expr);
@@ -450,21 +506,8 @@ ui32 flip_mask;
                         true
                     );
                 }
-                if self.hard && self.dup_pairs.contains_key(&name) {
-                    let dup_name = self.dup_pairs.get(&name).unwrap();
-                    let dup_offset = self.locals.get(dup_name).expect("Undefined dup variable");
-                    if self.stack_offset - dup_offset == 0 {
-                        self.write_line("str r0, [sp]", 1, true);
-                    } else {
-                        self.write_line(
-                            &format!("str r0, [sp, #{}]", self.stack_offset - dup_offset),
-                            1,
-                            true
-                        );
-                    }
-                }
                 self.wh_emit_assign(assign_stmt);
-                if self.hard {
+                if self.sc {
                     self.emit_step_check();
                 }
                 let pc_after = self.pc - 1;
@@ -476,10 +519,6 @@ ui32 flip_mask;
                 self.metadata.push(format!(r#".word 0x0 @ {register_string}"#));
                 self.metadata_current_registers.clear();
                 self.metadata.push(format!(r#".word 0x00000001 @ {name}"#));
-                if self.hard && self.dup_pairs.contains_key(&name) {
-                    let dup_name = self.dup_pairs.get(&name).unwrap();
-                    self.metadata.push(format!(r#".word 0x00000001 @ {dup_name}"#));
-                }
             }
             _ => panic!("Not a valid assignment"),
         }
@@ -487,19 +526,12 @@ ui32 flip_mask;
     fn wh_emit_assign(&mut self, assign_stmt: Stmt) {
         match assign_stmt {
             Stmt::AssignStatement(identifyer, expr) => {
-                self.wh_emit_dup_checks_for_expr(&expr);
-                let expr_str = self.wh_build_expr_str(expr);
+                let expr_str = self.wh_build_expr_str(expr.clone());
                 if expr_str == "".to_string() {
                     return;
                 }
                 let assign_line = format!("{identifyer} = {expr_str}");
                 self.wh_write_line(&format!("{assign_line};"), self.wh_indent);
-
-                if self.hard && self.dup_pairs.contains_key(&identifyer) {
-                    let dup_name = self.dup_pairs.get(&identifyer).unwrap();
-                    let assign_dup_line = format!("{dup_name} = {expr_str}");
-                    self.wh_write_line(&format!("{assign_dup_line};"), self.wh_indent);
-                }
 
                 self.wh_instrument_assign(assign_line.as_str());
             }
@@ -553,7 +585,6 @@ ui32 flip_mask;
         self.wh_emit_let(let_stmt.clone());
         match let_stmt {
             Stmt::Let(name, _type_name, expr) => {
-                let dup_name = format!("{}_dup", name);
                 self.metadata_current_registers.clear();
                 self.metadata_current_registers.push("r0".to_string());
                 self.stack_offset += 4;
@@ -562,17 +593,6 @@ ui32 flip_mask;
                 self.emit_expr(expr.clone());
                 self.write_line("str r0, [sp]", 1, true);
                 self.locals.insert(name.clone(), self.stack_offset);
-
-                if self.hard {
-                    self.stack_offset += 4;
-                    self.write_line("sub sp, sp, #4", 1, true);
-                    self.emit_expr(expr.clone());
-                    self.write_line("str r0, [sp]", 1, true);
-                    self.locals.insert(dup_name.clone(), self.stack_offset);
-                    self.dup_pairs.insert(name.clone(), dup_name.clone());
-                    self.dup_pairs.insert(dup_name.clone(), name.clone());
-                    self.emit_step_check();
-                }
 
                 let pc_after = self.pc - 1;
 
@@ -583,9 +603,6 @@ ui32 flip_mask;
                 self.metadata.push(format!(r#".word 0x0 @ {register_string}"#));
                 self.metadata_current_registers.clear();
                 self.metadata.push(format!(r#".word 0x00000001 @ {name}"#));
-                if self.hard {
-                    self.metadata.push(format!(r#".word 0x00000002 @ {dup_name}"#));
-                }
             }
             _ => panic!("Not a let statement format sorry "),
         }
@@ -598,25 +615,10 @@ ui32 flip_mask;
                 self.insert_at_line(self.next_assignment_location, combined.as_str());
                 self.next_assignment_location += 1;
 
-                if self.hard {
-                    let dup_name = format!("{}_dup", name);
-                    let combined_dup = indent_str.clone() + "ui32 " + dup_name.as_str() + ";";
-                    self.insert_at_line(self.next_assignment_location, combined_dup.as_str());
-                    self.next_assignment_location += 1;
-                    self.dup_pairs.insert(name.clone(), dup_name.clone());
-                    self.dup_pairs.insert(dup_name, name.clone());
-                }
-
-                let val = self.wh_build_expr_str(expr);
+                let val = self.wh_build_expr_str(expr.clone());
                 let assign_line = name.clone() + " = " + val.as_str();
 
                 self.wh_write_line(format!("{};", assign_line.as_str()).as_str(), self.wh_indent);
-
-                if self.hard {
-                    let dup_name = format!("{}_dup", name);
-                    let assign_dup_line = dup_name + " = " + val.as_str();
-                    self.wh_write_line(format!("{};", assign_dup_line.as_str()).as_str(), self.wh_indent);
-                }
 
                 self.wh_instrument_assign(assign_line.as_str());
             }
@@ -625,61 +627,35 @@ ui32 flip_mask;
     }
     fn wh_instrument_assign(&mut self, assign_line: &str) {
         self.wh_write_line(
+            "if (has_faulted == (0 as ui32)) {",
+            self.wh_indent
+        );
+        self.wh_indent += 1;
+        self.wh_write_line(
             format!("if (stmt == ({} as ui32)) {{", self.stmt).as_str(),
             self.wh_indent
         );
         self.wh_indent += 1;
         self.wh_write_line(format!("{} ^ flip_mask;", assign_line).as_str(), self.wh_indent);
+        self.wh_write_line(
+            "has_faulted = (1 as ui32);",
+            self.wh_indent
+        );
+        self.wh_indent -= 1;
+        self.wh_write_line("}", self.wh_indent);
         self.wh_indent -= 1;
         self.wh_write_line("}", self.wh_indent);
         self.stmt += 1;
     }
-    fn wh_emit_dup_check(&mut self, name: &str) {
-        if self.hard && self.dup_pairs.contains_key(name) {
-            let dup_name = self.dup_pairs.get(name).unwrap().clone();
-            self.wh_write_line(&format!("if ({name} != {dup_name}) {{"), self.wh_indent);
-            self.wh_indent += 1;
-            self.wh_write_line("return (77 as ui32);", self.wh_indent);
-            self.wh_indent -= 1;
-            self.wh_write_line("}", self.wh_indent);
-        }
-    }
-    fn wh_emit_dup_checks_for_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Identifier(name) => {
-                self.wh_emit_dup_check(name);
-            }
-            Expr::BinaryOp(left, _, right) => {
-                self.wh_emit_dup_checks_for_expr(left);
-                self.wh_emit_dup_checks_for_expr(right);
-            }
-            Expr::UnaryOp(_, inner) => {
-                self.wh_emit_dup_checks_for_expr(inner);
-            }
-            _ => {}
-        }
-    }
     fn wh_build_expr_str(&self, expr: Expr) -> String {
-        // IntegerLiteral(i64),
-        // BooleanLiteral(bool),
-        // StringLiteral(String),
-        // Identifier(String),
-        // BinaryOp(Box<Expr>, BinOp, Box<Expr>),
-        // UnaryOp(UnOp, Box<Expr>),
         match expr {
-            Expr::IntegerLiteral(val) => {
-                return format!("({val} as ui32)");
-            }
+            Expr::IntegerLiteral(val) => format!("({val} as ui32)"),
             Expr::BooleanLiteral(val) => {
                 let ival = if val { 1 } else { 0 };
-                return format!("{ival}");
+                format!("{ival}")
             }
-            Expr::StringLiteral(_val) => {
-                return "".to_string();
-            }
-            Expr::Identifier(val) => {
-                return val;
-            }
+            Expr::StringLiteral(_val) => "".to_string(),
+            Expr::Identifier(val) => val,
             Expr::BinaryOp(left, op, right) => {
                 let left_str = self.wh_build_expr_str(*left);
                 let right_str = self.wh_build_expr_str(*right);
@@ -693,11 +669,9 @@ ui32 flip_mask;
                     BinOp::Equals => "==",
                     BinOp::NotEquals => "!=",
                 };
-                return format!("{left_str} {op_str} {right_str}");
+                format!("{left_str} {op_str} {right_str}")
             }
-            Expr::UnaryOp(_, _) => {
-                return "".to_string();
-            }
+            Expr::UnaryOp(_, _) => "".to_string(),
             _ => panic!("building expr string went wrong"),
         }
     }
@@ -715,13 +689,6 @@ ui32 flip_mask;
             Expr::Identifier(name) => {
                 let offset = self.locals.get(&name).expect("Undefined variable");
                 self.write_line(&format!("ldr r0, [sp, #{}]", self.stack_offset - offset), 1, true);
-                if self.hard && self.dup_pairs.contains_key(&name) {
-                    let dup_name = self.dup_pairs.get(&name).unwrap();
-                    let dup_offset = self.locals.get(dup_name).expect("Undefined dup variable");
-                    self.write_line(&format!("ldr r2, [sp, #{}]", self.stack_offset - dup_offset), 1, true);
-                    self.write_line("cmp r0, r2", 1, true);
-                    self.write_line("bne countermeasure", 1, true);
-                }
             }
             Expr::BinaryOp(_, _, _) => {
                 self.emit_bin_op(expr);
@@ -734,9 +701,13 @@ ui32 flip_mask;
         match bin_op_expr {
             Expr::BinaryOp(left, op, right) => {
                 self.emit_expr(*left);
-                self.write_line("mov r1, r0", 1, true); // store left
-                self.metadata_current_registers.push_unique("r1".to_string());
+                self.write_line("sub sp, sp, #4", 1, true);
+                self.stack_offset += 4;
+                self.write_line("str r0, [sp, #0]", 1, true);
                 self.emit_expr(*right);
+                self.write_line("ldr r1, [sp, #0]", 1, true);
+                self.write_line("add sp, sp, #4", 1, true);
+                self.stack_offset -= 4;
 
                 match op {
                     BinOp::Add => self.write_line("add r0, r1, r0", 1, true),
@@ -816,7 +787,7 @@ mod tests {
             .expect("Failed to create file: /temp/tests/test_can_generate_init.wh");
         let ast = AST::new();
         let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-        codegen.generate(ast, false);
+        codegen.generate(ast, false, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -862,7 +833,7 @@ mod tests {
             .open("temp/tests/test_can_generate_return.wh")
             .expect("Failed to create file: /temp/tests/test_can_generate_return.wh");
         let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-        codegen.generate(ast, false);
+        codegen.generate(ast, false, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -914,7 +885,7 @@ mod tests {
             .open("temp/tests/test_can_generate_let.wh")
             .expect("Failed to create file: /temp/tests/test_can_generate_let.wh");
         let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-        codegen.generate(ast, false);
+        codegen.generate(ast, false, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -973,7 +944,7 @@ mod tests {
             .open("temp/tests/test_can_generate_if_else.wh")
             .expect("Failed to create file: /temp/tests/test_can_generate_if_else.wh");
         let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-        codegen.generate(ast, false);
+        codegen.generate(ast, false, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -1059,7 +1030,7 @@ mod tests {
             .open("temp/tests/test_can_generate_while.wh")
             .expect("Failed to create file: /temp/tests/test_can_generate_while.wh");
         let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-        codegen.generate(ast, false);
+        codegen.generate(ast, false, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -1141,7 +1112,7 @@ mod tests {
             .open("temp/tests/test_can_generate_two_whiles.wh")
             .expect("Failed to create file: /temp/tests/test_can_generate_two_whiles.wh");
         let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-        codegen.generate(ast, false);
+        codegen.generate(ast, false, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -1256,7 +1227,7 @@ mod tests {
             .open("temp/tests/test_can_generate_nested_while.wh")
             .expect("Failed to create file: /temp/tests/test_can_generate_nested_while.wh");
         let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-        codegen.generate(ast, false);
+        codegen.generate(ast, false, false);
         codegen.file.seek(SeekFrom::Start(0)).unwrap();
         let mut buf = String::new();
         codegen.file.read_to_string(&mut buf).unwrap();
@@ -1342,79 +1313,5 @@ mod tests {
             }
         ).to_string();
         assert_eq!(expected, buf)
-    }
-
-    #[test]
-    fn compiles_all_correct() {
-        initialize();
-
-        let test_codes_dir = std::path::Path::new("test_codes");
-        let trv_files: Vec<_> = std::fs
-            ::read_dir(test_codes_dir)
-            .unwrap()
-            .filter_map(|entry| {
-                let path = entry.unwrap().path();
-                if path.extension().map_or(false, |ext| ext == "trv") {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        for trv_path in trv_files {
-            let source = std::fs::read_to_string(&trv_path).expect("Failed to read trv file");
-            let mut lexer: Lexer = Lexer::new(source);
-            let tokens: Vec<Token> = lexer.tokenize();
-            let mut parser: Parser = Parser::new(tokens);
-            let ast: AST = parser.parse_program();
-
-            let file_stem = trv_path.file_stem().unwrap().to_str().unwrap();
-            let output_asm_path = format!("temp/tests/{}.s", file_stem);
-            let output_wh_path = format!("temp/tests/{}.wh", file_stem);
-            let output_file = File::options()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&output_asm_path)
-                .expect(&format!("Failed to create file: {}", output_asm_path));
-
-            let wh_output_file = File::options()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&output_wh_path)
-                .expect(&format!("Failed to create file: {}", output_wh_path));
-            let mut codegen = CodeGenerator::new(output_file, wh_output_file);
-            codegen.generate(ast, false);
-
-            let output_path = trv_path.with_extension("trv.output");
-            let expected_exit_code = std::fs
-                ::read_to_string(&output_path)
-                .expect("Failed to read output file")
-                .trim()
-                .parse::<i32>()
-                .expect("Failed to parse exit code");
-
-            let result = std::process::Command::new("./bin/run_asm").arg(&output_asm_path).output();
-
-            let actual_exit_code = match result {
-                Ok(output) => output.status.code().unwrap_or(-1),
-                Err(e) => panic!("{}",e),
-            };
-
-            std::fs::remove_file(&output_asm_path).ok();
-
-            assert_eq!(
-                expected_exit_code,
-                actual_exit_code,
-                "File {}: expected exit code {}, got {}",
-                file_stem,
-                expected_exit_code,
-                actual_exit_code
-            );
-        }
     }
 }

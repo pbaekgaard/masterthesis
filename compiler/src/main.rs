@@ -27,7 +27,10 @@ struct Args {
     hard: bool,
 
     #[arg(long)]
-    normal: bool,
+    sc: bool,
+
+    #[arg(long)]
+    vd: bool,
 }
 
 fn main() {
@@ -57,8 +60,15 @@ fn main() {
     let mut parser: Parser = Parser::new(_tokens);
     let _ast: AST = parser.parse_program();
     let mut codegen: CodeGenerator = CodeGenerator::new(output,wh_output);
-    let mut hard = false;
-    codegen.generate(_ast, args.hard);
+    let mut sc = args.sc;
+    let mut vd = args.vd;
+
+    if args.hard {
+        sc = true;
+        vd = true;
+    }
+
+    codegen.generate(_ast, sc, vd);
 
     
 

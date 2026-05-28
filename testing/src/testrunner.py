@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import re
 import subprocess
@@ -49,49 +50,6 @@ def _get_countermeasure_location_range(asm_path: str):
 # start, end = _get_countermeasure_location_range("code.s")
 # print(f"Countermeasure range: {start} to {end}")
 
-def _fault_worker(args):
-    asm_path, injection_point, pass_mode_config = args
-
-    bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
-    interpreter_path = os.path.join(bin_dir, "interpreter")
-
-    cmd = [interpreter_path, asm_path, "--injection-point", injection_point, "--test-mode"]
-
-    result = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
-
-    (cm_start, cm_end) = _get_countermeasure_location_range(asm_path)
-    passed = _check_passed(result, pass_mode_config, cm_start, cm_end, injection_point)
-
-    matched_output_line = None
-    if pass_mode_config.get("mode") == "stdout":
-        expected_pass = pass_mode_config.get("expected_pass", "")
-        expected_fail = pass_mode_config.get("expected_fail", "")
-        
-        stdout_lines = result.stdout.strip().split("\n")
-        
-        if passed and expected_pass:
-            for line in stdout_lines:
-                if expected_pass in line:
-                    matched_output_line = line.strip()
-                    break
-        elif not passed and expected_fail:
-            for line in stdout_lines:
-                if expected_fail in line:
-                    matched_output_line = line.strip()
-                    break
-        
-        if matched_output_line is None:
-            matched_output_line = "N/A"
-    return {
-        "injection_point": injection_point,
-        "returncode": result.returncode,
-        "stdout": result.stdout.strip(),
-        "stderr": result.stderr.strip(),
-        "expected_output": pass_mode_config.get("expected_pass", ""),
-        "matched_output_line": matched_output_line,
-        "passed": passed,
-        "test_report": _extract_test_report(result.stdout),
-    }
 
 def _extract_test_report(stdout: str):
     keyword = r'"title":\s*"test_report"'
@@ -101,47 +59,10 @@ def _extract_test_report(stdout: str):
         return match.group(0)
     return '{"title": "test_report"}'
     
-def _check_passed(result, pass_mode_config, cm_start, cm_end, injection_point):
-    mode = pass_mode_config.get("mode", "returncode")
-    expected_pass = pass_mode_config.get("expected_pass", None)
-    expected_fail = pass_mode_config.get("expected_fail", None)
-
-    if "COUNTERMEASURE" in result.stdout or result.returncode == 77:
-        return 77
-    elif "Detected Infinite Loop" in result.stdout:
-        return 3
-    if mode == "returncode" and result.returncode == 0:
-        return 1
-    elif "panic" in result.stderr:
-        return 2
-    elif mode == "returncode" and result.returncode != 0:
-        if cm_start is not None and cm_end is not None and injection_point is not None:
-            parts = injection_point.split(":")
-            if parts[0] == "pc":
-                pc_value = int(parts[1])
-                bit_value = int(parts[2])
-                mask = 1 << bit_value
-                flipped_pc = pc_value ^ mask
-                if(flipped_pc in range(cm_start, cm_end+1)):
-                    return 78
-                return 0
-            return 0
-        return 0
-    elif mode == "stdout":
-        if expected_pass and expected_pass in result.stdout:
-            return 1
-        elif expected_fail and expected_fail in result.stdout and result.returncode == 1:
-            return 0
-        return 1
-    else:
-        print(f"STDOUT: {result.stdout}")
-        print(f"STDERR: {result.stderr}")
-        print(f"RETURNCODE: {result.returncode}")
-        raise ValueError(f"Unknown pass mode: {mode}")
 
 
 class TestRunner:
-    def __init__(self, config_path=None):
+    def __init__(self, config_path=None, oracle=None):
         if config_path is None:
             config_path = os.path.join(os.path.dirname(__file__), "..", "config.toml")
 
@@ -152,6 +73,7 @@ class TestRunner:
         self.tests_folder = os.path.join(
             self.base_dir, config.get("test_folder", "fissc")
         )
+        self.oracle = oracle
         self.artifacts_folder = os.path.join(self.base_dir, "artifacts")
         self.injection_points = config.get(
             "injection_points",
@@ -171,10 +93,55 @@ class TestRunner:
                 "r12",
             ],
         )
-        self.default_pass_mode = config.get("pass_mode", {}).get("default", "returncode")
-        self.pass_mode_configs = config.get("pass_mode", {})
         self.tests = self._discover_tests()
         self.compile_results = None
+
+    def _fault_worker(self, args):
+        asm_path, injection_point, pass_mode_config = args
+
+        bin_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
+        interpreter_path = os.path.join(bin_dir, "interpreter")
+
+        cmd = [interpreter_path, asm_path, "--injection-point", injection_point, "--test-mode"]
+
+        result = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
+
+        (cm_start, cm_end) = _get_countermeasure_location_range(asm_path)
+        passed = self._check_passed(result, pass_mode_config, cm_start, cm_end, injection_point)
+
+        matched_output_line = None
+        if pass_mode_config.get("mode") == "stdout":
+            expected_pass = pass_mode_config.get("expected_pass", "")
+            expected_fail = pass_mode_config.get("expected_fail", "")
+            
+            stdout_lines = result.stdout.strip().split("\n")
+            
+            if passed and expected_pass:
+                for line in stdout_lines:
+                    if expected_pass in line:
+                        matched_output_line = line.strip()
+                        break
+            elif not passed and expected_fail:
+                for line in stdout_lines:
+                    if expected_fail in line:
+                        matched_output_line = line.strip()
+                        break
+            
+            if matched_output_line is None:
+                matched_output_line = "N/A"
+        return {
+            "injection_point": injection_point,
+            "returncode": result.returncode,
+            "stdout": result.stdout.strip(),
+            "stderr": result.stderr.strip(),
+            "expected_output": pass_mode_config.get("expected_pass", ""),
+            "matched_output_line": matched_output_line,
+            "passed": passed,
+            "test_report": _extract_test_report(result.stdout),
+        }
+
+    def _check_passed(self, result, pass_mode_config, cm_start, cm_end, injection_point):
+        return self.oracle(result, pass_mode_config, cm_start, cm_end, injection_point)
 
     def _discover_tests(self):
         tests = []
@@ -186,17 +153,7 @@ class TestRunner:
 
         for trv_file in trv_files:
             test_name = trv_file[:-4]
-            output_file = trv_file + ".output"
-            toml_file = trv_file + ".toml"
-
-            if output_file not in files:
-                continue
-
             trv_path = os.path.join(self.tests_folder, trv_file)
-            output_path = os.path.join(self.tests_folder, output_file)
-
-            with open(output_path, "r") as f:
-                expected_output = f.read().strip()
 
             pass_mode_config = self._load_pass_mode_config(test_name, trv_file, files)
 
@@ -204,7 +161,7 @@ class TestRunner:
                 {
                     "name": test_name,
                     "path": trv_path,
-                    "expected_output": expected_output,
+                    "expected_output": "",
                     "pass_mode": pass_mode_config,
                 }
             )
@@ -212,29 +169,37 @@ class TestRunner:
         return tests
 
     def _load_pass_mode_config(self, test_name, trv_file, files):
-        toml_file = trv_file + ".toml"
+        conf_file = "test.conf"
 
-        if toml_file in files:
-            toml_path = os.path.join(self.tests_folder, toml_file)
-            with open(toml_path, "r") as f:
-                test_config = toml.load(f)
-            pass_mode = test_config.get("pass_mode", {})
-            if "mode" in pass_mode:
-                mode = pass_mode["mode"]
-                mode_config = self.pass_mode_configs.get(mode, {})
+        if conf_file in files:
+            conf_path = os.path.join(self.tests_folder, conf_file)
+            config = {}
+            with open(conf_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or ":" not in line:
+                        continue
+                    key, _, value = line.partition(":")
+                    config[key.strip()] = value.strip()
+
+            mode = config.get("mode", "returncode")
+            if mode == "returncode":
                 return {
                     "mode": mode,
-                    "expected_pass": pass_mode.get("passed", 0) if mode == "returncode" else pass_mode.get("expected_pass"),
-                    "expected_fail": pass_mode.get("failed", 1) if mode == "returncode" else pass_mode.get("expected_fail"),
+                    "expected_pass": int(config.get("passed", "0")),
+                    "expected_fail": int(config.get("failed", "1")),
+                }
+            else:
+                return {
+                    "mode": mode,
+                    "expected_pass": config.get("passed", ""),
+                    "expected_fail": config.get("failed", ""),
                 }
 
-        mode = self.default_pass_mode
-        mode_config = self.pass_mode_configs.get(mode, {})
-        return {
-            "mode": mode,
-            "expected_pass": mode_config.get("passed", 0) if mode == "returncode" else mode_config.get("expected_pass"),
-            "expected_fail": mode_config.get("failed", 1) if mode == "returncode" else mode_config.get("expected_fail"),
-        }
+        raise FileNotFoundError(
+            f"Missing test.conf in {self.tests_folder}. "
+            "Each test folder must have a test.conf file defining mode, passed, and failed."
+        )
 
     def check_bin(self):
         from pathlib import Path
@@ -269,16 +234,24 @@ class TestRunner:
         trv_path = test["path"]
         test_name = test["name"]
 
-        if hard:
+        if hard == "hard":
             asm_path = os.path.join(compiled_folder, f"{test_name}.hard")
+        elif hard == "sc":
+            asm_path = os.path.join(compiled_folder, f"{test_name}.sc")
+        elif hard == "vd":
+            asm_path = os.path.join(compiled_folder, f"{test_name}.vd")
         else:
             asm_path = os.path.join(compiled_folder, f"{test_name}")
 
         compiler_dir = os.path.join(os.path.dirname(__file__), "..", "bin")
 
         cmd = [os.path.join(compiler_dir, "compiler"), trv_path, "-o", asm_path]
-        if hard:
+        if hard == "hard":
             cmd.append("--hard")
+        elif hard == "sc":
+            cmd.append("--sc")
+        elif hard == "vd":
+            cmd.append("--vd")
 
         result = subprocess.run(cmd, cwd=compiler_dir, capture_output=True, text=True)
         asm_path = asm_path + ".s"
@@ -351,7 +324,7 @@ class TestRunner:
         registers = []
         cpsr_registers = []
         pc_points = []
-        do_all = False
+        do_all = True
 
         if len(self.injection_points) == 0:
             do_all = True
@@ -452,6 +425,10 @@ class TestRunner:
             injection_points = self._generate_injection_points(asm_path)
         else:
             injection_points = self._symex_to_injection_points(variant, asm_path, minimc_res)
+            if injection_points is None or len(injection_points) == 0:
+                print("NO INJECTION POINTS FOUND FROM SYMEX")
+            else:
+                print("FOUND INJECTION POINTS FROM SYMEX")
 
         if limit is not None and len(injection_points) > limit:
             injection_points = injection_points[:limit]
@@ -469,7 +446,7 @@ class TestRunner:
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count) as executor:
             for res in tqdm(
-                executor.map(_fault_worker, tasks, chunksize=50),
+                executor.map(self._fault_worker, tasks, chunksize=50),
                 total=len(tasks),
                 desc="Fault Injection",
             ):
@@ -479,17 +456,32 @@ class TestRunner:
 
         return results
 
-    def compile(self, nohard=False):
+    def _patch_wh_assert(self, asm_path, expected_value):
+        wh_path = str(Path(asm_path).with_suffix(".wh"))
+        if not os.path.exists(wh_path):
+            return
+        with open(wh_path, "r") as f:
+            content = f.read()
+        if "XYZ" not in content:
+            return
+        content = content.replace("XYZ", str(expected_value))
+        with open(wh_path, "w") as f:
+            f.write(content)
+
+    def compile(self):
         results = []
         for test in self.tests:
-            test_result = {"name": test["name"], "normal": None, "hard": None}
+            test_result = {"name": test["name"], "normal": None, "hard": None, "sc": None, "vd": None}
 
-            for hard in [False, True]:
-                hard_str = "hard" if hard else "normal"
+            for hard in ["hard", "sc", "vd", "normal"]:
                 success, asm_path, stdout, stderr = self.compile_test(
                     test, hard, self.compiled_folder
                 )
-                test_result[hard_str] = {
+                if success:
+                    self._patch_wh_assert(asm_path, int(str(test["pass_mode"]["expected_pass"]).partition(",")[0]))
+                else:
+                    raise Exception("Something went wrong compiling test")
+                test_result[hard] = {
                     "success": success,
                     "asm_path": asm_path,
                     "stdout": stdout,
@@ -500,29 +492,28 @@ class TestRunner:
         self.compile_results = results
         return results
 
-    def run_tests(self, limit=None, run_variants="both", minimc_res=None):
+    def run_tests(self, limit=None, run_variants="all", minimc_res=None, guided=False):
         if self.compile_results is None:
             self.compile()
 
         all_fault_results = []
 
         if run_variants == "normal":
-            variants = [False]
+            variants = ["normal"]
         elif run_variants == "hard":
-            variants = [True]
+            variants = ["hard"]
         else:
-            variants = [False, True]
+            variants = ["hard", "sc", "vd", "normal"]
         compile_results = self.compile_results or []
 
         for test, result in zip(self.tests, compile_results):
             print(f"Test: {test['name']}")
 
             for hard in variants:
-                hard_str = "hard" if hard else "normal"
-                res = result[hard_str]
+                res = result[hard]
 
                 if not res["success"]:
-                    print(f"  Compilation failed ({hard_str})")
+                    print(f"  Compilation failed ({hard})")
                     if res["stdout"]:
                         print(f"    stdout: {res['stdout']}")
                     if res["stderr"]:
@@ -531,16 +522,20 @@ class TestRunner:
 
                 asm_path = res["asm_path"]
                 max_pc = self._get_program_max_pc(asm_path)
-                injection_points = self._generate_injection_points(asm_path)
+                injection_points = []
+                if guided:
+                    injection_points = self._symex_to_injection_points(hard, asm_path, minimc_res)
+                else:
+                    injection_points = self._generate_injection_points(asm_path)
 
-                print(f"  Compiled ({hard_str}) successfully")
+                print(f"  Compiled ({hard}) successfully")
                 print(f"  ASM path: {asm_path}")
                 print(f"  Max PC: {max_pc}")
                 print(f"  Fault runs to execute: {len(injection_points)}")
 
                 fault_results = self._run_fault_campaign(
                     test_name=test["name"],
-                    variant=hard_str,
+                    variant=hard,
                     asm_path=asm_path,
                     pass_mode_config=test["pass_mode"],
                     limit=limit,

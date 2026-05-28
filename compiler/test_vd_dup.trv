@@ -1,0 +1,44 @@
+func main() -> Integer {
+  let x : Integer = 0;
+  let x_dup : Integer = 0;
+  let y : Integer = 2;
+  let y_dup : Integer = 2;
+  let z : Integer = 4;
+  let z_dup : Integer = 4;
+  if x != x_dup {
+      return 77;
+  }
+
+  if y != y_dup {
+      return 77;
+  }
+
+  if z != z_dup {
+      return 77; 
+  }
+
+  let vd : Integer = x + y + z + 1;
+  let vd_dup : Integer = x_dup + y_dup + z_dup + 1;
+
+  if vd != vd_dup {
+      return 77;
+  }
+  if vd == 6 then {
+    if vd != vd_dup {
+        return 77;
+    }
+    vd = 7;
+    vd_dup = 7;
+  } else {
+      if vd != vd_dup {
+          return 77;
+      }
+      vd = 8;
+      vd_dup = 8;
+  }
+
+  if vd != vd_dup {
+      return 77;
+  }
+  return vd;
+}

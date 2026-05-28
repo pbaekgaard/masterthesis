@@ -1,0 +1,46 @@
+func main() -> Integer {
+    # 123456789 is too big for a single ARM move.
+    # We build it: 12345 * 10000 + 6789
+    let message : Integer = 0;
+    message = 12345;
+
+    # Initialize hash with a non-zero prime offset (like FNV)
+    let h : Integer = 5381; 
+    let multiplier : Integer = 33;
+
+    # 104729 is too big for a single ARM move.
+    # We build it: 104 * 1000 + 729
+    let prime_modulo : Integer = 0; 
+    prime_modulo = 104 * 1000 + 729;
+    
+    let temp_msg : Integer = message;
+    let chunk : Integer = 0;
+
+    # Handle a 0 message quickly
+    if temp_msg == 0 then {
+        temp_msg = 7; # Fallback seed
+    }
+
+    # Single loop: process the integer by stripping off digits/chunks
+    while temp_msg > 0 do {
+        # chunk = temp_msg mod 100 (processes two digits at a time)
+        chunk = temp_msg - (temp_msg / 100) * 100;
+        
+        # Mix the chunk into the hash
+        h = (h * multiplier) + chunk;
+        
+        # Inline modulo: h = h mod prime_modulo
+        h = h - (h / prime_modulo) * prime_modulo;
+
+        # Move to the next chunk
+        temp_msg = temp_msg / 100;
+    }
+
+    # Final guard statement if operations pushed the integer into negative wrap
+    if h < 0 then {
+        h = h + prime_modulo;
+    }
+
+    print h;
+    return h;
+}

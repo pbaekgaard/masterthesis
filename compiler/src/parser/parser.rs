@@ -1,6 +1,4 @@
-use crate::{
-    lexer::token::{Token, TokenType},
-};
+use crate::{ lexer::token::{ Token, TokenType } };
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Let(String, Type, Expr),
@@ -49,7 +47,66 @@ pub enum Expr {
     Identifier(String),
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     UnaryOp(UnOp, Box<Expr>),
-    Call(Vec<Expr>), 
+    Call(Vec<Expr>),
+}
+
+impl Expr {
+    /// Recursively traverses the expression and appends a suffix to all Identifiers.
+    pub fn duplicate_identifiers(&self, suffix: &str) -> Self {
+        match self {
+            Expr::Identifier(name) => { Expr::Identifier(format!("{}{}", name, suffix)) }
+            Expr::BinaryOp(left, op, right) => {
+                Expr::BinaryOp(
+                    Box::new(left.duplicate_identifiers(suffix)),
+                    op.clone(),
+                    Box::new(right.duplicate_identifiers(suffix))
+                )
+            }
+            Expr::UnaryOp(op, expr) => {
+                Expr::UnaryOp(op.clone(), Box::new(expr.duplicate_identifiers(suffix)))
+            }
+            Expr::Call(args) => {
+                let dup_args = args
+                    .iter()
+                    .map(|arg| arg.duplicate_identifiers(suffix))
+                    .collect();
+                Expr::Call(dup_args)
+            }
+            // Literals don't contain identifiers, so they remain unchanged
+            Expr::IntegerLiteral(_) | Expr::BooleanLiteral(_) | Expr::StringLiteral(_) => {
+                self.clone()
+            }
+        }
+    }
+    pub fn get_all_identifiers(&self) -> Vec<String> {
+        let mut identifiers = Vec::new();
+        self.collect_identifiers(&mut identifiers);
+        identifiers
+    }
+
+    // A private helper function that passes a mutable reference
+    // to avoid allocating multiple vectors during recursion.
+    fn collect_identifiers(&self, acc: &mut Vec<String>) {
+        match self {
+            Expr::Identifier(name) => {
+                acc.push(name.clone());
+            }
+            Expr::BinaryOp(left, _, right) => {
+                left.collect_identifiers(acc);
+                right.collect_identifiers(acc);
+            }
+            Expr::UnaryOp(_, expr) => {
+                expr.collect_identifiers(acc);
+            }
+            Expr::Call(args) => {
+                for arg in args {
+                    arg.collect_identifiers(acc);
+                }
+            }
+            // Literals do not contain any identifiers
+            Expr::IntegerLiteral(_) | Expr::BooleanLiteral(_) | Expr::StringLiteral(_) => {}
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,12 +146,13 @@ impl Parser {
                 TokenType::Func => {
                     ast.push(self.parse_func());
                 }
-                _ => panic!(
-                    "Wrong token {} at {}:{}",
-                    self.current(),
-                    self.current().line,
-                    self.current().column,
-                ),
+                _ =>
+                    panic!(
+                        "Wrong token {} at {}:{}",
+                        self.current(),
+                        self.current().line,
+                        self.current().column
+                    ),
             }
         }
         ast
@@ -144,10 +202,7 @@ impl Parser {
                 let _ = self.expect(TokenType::Boolean);
                 Type::Boolean
             }
-            _ => panic!(
-                "Unknown return type for function: {}",
-                self.current().token_type
-            ),
+            _ => panic!("Unknown return type for function: {}", self.current().token_type),
         };
 
         let _ = self.expect(TokenType::LeftBrace);
@@ -260,13 +315,14 @@ impl Parser {
         let type_of_var = match self.current().token_type {
             TokenType::Integer => Type::Integer,
             TokenType::Boolean => Type::Boolean,
-            _ => panic!(
-                "Expected type, got {:?} ({}) at {}:{}",
-                self.current().token_type,
-                self.current().value,
-                self.current().line,
-                self.current().column
-            ),
+            _ =>
+                panic!(
+                    "Expected type, got {:?} ({}) at {}:{}",
+                    self.current().token_type,
+                    self.current().value,
+                    self.current().line,
+                    self.current().column
+                ),
         };
         self.consume();
         let _ = self.expect(TokenType::Assign);
@@ -290,115 +346,112 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Expr {
+        self.parse_equality()
+    }
+
+    fn parse_equality(&mut self) -> Expr {
+        let mut left = self.parse_comparison();
+        loop {
+            if self.match_any(&[TokenType::Equals, TokenType::NotEquals]) {
+                let op = self.token_to_binop(&self.current().token_type);
+                self.consume();
+                let right = self.parse_comparison();
+                left = Expr::BinaryOp(Box::new(left), op, Box::new(right));
+            } else {
+                break;
+            }
+        }
+        left
+    }
+
+    fn parse_comparison(&mut self) -> Expr {
+        let mut left = self.parse_additive();
+        loop {
+            if self.match_any(&[TokenType::GreaterThan, TokenType::LessThan]) {
+                let op = self.token_to_binop(&self.current().token_type);
+                self.consume();
+                let right = self.parse_additive();
+                left = Expr::BinaryOp(Box::new(left), op, Box::new(right));
+            } else {
+                break;
+            }
+        }
+        left
+    }
+
+    fn parse_additive(&mut self) -> Expr {
+        let mut left = self.parse_multiplicative();
+        loop {
+            if self.match_any(&[TokenType::Plus, TokenType::Minus]) {
+                let op = self.token_to_binop(&self.current().token_type);
+                self.consume();
+                let right = self.parse_multiplicative();
+                left = Expr::BinaryOp(Box::new(left), op, Box::new(right));
+            } else {
+                break;
+            }
+        }
+        left
+    }
+
+    fn parse_multiplicative(&mut self) -> Expr {
+        let mut left = self.parse_unary();
+        loop {
+            if self.match_any(&[TokenType::Multiply, TokenType::Division]) {
+                let op = self.token_to_binop(&self.current().token_type);
+                self.consume();
+                let right = self.parse_unary();
+                left = Expr::BinaryOp(Box::new(left), op, Box::new(right));
+            } else {
+                break;
+            }
+        }
+        left
+    }
+
+    fn parse_unary(&mut self) -> Expr {
+        if self.match_token(TokenType::Not) {
+            self.consume();
+            let expr = self.parse_unary();
+            return Expr::UnaryOp(UnOp::Not, Box::new(expr));
+        }
+        if self.match_token(TokenType::Minus) {
+            self.consume();
+            let expr = self.parse_unary();
+            return Expr::UnaryOp(UnOp::Neg, Box::new(expr));
+        }
+        self.parse_primary()
+    }
+
+    fn parse_primary(&mut self) -> Expr {
         let tok = self.consume();
         match tok.token_type {
-            TokenType::IntegerLiteral | TokenType::Identifier => {
-                if self.match_any(&[
-                    TokenType::Minus,
-                    TokenType::Plus,
-                    TokenType::Multiply,
-                    TokenType::Division,
-                    TokenType::GreaterThan,
-                    TokenType::LessThan,
-                    TokenType::Equals,
-                    TokenType::NotEquals,
-                ]) {
-                    let op_token = self.consume();
-                    let op = self.token_to_binop(&op_token.token_type);
-                    let right = self.parse_expression();
-                    Expr::BinaryOp(
-                        match tok.token_type {
-                            TokenType::IntegerLiteral => {
-                                Box::new(Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap()))
-                            }
-                            TokenType::Identifier => Box::new(Expr::Identifier(tok.value)),
-                            _ => panic!("SOMETHING IS WRONGDOG"),
-                        },
-                        op,
-                        Box::new(right),
-                    )
-                } else {
-                    match tok.token_type {
-                        TokenType::IntegerLiteral => {
-                            Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap())
+            TokenType::IntegerLiteral => { Expr::IntegerLiteral(tok.value.parse::<i64>().unwrap()) }
+            TokenType::Identifier => {
+                if self.match_token(TokenType::LeftParen) {
+                    self.consume();
+                    let mut args = Vec::new();
+                    if !self.match_token(TokenType::RightParen) {
+                        args.push(self.parse_expression());
+                        while self.match_token(TokenType::Comma) {
+                            self.consume();
+                            args.push(self.parse_expression());
                         }
-                        TokenType::Identifier => Expr::Identifier(tok.value),
-                        _ => panic!("tokentype wrong, should be integer literal or identifyer"),
                     }
+                    let _ = self.expect(TokenType::RightParen);
+                    Expr::Call(args)
+                } else {
+                    Expr::Identifier(tok.value)
                 }
             }
             TokenType::BooleanLiteral => {
-                if self.match_any(&[TokenType::Equals, TokenType::NotEquals]) {
-                    let op_token = self.consume();
-                    let op = self.token_to_binop(&op_token.token_type);
-                    let right = self.parse_expression();
-                    Expr::BinaryOp(
-                        Box::new(Expr::BooleanLiteral(tok.value.parse::<bool>().unwrap())),
-                        op,
-                        Box::new(right),
-                    )
-                } else {
-                    let _val = tok.value.clone();
-                    Expr::BooleanLiteral(tok.value.to_lowercase().parse::<bool>().unwrap())
-                }
+                Expr::BooleanLiteral(tok.value.to_lowercase().parse::<bool>().unwrap())
             }
-            TokenType::StringLiteral => {
-                if self.match_token(TokenType::Equals) {
-                    let op_token = self.consume();
-                    let op = self.token_to_binop(&op_token.token_type);
-                    let right = self.expect(TokenType::StringLiteral).unwrap();
-                    Expr::BinaryOp(
-                        Box::new(Expr::StringLiteral(tok.value.parse::<String>().unwrap())),
-                        op,
-                        Box::new(Expr::StringLiteral(right.value.parse::<String>().unwrap())),
-                    )
-                } else if self.match_token(TokenType::Not) {
-                    let _ = self.expect(TokenType::Equals);
-                    let op = BinOp::NotEquals;
-                    let right = self.expect(TokenType::StringLiteral).unwrap();
-                    Expr::BinaryOp(
-                        Box::new(Expr::StringLiteral(tok.value.parse::<String>().unwrap())),
-                        op,
-                        Box::new(Expr::StringLiteral(right.value.parse::<String>().unwrap())),
-                    )
-                } else {
-                    Expr::StringLiteral(tok.value.clone())
-                }
-            }
-            TokenType::Not => {
-                let exprs = self.parse_expression();
-                Expr::UnaryOp(UnOp::Not, Box::new(exprs))
-            }
-            TokenType::Minus => match self.current().token_type {
-                TokenType::IntegerLiteral => {
-                    let cur = self.consume();
-                    Expr::IntegerLiteral(-cur.value.parse::<i64>().unwrap())
-                }
-                _ => {
-                    let expr = self.parse_expression();
-                    Expr::UnaryOp(UnOp::Neg, Box::new(expr))
-                }
-            },
+            TokenType::StringLiteral => Expr::StringLiteral(tok.value),
             TokenType::LeftParen => {
                 let expr = self.parse_expression();
                 let _ = self.expect(TokenType::RightParen);
-                if self.match_any(&[
-                    TokenType::Minus,
-                    TokenType::Plus,
-                    TokenType::Multiply,
-                    TokenType::Division,
-                    TokenType::GreaterThan,
-                    TokenType::LessThan,
-                    TokenType::Equals,
-                    TokenType::NotEquals,
-                ]) {
-                    let op_token = self.consume();
-                    let op = self.token_to_binop(&op_token.token_type);
-                    let right = self.parse_expression();
-                    Expr::BinaryOp(Box::new(expr), op, Box::new(right))
-                } else {
-                    expr
-                }
+                expr
             }
             _ => panic!("Unexpected token {:?} in expression", tok.token_type),
         }
@@ -436,10 +489,15 @@ impl Parser {
         if tok.token_type == expected {
             Ok(self.consume())
         } else {
-            Err(format!(
-                "Expected {:?} at {}:{}, found {:?}",
-                expected, tok.line, tok.column, tok.token_type
-            ))
+            Err(
+                format!(
+                    "Expected {:?} at {}:{}, found {:?}",
+                    expected,
+                    tok.line,
+                    tok.column,
+                    tok.token_type
+                )
+            )
         }
     }
 }
@@ -450,13 +508,15 @@ mod tests {
     use crate::parser::parser::Stmt;
     use crate::{
         lexer::lexer::Lexer,
-        parser::parser::{BinOp, Block, Expr, Function, Type, AST},
+        parser::parser::{ BinOp, Block, Expr, Function, Type, UnOp, AST },
     };
 
     #[test]
     fn test_parser_parses_correct_ast() {
         use std::fs;
-        let source = fs::read_to_string("test_codes/test_correct_ast.trv").expect("Failed to read file");
+        let source = fs
+            ::read_to_string("test_codes/test_correct_ast.trv")
+            .expect("Failed to read file");
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = Parser::new(tokens);
@@ -473,39 +533,218 @@ mod tests {
                         expr: Expr::BinaryOp(
                             Box::new(Expr::Identifier("num".to_string())),
                             BinOp::LessThan,
-                            Box::new(Expr::IntegerLiteral(10)),
+                            Box::new(Expr::IntegerLiteral(10))
                         ),
                         block: Block {
-                            statements: vec![Stmt::AssignStatement(
-                                "num".to_string(),
-                                Expr::IntegerLiteral(11),
-                            )],
+                            statements: vec![
+                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
+                            ],
                         },
                     },
                     Stmt::If {
                         condition: Expr::BinaryOp(
                             Box::new(Expr::Identifier("num".to_string())),
                             BinOp::GreaterThan,
-                            Box::new(Expr::IntegerLiteral(10)),
+                            Box::new(Expr::IntegerLiteral(10))
                         ),
                         block: Block {
-                            statements: vec![Stmt::AssignStatement(
-                                "num".to_string(),
-                                Expr::IntegerLiteral(12),
-                            )],
+                            statements: vec![
+                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(12))
+                            ],
                         },
                         option: Some(Block {
-                            statements: vec![Stmt::AssignStatement(
-                                "num".to_string(),
-                                Expr::IntegerLiteral(11),
-                            )],
+                            statements: vec![
+                                Stmt::AssignStatement("num".to_string(), Expr::IntegerLiteral(11))
+                            ],
                         }),
                     },
-                    Stmt::Return(Expr::Identifier("num".to_string())),
+                    Stmt::Return(Expr::Identifier("num".to_string()))
                 ],
             },
         }];
 
         assert_eq!(actual, expected);
+    }
+
+    fn parse_expr(source: &str) -> Expr {
+        let full = format!("func test() -> Integer {{ return {}; }}", source);
+        let mut lexer = Lexer::new(full);
+        let tokens = lexer.tokenize();
+        let mut parser = Parser::new(tokens);
+        let ast = parser.parse_program();
+        match &ast[0].body.statements[0] {
+            Stmt::Return(e) => e.clone(),
+            _ => panic!("Expected return statement"),
+        }
+    }
+
+    #[test]
+    fn test_mul_binds_tighter_than_add() {
+        let ast = parse_expr("1 + 2 * 3");
+        let expected = Expr::BinaryOp(
+            Box::new(Expr::IntegerLiteral(1)),
+            BinOp::Add,
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(2)),
+                    BinOp::Mul,
+                    Box::new(Expr::IntegerLiteral(3))
+                )
+            )
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_add_binds_tighter_than_mul() {
+        let ast = parse_expr("1 * 2 + 3");
+        let expected = Expr::BinaryOp(
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Mul,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            ),
+            BinOp::Add,
+            Box::new(Expr::IntegerLiteral(3))
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_relational_binds_tighter_than_equality() {
+        let ast = parse_expr("a == b < c");
+        let expected = Expr::BinaryOp(
+            Box::new(Expr::Identifier("a".to_string())),
+            BinOp::Equals,
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::Identifier("b".to_string())),
+                    BinOp::LessThan,
+                    Box::new(Expr::Identifier("c".to_string()))
+                )
+            )
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_additive_binds_tighter_than_relational() {
+        let ast = parse_expr("a < b + c");
+        let expected = Expr::BinaryOp(
+            Box::new(Expr::Identifier("a".to_string())),
+            BinOp::LessThan,
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::Identifier("b".to_string())),
+                    BinOp::Add,
+                    Box::new(Expr::Identifier("c".to_string()))
+                )
+            )
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_add_is_left_associative() {
+        let ast = parse_expr("1 + 2 + 3");
+        let expected = Expr::BinaryOp(
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Add,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            ),
+            BinOp::Add,
+            Box::new(Expr::IntegerLiteral(3))
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_mul_is_left_associative() {
+        let ast = parse_expr("1 * 2 * 3");
+        let expected = Expr::BinaryOp(
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Mul,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            ),
+            BinOp::Mul,
+            Box::new(Expr::IntegerLiteral(3))
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_mixed_precedence_complex() {
+        let ast = parse_expr("1 + 2 * 3 - 4 / 2");
+        let expected = Expr::BinaryOp(
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Add,
+                    Box::new(
+                        Expr::BinaryOp(
+                            Box::new(Expr::IntegerLiteral(2)),
+                            BinOp::Mul,
+                            Box::new(Expr::IntegerLiteral(3))
+                        )
+                    )
+                )
+            ),
+            BinOp::Sub,
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(4)),
+                    BinOp::Div,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            )
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_parentheses_override_precedence() {
+        let ast = parse_expr("(1 + 2) * 3");
+        let expected = Expr::BinaryOp(
+            Box::new(
+                Expr::BinaryOp(
+                    Box::new(Expr::IntegerLiteral(1)),
+                    BinOp::Add,
+                    Box::new(Expr::IntegerLiteral(2))
+                )
+            ),
+            BinOp::Mul,
+            Box::new(Expr::IntegerLiteral(3))
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_unary_neg_precedence() {
+        let ast = parse_expr("-1 * 2");
+        let expected = Expr::BinaryOp(
+            Box::new(Expr::UnaryOp(UnOp::Neg, Box::new(Expr::IntegerLiteral(1)))),
+            BinOp::Mul,
+            Box::new(Expr::IntegerLiteral(2))
+        );
+        assert_eq!(ast, expected);
+    }
+
+    #[test]
+    fn test_not_precedence() {
+        let ast = parse_expr("not True == False");
+        let expected = Expr::BinaryOp(
+            Box::new(Expr::UnaryOp(UnOp::Not, Box::new(Expr::BooleanLiteral(true)))),
+            BinOp::Equals,
+            Box::new(Expr::BooleanLiteral(false))
+        );
+        assert_eq!(ast, expected);
     }
 }
